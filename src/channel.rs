@@ -57,7 +57,7 @@ impl Channel {
         let mut res = Extractor::extract_5m31(&extract);
 
         for v in res.0.iter_mut() {
-            *v.0 = trim_m31(v.0, logn);
+            v.0 = trim_m31(v.0, logn);
         }
 
         res
@@ -79,7 +79,7 @@ impl ChannelGadget {
         }
     }
 
-    pub fn mix_with_el() -> Script {
+    pub fn mix_with_qm31() -> Script {
         script! {
             { CommitmentGadget::commit_qm31() }
             OP_CAT OP_SHA256
@@ -106,5 +106,79 @@ impl ChannelGadget {
             { trim_m31_gadget(logn) }
             OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cfri::fields::{CM31, M31, QM31};
+    use crate::channel::{Channel, ChannelGadget};
+    use crate::channel_commit::Commitment;
+    use bitcoin_script::script;
+    use bitvm::treepp::*;
+    use rand::{Rng, RngCore, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+
+    #[test]
+    fn test_mix_with_commitment() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let channel_script = ChannelGadget::mix_with_commitment();
+        println!(
+            "Channel.mix_with_commitment() = {} bytes",
+            channel_script.len()
+        );
+
+        let mut a = [0u8; 32];
+        a.iter_mut().for_each(|v| *v = prng.gen());
+
+        let mut b = [0u8; 32];
+        b.iter_mut().for_each(|v| *v = prng.gen());
+
+        let mut channel = Channel::new(a);
+        channel.mix_with_commitment(&Commitment(b));
+
+        let c = channel.state;
+
+        let script = script! {
+            { a.to_vec() }
+            { b.to_vec() }
+            { channel_script.clone() }
+            { c.to_vec() }
+            OP_EQUAL
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_mix_with_qm31() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let channel_script = ChannelGadget::mix_with_qm31();
+        println!("Channel.mix_with_el() = {} bytes", channel_script.len());
+
+        let mut a = [0u8; 32];
+        a.iter_mut().for_each(|v| *v = prng.gen());
+
+        let mut b = QM31(
+            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
+            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
+        );
+
+        let mut channel = Channel::new(a);
+        channel.mix_with_el(&b);
+
+        let c = channel.state;
+
+        let script = script! {
+            { a.to_vec() }
+            { b }
+            { channel_script.clone() }
+            { c.to_vec() }
+            OP_EQUAL
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }

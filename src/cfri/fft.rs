@@ -1,4 +1,4 @@
-use crate::{
+use crate::cfri::{
     circle::CirclePoint,
     fields::{Field, M31},
     utils::bit_reverse_index,

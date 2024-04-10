@@ -1,4 +1,4 @@
-use crate::{
+use crate::cfri::{
     channel::{Channel, Commitment},
     fft::{get_twiddles, ibutterfly},
     fields::{Field, QM31},

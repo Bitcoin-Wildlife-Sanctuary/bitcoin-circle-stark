@@ -1,4 +1,4 @@
-use crate::fields::{Field, QM31};
+use crate::cfri::fields::{Field, QM31};
 
 pub fn bit_reverse_index(i: usize, log_size: usize) -> usize {
     if i == 0 {
