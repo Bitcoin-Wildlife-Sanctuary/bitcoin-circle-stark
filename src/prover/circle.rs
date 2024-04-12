@@ -2,7 +2,7 @@
 
 use std::ops::{Add, Neg, Sub};
 
-use crate::cfri::fields::M31;
+use crate::fields::M31;
 
 /// A point on the complex circle. Treaed as an additive group.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

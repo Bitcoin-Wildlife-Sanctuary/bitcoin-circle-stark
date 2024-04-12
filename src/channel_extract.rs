@@ -1,4 +1,4 @@
-use crate::cfri::fields::{CM31, M31, QM31};
+use crate::fields::{CM31, M31, QM31};
 use bitvm::treepp::*;
 use core::ops::Neg;
 

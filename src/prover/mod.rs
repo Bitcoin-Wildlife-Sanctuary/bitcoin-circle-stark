@@ -3,17 +3,16 @@
 mod channel;
 pub(crate) mod circle;
 mod fft;
-pub(crate) mod fields;
 mod fri;
 mod utils;
 
 #[cfg(test)]
 mod test {
-    use crate::cfri::channel::Channel;
-    use crate::cfri::circle::CirclePoint;
-    use crate::cfri::fields::Field;
-    use crate::cfri::fri;
-    use crate::cfri::utils::permute_eval;
+    use crate::fields::Field;
+    use crate::prover::channel::Channel;
+    use crate::prover::circle::CirclePoint;
+    use crate::prover::fri;
+    use crate::prover::utils::permute_eval;
 
     #[test]
     fn test_cfri_main() {

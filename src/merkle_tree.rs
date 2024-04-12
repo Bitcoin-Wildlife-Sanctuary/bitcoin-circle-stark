@@ -1,5 +1,5 @@
-use crate::cfri::fields::QM31;
 use crate::channel_commit::{Commitment, CommitmentGadget};
+use crate::fields::QM31;
 use bitvm::bigint::bits::u30_to_bits_toaltstack;
 use bitvm::treepp::*;
 use sha2::{Digest, Sha256};
@@ -111,7 +111,7 @@ pub struct MerkleTreePath(pub Vec<[u8; 32]>);
 
 #[cfg(test)]
 mod test {
-    use crate::cfri::fields::{CM31, M31, QM31};
+    use crate::fields::{CM31, M31, QM31};
     use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};

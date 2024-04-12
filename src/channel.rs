@@ -1,6 +1,6 @@
-use crate::cfri::fields::{M31, QM31};
 use crate::channel_commit::{Commitment, CommitmentGadget};
 use crate::channel_extract::{Extraction5M31, ExtractionQM31, Extractor, ExtractorGadget};
+use crate::fields::{M31, QM31};
 use crate::utils::{trim_m31, trim_m31_gadget};
 use bitvm::treepp::*;
 use sha2::{Digest, Sha256};
@@ -111,10 +111,10 @@ impl ChannelGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::cfri::fields::{CM31, M31, QM31};
     use crate::channel::{Channel, ChannelGadget};
     use crate::channel_commit::Commitment;
     use crate::channel_extract::ExtractorGadget;
+    use crate::fields::{CM31, M31, QM31};
     use bitcoin_script::script;
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};

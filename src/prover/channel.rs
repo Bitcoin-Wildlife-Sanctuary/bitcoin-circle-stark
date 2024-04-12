@@ -1,6 +1,6 @@
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 
-use crate::cfri::fields::{M31, QM31};
+use crate::fields::{M31, QM31};
 
 pub type Commitment = Vec<QM31>;
 

@@ -1,7 +1,7 @@
-use crate::cfri::{
+use crate::fields::{Field, QM31};
+use crate::prover::{
     channel::{Channel, Commitment},
     fft::{get_twiddles, ibutterfly},
-    fields::{Field, QM31},
 };
 
 // TODO: This should be a merkle commitment.

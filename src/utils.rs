@@ -26,7 +26,7 @@ pub fn trim_m31_gadget(logn: usize) -> Script {
 
 #[cfg(test)]
 mod test {
-    use crate::cfri::fields::M31;
+    use crate::fields::M31;
     use crate::utils::{trim_m31, trim_m31_gadget};
     use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};

@@ -1,4 +1,4 @@
-use crate::cfri::fields::{CM31, M31, QM31};
+use crate::fields::{CM31, M31, QM31};
 use bitcoin::script::{Builder, PushBytesBuf};
 use bitvm::treepp::pushable::Pushable;
 use bitvm::treepp::*;
@@ -117,8 +117,8 @@ impl CommitmentGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::cfri::fields::{CM31, M31, QM31};
     use crate::channel_commit::{Commitment, CommitmentGadget};
+    use crate::fields::{CM31, M31, QM31};
     use bitcoin_script::script;
     use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};
