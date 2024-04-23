@@ -1,6 +1,6 @@
 use crate::channel_commit::{Commitment, CommitmentGadget};
 use crate::fields::QM31;
-use bitvm::bigint::bits::u30_to_bits_toaltstack;
+use bitvm::bigint::bits::u30_to_be_bits_toaltstack;
 use bitvm::treepp::*;
 use sha2::{Digest, Sha256};
 
@@ -92,7 +92,7 @@ impl MerkleTreeGadget {
     ///   pos
     pub fn verify(logn: usize) -> Script {
         script! {
-            { u30_to_bits_toaltstack(logn as u32) }
+            { u30_to_be_bits_toaltstack(logn as u32) }
             { CommitmentGadget::commit_qm31() }
 
             for _ in 0..logn {

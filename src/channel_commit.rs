@@ -1,6 +1,6 @@
 use crate::fields::{CM31, M31, QM31};
-use bitcoin::script::{Builder, PushBytesBuf};
-use bitvm::treepp::pushable::Pushable;
+use bitcoin::script::PushBytesBuf;
+use bitvm::treepp::pushable::{Builder, Pushable};
 use bitvm::treepp::*;
 use sha2::{Digest, Sha256};
 
