@@ -73,6 +73,35 @@ impl MerkleTree {
 
         (elem, merkle_tree_path)
     }
+
+    pub fn verify(
+        root_hash: [u8; 32],
+        num_layer: usize,
+        leaf: QM31,
+        path: &MerkleTreePath,
+        mut query: usize,
+    ) -> bool {
+        assert_eq!(path.0.len(), num_layer);
+
+        let mut leaf_hash = Commitment::commit_qm31(leaf).0;
+
+        for i in 0..num_layer {
+            let (f0, f1) = if query & 1 == 0 {
+                (leaf_hash, path.0[i])
+            } else {
+                (path.0[i], leaf_hash)
+            };
+
+            let mut hasher = Sha256::new();
+            Digest::update(&mut hasher, &f0);
+            Digest::update(&mut hasher, &f1);
+            leaf_hash.copy_from_slice(hasher.finalize().as_slice());
+
+            query >>= 1;
+        }
+
+        leaf_hash == root_hash
+    }
 }
 
 pub struct MerkleTreeGadget;
@@ -106,7 +135,7 @@ impl MerkleTreeGadget {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct MerkleTreePath(pub Vec<[u8; 32]>);
 
 #[cfg(test)]

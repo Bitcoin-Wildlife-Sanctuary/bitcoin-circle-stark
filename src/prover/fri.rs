@@ -1,20 +1,21 @@
+use crate::channel_commit::Commitment;
 use crate::fields::{Field, QM31};
+use crate::merkle_tree::{MerkleTree, MerkleTreePath};
 use crate::prover::{
-    channel::{Channel, Commitment},
+    channel::Channel,
     fft::{get_twiddles, ibutterfly},
 };
 
-// TODO: This should be a merkle commitment.
 #[derive(Clone, Debug)]
 pub struct FriProof {
     commitments: Vec<Commitment>,
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
     siblings: Vec<Vec<QM31>>,
-    pub decommitments: Vec<Vec<()>>,
+    decommitments: Vec<Vec<MerkleTreePath>>,
 }
 
-const N_QUERIES: usize = 5;
+const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
 
 pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
     let logn = evaluation.len().ilog2() as usize;
@@ -22,16 +23,21 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
     let twiddles = get_twiddles(logn);
 
     let mut layers = Vec::with_capacity(n_layers);
+    let mut trees = Vec::with_capacity(n_layers);
     let mut layer = evaluation;
+
     // Commit.
     let mut commitments = Vec::with_capacity(n_layers);
     for layer_twiddles in twiddles.iter().take(n_layers) {
         layers.push(layer.clone());
-        // TODO: This should be a merkle commitment.
-        let commitment = layer.clone();
-        // TODO: Update channel with commitment hash instead.
+
+        let tree = MerkleTree::new(layer.clone());
+
+        let commitment = Commitment(tree.root_hash);
         channel.mix_with_commitment(&commitment);
         commitments.push(commitment);
+
+        trees.push(tree);
 
         let alpha = channel.draw_element();
 
@@ -45,15 +51,13 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
             })
             .collect();
     }
+
     // Last layer.
-    // TODO: Send only the coefficients.
     let last_layer = layer;
     last_layer.iter().for_each(|v| channel.mix_with_el(v));
 
     // Queries.
-    let queries = (0..N_QUERIES)
-        .map(|_| channel.draw_query(logn))
-        .collect::<Vec<_>>();
+    let queries = channel.draw_5queries(logn).to_vec();
 
     // Decommit.
     let mut leaves = Vec::with_capacity(N_QUERIES);
@@ -63,10 +67,10 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
         leaves.push(layers[0][query]);
         let mut layer_sibling = Vec::with_capacity(n_layers);
         let mut layer_decommitments = Vec::with_capacity(n_layers);
-        for layer in layers.iter() {
+        for (layer, tree) in layers.iter().zip(trees.iter()) {
             layer_sibling.push(layer[query ^ 1]);
-            // TODO: Add decommitment.
-            layer_decommitments.push(());
+
+            layer_decommitments.push(tree.query(query ^ 1).1);
             query >>= 1;
         }
         siblings.push(layer_sibling);
@@ -96,23 +100,28 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
     // Check it's of half degree.
     assert_eq!(proof.last_layer[0], proof.last_layer[1]);
     // Queries.
-    let queries = (0..N_QUERIES)
-        .map(|_| channel.draw_query(logn))
-        .collect::<Vec<_>>();
+    let queries = channel.draw_5queries(logn).to_vec();
     // Decommit.
-    for (mut query, (mut leaf, siblings)) in queries
-        .iter()
-        .copied()
-        .zip(proof.leaves.iter().copied().zip(proof.siblings.iter()))
-    {
+    for (mut query, (mut leaf, (siblings, decommitments))) in queries.iter().copied().zip(
+        proof
+            .leaves
+            .iter()
+            .copied()
+            .zip(proof.siblings.iter().zip(proof.decommitments.iter())),
+    ) {
         for (i, ((&sibling, &alpha), layer_twiddles)) in siblings
             .iter()
             .zip(factors.iter())
             .zip(twiddles.iter().take(n_layers))
             .enumerate()
         {
-            // TODO: Verify sibling decommitment.
-            assert_eq!(sibling, proof.commitments[i][query ^ 1]);
+            assert!(MerkleTree::verify(
+                proof.commitments[i].0,
+                logn - i,
+                sibling,
+                &decommitments[i],
+                query ^ 1
+            ));
 
             let (mut f0, mut f1) = if query & 1 == 0 {
                 (leaf, sibling)

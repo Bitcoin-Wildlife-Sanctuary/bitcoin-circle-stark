@@ -4,7 +4,7 @@ use std::ops::{Add, Neg, Sub};
 
 use crate::fields::M31;
 
-/// A point on the complex circle. Treaed as an additive group.
+/// A point on the complex circle. Treated as an additive group.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CirclePoint {
     pub x: M31,
