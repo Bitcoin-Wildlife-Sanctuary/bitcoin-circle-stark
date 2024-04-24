@@ -25,7 +25,7 @@ impl ChannelGadget {
         }
     }
 
-    pub fn draw_element_using_hint() -> Script {
+    pub fn squeeze_element_using_hint() -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
             OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
@@ -33,7 +33,7 @@ impl ChannelGadget {
         }
     }
 
-    pub fn draw_5queries_using_hint(logn: usize) -> Script {
+    pub fn squeeze_5queries_using_hint(logn: usize) -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
             OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
@@ -61,12 +61,12 @@ mod test {
     use rust_bitcoin_u31_or_u30::{u31ext_equalverify, QM31 as QM31Gadget};
 
     #[test]
-    fn test_mix_with_commitment() {
+    fn test_absorb_commitment() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::absorb_commitment();
         println!(
-            "Channel.mix_with_commitment() = {} bytes",
+            "Channel.absorb_commitment() = {} bytes",
             channel_script.len()
         );
 
@@ -93,11 +93,11 @@ mod test {
     }
 
     #[test]
-    fn test_mix_with_qm31() {
+    fn test_absorb_qm31() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::absorb_qm31();
-        println!("Channel.mix_with_qm31() = {} bytes", channel_script.len());
+        println!("Channel.absorb_qm31() = {} bytes", channel_script.len());
 
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());
@@ -124,12 +124,12 @@ mod test {
     }
 
     #[test]
-    fn test_draw_element_using_hint() {
+    fn test_squeeze_element_using_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::draw_element_using_hint();
+        let channel_script = ChannelGadget::squeeze_element_using_hint();
         println!(
-            "Channel.draw_element_using_hint() = {} bytes",
+            "Channel.squeeze_element_using_hint() = {} bytes",
             channel_script.len()
         );
 
@@ -155,12 +155,12 @@ mod test {
     }
 
     #[test]
-    fn test_draw_5queries_using_hint() {
+    fn test_squeeze_5queries_using_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::draw_5queries_using_hint(15);
+        let channel_script = ChannelGadget::squeeze_5queries_using_hint(15);
         println!(
-            "Channel.draw_5queries_using_hint() = {} bytes",
+            "Channel.squeeze_5queries_using_hint() = {} bytes",
             channel_script.len()
         );
 
