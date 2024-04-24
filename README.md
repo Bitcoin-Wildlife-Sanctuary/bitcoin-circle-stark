@@ -13,7 +13,9 @@ This repository includes Bitcoin script implementations of various cryptographic
 - **Merkle Tree**
   * implementation of Merkle path verification using hints and `OP_CAT + OP_SHA256`.
 
-Currently, the next step is to implement the FRI protocol, which reasons about the degree of a quotient polynomial.
+The next step is to implement the FRI protocol, which reasons about the degree of a quotient polynomial.
+
+---
 
 ### Channel
 
@@ -37,6 +39,8 @@ messages, and it can be squeezed to produce pseudorandom elements. There are fiv
 
 The constructions of commit and extract are discussed later.
 
+---
+
 ### Commit
 
 With `OP_CAT + OP_SHA256`, we can commit M31, CM31, and QM31 elements with a few bytes.
@@ -56,7 +60,9 @@ QM31 requires 7 bytes: `commit(qm31) := SHA256(qm31.0.0 || SHA256(qm31.0.1 || SH
 OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
 ```
 
-We feel that this is the minimal.
+We feel that this is the optimal.
+
+---
 
 ### Extract
 
@@ -94,6 +100,8 @@ OP_NOTIF OP_1SUB OP_ENDIF
 ```
 
 After such adjustment, one obtains an element. 
+
+---
 
 ### License
 
