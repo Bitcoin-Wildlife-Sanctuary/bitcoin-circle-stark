@@ -1,3 +1,6 @@
+mod bitcoin_script;
+pub use bitcoin_script::*;
+
 use crate::prover::circle::CirclePoint;
 use bitvm::treepp::*;
 use rust_bitcoin_u31_or_u30::{u31_add, u31_mul, u31_neg, u31_sub, M31 as M31Gadget};
