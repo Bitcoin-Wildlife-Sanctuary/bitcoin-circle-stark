@@ -87,7 +87,19 @@ positions, the numbers are further adjusted to have only `logn` bits.
 Due to the minimal number encoding form, the hint element, which represents a signed 32-bit integer, does not necessarily 
 have four bytes. Our solution is to use `OP_SIZE` to detect its length and then use `OP_CAT` to pad it to four bytes. 
 A subtlety here is that negative numbers, which occur when the original hash's last byte's most significant bit is 1, 
-need to be handled differently, as it would first be padded with `OP_LEFT` and then `OP_O`.
+need to be handled differently, as it would first be padded with `OP_LEFT (0x80)` and then `OP_PUSHBYTES_0 (0x00)`.
+
+```
+OP_IF
+OP_PUSHBYTES_1 OP_PUSHBYTES_0
+OP_ELSE
+OP_PUSHBYTES_1 OP_LEFT
+OP_ENDIF
+```
+
+Note that `OP_PUSHBYTES_0` and `OP_LEFT` here are not opcodes but rather data that `OP_PUSHBYTES_1` will push to the stack. 
+One cannot directly write `0x00` and `0x80` in the interpreter, as they would become an empty string and `0x80 0x00`, 
+respectively. 
 
 It first uses `OP_CAT` to combine the hint elements together and compare it with the hash that is to be extracted from. 
 
