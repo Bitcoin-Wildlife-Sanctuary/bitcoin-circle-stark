@@ -12,13 +12,13 @@ impl ChannelGadget {
         }
     }
 
-    pub fn mix_with_commitment() -> Script {
+    pub fn absorb_commitment() -> Script {
         script! {
             OP_CAT OP_SHA256
         }
     }
 
-    pub fn mix_with_qm31() -> Script {
+    pub fn absorb_qm31() -> Script {
         script! {
             { CommitmentGadget::commit_qm31() }
             OP_CAT OP_SHA256
@@ -64,7 +64,7 @@ mod test {
     fn test_mix_with_commitment() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::mix_with_commitment();
+        let channel_script = ChannelGadget::absorb_commitment();
         println!(
             "Channel.mix_with_commitment() = {} bytes",
             channel_script.len()
@@ -77,7 +77,7 @@ mod test {
         b.iter_mut().for_each(|v| *v = prng.gen());
 
         let mut channel = Channel::new(a);
-        channel.mix_with_commitment(&Commitment(b));
+        channel.absorb_commitment(&Commitment(b));
 
         let c = channel.state;
 
@@ -96,7 +96,7 @@ mod test {
     fn test_mix_with_qm31() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::mix_with_qm31();
+        let channel_script = ChannelGadget::absorb_qm31();
         println!("Channel.mix_with_qm31() = {} bytes", channel_script.len());
 
         let mut a = [0u8; 32];
@@ -108,7 +108,7 @@ mod test {
         );
 
         let mut channel = Channel::new(a);
-        channel.mix_with_el(&b);
+        channel.absorb_qm31(&b);
 
         let c = channel.state;
 

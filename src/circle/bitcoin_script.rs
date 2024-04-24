@@ -1,4 +1,4 @@
-use crate::prover::circle::CirclePoint;
+use crate::circle::CirclePoint;
 use bitvm::treepp::*;
 use rust_bitcoin_u31_or_u30::{u31_add, u31_mul, u31_neg, u31_sub, M31 as M31Gadget};
 
@@ -112,9 +112,9 @@ impl CirclePointGadget {
 
 #[cfg(test)]
 mod test {
+    use crate::circle::CirclePoint;
     use crate::circle::CirclePointGadget;
     use crate::fields::M31;
-    use crate::prover::circle::CirclePoint;
     use bitvm::treepp::*;
     use rand::Rng;
     use rand_chacha::rand_core::{RngCore, SeedableRng};

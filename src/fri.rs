@@ -1,8 +1,8 @@
 use crate::channel::Channel;
 use crate::channel_commit::Commitment;
+use crate::fft::{get_twiddles, ibutterfly};
 use crate::fields::{Field, QM31};
 use crate::merkle_tree::{MerkleTree, MerkleTreePath};
-use crate::prover::fft::{get_twiddles, ibutterfly};
 
 #[derive(Clone, Debug)]
 pub struct FriProof {
@@ -32,7 +32,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
         let tree = MerkleTree::new(layer.clone());
 
         let commitment = Commitment(tree.root_hash);
-        channel.mix_with_commitment(&commitment);
+        channel.absorb_commitment(&commitment);
         commitments.push(commitment);
 
         trees.push(tree);
@@ -52,7 +52,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     // Last layer.
     let last_layer = layer;
-    last_layer.iter().for_each(|v| channel.mix_with_el(v));
+    last_layer.iter().for_each(|v| channel.absorb_qm31(v));
 
     // Queries.
     let queries = channel.draw_5queries(logn).0.to_vec();
@@ -90,11 +90,11 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
     // Draw factors.
     let mut factors = Vec::with_capacity(n_layers);
     for c in proof.commitments.iter() {
-        channel.mix_with_commitment(c);
+        channel.absorb_commitment(c);
         factors.push(channel.draw_element().0);
     }
     // Last layer.
-    proof.last_layer.iter().for_each(|v| channel.mix_with_el(v));
+    proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
     // Check it's of half degree.
     assert_eq!(proof.last_layer[0], proof.last_layer[1]);
     // Queries.

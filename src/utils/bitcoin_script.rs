@@ -1,9 +1,5 @@
 use bitvm::treepp::*;
 
-pub fn trim_m31(v: u32, logn: usize) -> u32 {
-    v & ((1 << logn) - 1)
-}
-
 pub fn trim_m31_gadget(logn: usize) -> Script {
     if logn == 31 {
         script! {}

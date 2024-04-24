@@ -1,4 +1,6 @@
+mod bitcoin_script;
 use crate::fields::{Field, QM31};
+pub use bitcoin_script::*;
 
 pub fn bit_reverse_index(i: usize, log_size: usize) -> usize {
     if i == 0 {
@@ -16,4 +18,8 @@ pub fn permute_eval(evaluation: Vec<QM31>) -> Vec<QM31> {
             evaluation[evaluation.len() - 1 - i * 2];
     }
     layer
+}
+
+pub fn trim_m31(v: u32, logn: usize) -> u32 {
+    v & ((1 << logn) - 1)
 }

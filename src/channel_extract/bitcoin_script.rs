@@ -41,16 +41,37 @@ impl ExtractorGadget {
 
     fn reconstruct() -> Script {
         script! {
-            OP_DUP OP_ABS OP_2DUP OP_TOALTSTACK
-            OP_EQUAL
+            OP_DUP OP_ABS
+            OP_DUP OP_TOALTSTACK
+
+            OP_SIZE 4 OP_LESSTHAN
             OP_IF
-                OP_SIZE 4 OP_LESSTHAN OP_IF OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
+                OP_DUP OP_ROT
+                OP_EQUAL OP_TOALTSTACK
+
+                // stack: abs(a)
+                // altstack: abs(a), is_positive
+
+                for _ in 0..3 {
+                    OP_SIZE 3 OP_LESSTHAN OP_IF OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
+                }
+
+                OP_FROMALTSTACK
+                OP_IF
+                    OP_PUSHBYTES_1 OP_PUSHBYTES_0
+                OP_ELSE
+                    OP_PUSHBYTES_1 OP_LEFT
+                OP_ENDIF
+                OP_CAT
             OP_ELSE
-                OP_SIZE 4 OP_LESSTHAN OP_IF OP_ABS OP_PUSHBYTES_1 OP_LEFT OP_CAT OP_ENDIF
+                OP_DROP
             OP_ENDIF
-            for _ in 0..3 {
-                OP_SIZE 4 OP_LESSTHAN OP_IF OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
-            }
+        }
+    }
+
+    fn reduce() -> Script {
+        script! {
+            OP_DUP OP_NOT OP_NOTIF OP_1SUB OP_ENDIF
         }
     }
 
@@ -65,6 +86,7 @@ impl ExtractorGadget {
             OP_SWAP OP_CAT
             OP_EQUALVERIFY
             OP_FROMALTSTACK
+            { Self::reduce() }
         }
     }
 
@@ -84,7 +106,11 @@ impl ExtractorGadget {
             OP_SWAP OP_CAT
 
             OP_EQUALVERIFY
-            OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_SWAP
         }
     }
 
@@ -104,8 +130,14 @@ impl ExtractorGadget {
             OP_SWAP OP_CAT
 
             OP_EQUALVERIFY
-            OP_FROMALTSTACK OP_FROMALTSTACK
-            OP_FROMALTSTACK OP_FROMALTSTACK
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
             OP_SWAP
             2 OP_ROLL
             3 OP_ROLL
@@ -127,8 +159,16 @@ impl ExtractorGadget {
             OP_SWAP OP_CAT
 
             OP_EQUALVERIFY
-            OP_FROMALTSTACK OP_FROMALTSTACK
-            OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
+            OP_FROMALTSTACK
+            { Self::reduce() }
             OP_SWAP
             2 OP_ROLL
             3 OP_ROLL
@@ -231,6 +271,42 @@ mod test {
         }
         hash[3] |= 0x80;
         hash[2] = 0;
+
+        let (elem, e) = Extractor::extract_m31(&hash);
+
+        let script = script! {
+            { ExtractorGadget::push_hint_m31(&e) }
+            { hash.to_vec() }
+            { unpack_script.clone() }
+            { elem }
+            OP_EQUAL
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+
+        let mut hash = [0u8; 32];
+        hash[0] = 0xff;
+        hash[1] = 0xff;
+        hash[2] = 0xff;
+        hash[3] = 0x7f;
+
+        let (elem, e) = Extractor::extract_m31(&hash);
+
+        let script = script! {
+            { ExtractorGadget::push_hint_m31(&e) }
+            { hash.to_vec() }
+            { unpack_script.clone() }
+            { elem }
+            OP_EQUAL
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+
+        let mut hash = [0u8; 32];
+        hash[0] = 0x02;
+        hash[1] = 0x00;
+        hash[2] = 0x00;
+        hash[3] = 0x80;
 
         let (elem, e) = Extractor::extract_m31(&hash);
 

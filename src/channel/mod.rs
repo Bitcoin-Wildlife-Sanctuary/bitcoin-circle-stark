@@ -15,14 +15,14 @@ impl Channel {
     pub fn new(hash: [u8; 32]) -> Self {
         Self { state: hash }
     }
-    pub fn mix_with_commitment(&mut self, commitment: &Commitment) {
+    pub fn absorb_commitment(&mut self, commitment: &Commitment) {
         let mut hasher = Sha256::new();
         Digest::update(&mut hasher, &self.state);
         Digest::update(&mut hasher, commitment.0);
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
-    pub fn mix_with_el(&mut self, el: &QM31) {
+    pub fn absorb_qm31(&mut self, el: &QM31) {
         let mut hasher = Sha256::new();
         Digest::update(&mut hasher, &self.state);
         Digest::update(&mut hasher, Commitment::commit_qm31(el.clone()).0);

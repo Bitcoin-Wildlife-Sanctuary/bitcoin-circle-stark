@@ -9,9 +9,8 @@ pub use bitcoin_script::*;
 pub struct Commitment(pub [u8; 32]);
 
 impl Commitment {
-    pub fn commit_m31(v: M31) -> Self {
+    fn num_to_bytes(v: M31) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut res = Self::default();
 
         let mut v = v.0;
         while v > 0 {
@@ -24,9 +23,14 @@ impl Commitment {
                 bytes.push(0);
             }
         }
+        bytes
+    }
+
+    pub fn commit_m31(v: M31) -> Self {
+        let mut res = Self::default();
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &bytes);
+        Digest::update(&mut hasher, &Self::num_to_bytes(v));
 
         res.0.copy_from_slice(hasher.finalize().as_slice());
 
@@ -36,10 +40,9 @@ impl Commitment {
     pub fn commit_cm31(v: CM31) -> Self {
         let mut res = Self::default();
 
-        let c0 = Self::commit_m31(v.0);
         let c1 = Self::commit_m31(v.1);
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &c0.0);
+        Digest::update(&mut hasher, &Self::num_to_bytes(v.0));
         Digest::update(&mut hasher, &c1.0);
 
         res.0.copy_from_slice(hasher.finalize().as_slice());
@@ -50,12 +53,19 @@ impl Commitment {
     pub fn commit_qm31(v: QM31) -> Self {
         let mut res = Self::default();
 
-        let c0 = Self::commit_cm31(v.0);
-        let c1 = Self::commit_cm31(v.1);
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &c0.0);
-        Digest::update(&mut hasher, &c1.0);
+        Digest::update(&mut hasher, &Self::num_to_bytes(v.1 .0));
+        Digest::update(&mut hasher, &Self::commit_m31(v.1 .1).0);
+        res.0.copy_from_slice(hasher.finalize().as_slice());
 
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, &Self::num_to_bytes(v.0 .1));
+        Digest::update(&mut hasher, &res.0);
+        res.0.copy_from_slice(hasher.finalize().as_slice());
+
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, &Self::num_to_bytes(v.0 .0));
+        Digest::update(&mut hasher, &res.0);
         res.0.copy_from_slice(hasher.finalize().as_slice());
 
         res

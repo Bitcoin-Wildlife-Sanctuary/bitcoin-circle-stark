@@ -21,17 +21,13 @@ impl CommitmentGadget {
 
     pub fn commit_cm31() -> Script {
         script! {
-            OP_SWAP OP_SHA256
-            OP_SWAP OP_SHA256
-            OP_CAT OP_SHA256
+            OP_SHA256 OP_CAT OP_SHA256
         }
     }
 
     pub fn commit_qm31() -> Script {
         script! {
-            { Self::commit_cm31() } OP_TOALTSTACK
-            { Self::commit_cm31() } OP_FROMALTSTACK
-            OP_CAT OP_SHA256
+            OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
         }
     }
 }
