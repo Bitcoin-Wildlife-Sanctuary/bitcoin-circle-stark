@@ -1,6 +1,5 @@
 // This folder contains reference code provided by Starkware, as a minimalistic example for FRI.
 
-pub(crate) mod circle;
 mod fft;
 mod fri;
 mod utils;
@@ -8,8 +7,8 @@ mod utils;
 #[cfg(test)]
 mod test {
     use crate::channel::Channel;
+    use crate::circle::CirclePoint;
     use crate::fields::Field;
-    use crate::prover::circle::CirclePoint;
     use crate::prover::fri;
     use crate::prover::utils::permute_eval;
     use rand::{Rng, SeedableRng};
