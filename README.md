@@ -24,21 +24,21 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
 - **M31, CM31, QM31, CirclePoint**
   * M31.add() = 18 bytes, QM31.add() = 84 bytes
   * M31.sub() = 12 bytes, QM31.sub() = 63 bytes
-  * M31.mul() = 1505 bytes, QM31.mul() = 14131 bytes
+  * M31.mul() = 1415 bytes, QM31.mul() = 13321 bytes
   * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
   * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
-  * CirclePoint.add() = 4615 bytes, CirclePoint.double() = 4616 bytes, CirclePoint.sub() = 4622 bytes, CirclePoint.mul(128) = 1177989 bytes
+  * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes, CirclePoint.mul(128) = 1109139 bytes
 - **Fiat-Shamir Transcript**
   * Channel.absorb_commitment = 2 bytes
   * Channel.absorb_qm31() = 9 bytes
   * Channel.squeeze_element_using_hint() = 257 bytes (require 5 hint elements)
   * Channel.squeeze_5queries_using_hint() = 1222 bytes (require 6 hint elements)
 - **Merkle tree**
-  * MT.verify(2^12) = 263 bytes
-  * MT.verify(2^14) = 309 bytes
-  * MT.verify(2^16) = 356 bytes
-  * MT.verify(2^18) = 404 bytes
-  * MT.verify(2^20) = 452 bytes
+  * MT.verify(2^12) = 263 bytes (require 11 hint elements)
+  * MT.verify(2^14) = 309 bytes (require 13 hint elements)
+  * MT.verify(2^16) = 356 bytes (require 15 hint elements)
+  * MT.verify(2^18) = 404 bytes (require 18 hint elements)
+  * MT.verify(2^20) = 452 bytes (require 20 hint elements)
 
 ---
 
