@@ -25,7 +25,8 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * M31.add() = 18 bytes, QM31.add() = 84 bytes
   * M31.sub() = 12 bytes, QM31.sub() = 63 bytes
   * M31.mul() = 1415 bytes, QM31.mul() = 13321 bytes
-  * QM31.mul_by_m31() = 4838 bytes
+  * M31.mul_by_constant() = ~744 bytes, QM31.mul_by_m31_constant() = ~2981 bytes
+  * QM31.mul_by_m31() = 4702 bytes
   * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
   * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
   * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes, CirclePoint.mul(128) = 1109139 bytes
