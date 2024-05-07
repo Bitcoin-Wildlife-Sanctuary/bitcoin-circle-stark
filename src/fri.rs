@@ -40,10 +40,10 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
         let (alpha, _) = channel.draw_element();
 
         layer = layer
-            .array_chunks()
+            .chunks_exact(2)
             .zip(layer_twiddles)
-            .map(|(&[f_x, f_neg_x], twid)| {
-                let (mut f0, mut f1) = (f_x, f_neg_x);
+            .map(|(f, twid)| {
+                let (mut f0, mut f1) = (f[0], f[1]);
                 ibutterfly(&mut f0, &mut f1, twid.inverse().into());
                 f0 + alpha * f1
             })

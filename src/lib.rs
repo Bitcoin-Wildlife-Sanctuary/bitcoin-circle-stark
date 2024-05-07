@@ -1,5 +1,3 @@
-#![feature(array_chunks)]
-
 use crate::fields::{CM31, M31, QM31};
 use bitvm::treepp::pushable::{Builder, Pushable};
 
