@@ -1,6 +1,23 @@
 mod bitcoin_script;
-use crate::fields::{Field, QM31};
+use crate::fields::{Field, M31, QM31};
 pub use bitcoin_script::*;
+
+pub fn num_to_bytes(v: M31) -> Vec<u8> {
+    let mut bytes = Vec::new();
+
+    let mut v = v.0;
+    while v > 0 {
+        bytes.push((v & 0xff) as u8);
+        v >>= 8;
+    }
+
+    if bytes.last().is_some() {
+        if bytes.last().unwrap() & 0x80 != 0 {
+            bytes.push(0);
+        }
+    }
+    bytes
+}
 
 pub fn bit_reverse_index(i: usize, log_size: usize) -> usize {
     if i == 0 {

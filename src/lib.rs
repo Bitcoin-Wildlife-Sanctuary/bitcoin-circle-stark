@@ -9,6 +9,7 @@ pub mod fft;
 pub(crate) mod fields;
 pub mod fri;
 pub mod merkle_tree;
+pub mod twiddle_merkle_tree;
 pub mod utils;
 
 impl Pushable for M31 {
