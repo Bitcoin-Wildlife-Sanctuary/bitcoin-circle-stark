@@ -83,4 +83,70 @@ impl TwiddleMerkleTree {
             root_hash: cur[0],
         }
     }
+
+    pub fn query(&self, mut pos: usize) -> TwiddleMerkleTreePath {
+        let logn = self.intermediate_layers.len();
+
+        let leaf = self.leaf_layer[pos].clone();
+
+        let mut siblings = Vec::with_capacity(logn);
+        siblings.push(self.leaf_hashes[pos ^ 1]);
+
+        for i in 0..(logn - 1) {
+            pos >>= 1;
+            siblings.push(self.intermediate_layers[i][pos ^ 1]);
+        }
+
+        TwiddleMerkleTreePath { leaf, siblings }
+    }
+
+    pub fn verify(
+        root_hash: [u8; 32],
+        num_layer: usize,
+        path: &TwiddleMerkleTreePath,
+        mut query: usize,
+    ) -> bool {
+        assert_eq!(path.leaf.len(), num_layer);
+        assert_eq!(path.siblings.len(), num_layer);
+
+        let logn = num_layer;
+
+        let mut hash = {
+            let mut sha256 = Sha256::new();
+            Digest::update(&mut sha256, num_to_bytes(path.leaf[logn - 1]));
+            sha256.finalize().to_vec()
+        };
+
+        for j in 1..logn {
+            let mut sha256 = Sha256::new();
+            Digest::update(&mut sha256, num_to_bytes(path.leaf[logn - 1 - j]));
+            Digest::update(&mut sha256, &hash);
+            hash = sha256.finalize().to_vec();
+        }
+
+        let mut leaf_hash = [0u8; 32];
+        leaf_hash.copy_from_slice(&hash);
+
+        for i in 0..num_layer {
+            let (f0, f1) = if query & 1 == 0 {
+                (leaf_hash, path.siblings[i])
+            } else {
+                (path.siblings[i], leaf_hash)
+            };
+
+            let mut hasher = Sha256::new();
+            Digest::update(&mut hasher, &f0);
+            Digest::update(&mut hasher, &f1);
+            leaf_hash.copy_from_slice(hasher.finalize().as_slice());
+
+            query >>= 1;
+        }
+
+        leaf_hash == root_hash
+    }
+}
+
+pub struct TwiddleMerkleTreePath {
+    pub leaf: Vec<M31>,
+    pub siblings: Vec<[u8; 32]>,
 }
