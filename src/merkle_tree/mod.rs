@@ -1,8 +1,9 @@
-use crate::channel_commit::{Commitment, CommitmentGadget};
+use crate::channel_commit::Commitment;
 use crate::fields::QM31;
-use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
-use bitvm::treepp::*;
 use sha2::{Digest, Sha256};
+
+mod bitcoin_script;
+pub use bitcoin_script::*;
 
 pub struct MerkleTree {
     pub leaf_layer: Vec<QM31>,
@@ -54,42 +55,40 @@ impl MerkleTree {
         }
     }
 
-    pub fn query(&self, mut pos: usize) -> (QM31, MerkleTreePath) {
+    pub fn query(&self, mut pos: usize) -> MerkleTreeProof {
         let logn = self.intermediate_layers.len();
 
-        let elem = self.leaf_layer[pos];
-
-        let mut merkle_tree_path = MerkleTreePath::default();
-        merkle_tree_path
-            .0
+        let mut merkle_tree_proof = MerkleTreeProof::default();
+        merkle_tree_proof.leaf = self.leaf_layer[pos];
+        merkle_tree_proof
+            .siblings
             .push(Commitment::commit_qm31(self.leaf_layer[pos ^ 1]).0);
 
         for i in 0..(logn - 1) {
             pos >>= 1;
-            merkle_tree_path
-                .0
+            merkle_tree_proof
+                .siblings
                 .push(self.intermediate_layers[i][pos ^ 1]);
         }
 
-        (elem, merkle_tree_path)
+        merkle_tree_proof
     }
 
     pub fn verify(
         root_hash: [u8; 32],
-        num_layer: usize,
-        leaf: QM31,
-        path: &MerkleTreePath,
+        logn: usize,
+        proof: &MerkleTreeProof,
         mut query: usize,
     ) -> bool {
-        assert_eq!(path.0.len(), num_layer);
+        assert_eq!(proof.siblings.len(), logn);
 
-        let mut leaf_hash = Commitment::commit_qm31(leaf).0;
+        let mut leaf_hash = Commitment::commit_qm31(proof.leaf).0;
 
-        for i in 0..num_layer {
+        for i in 0..logn {
             let (f0, f1) = if query & 1 == 0 {
-                (leaf_hash, path.0[i])
+                (leaf_hash, proof.siblings[i])
             } else {
-                (path.0[i], leaf_hash)
+                (proof.siblings[i], leaf_hash)
             };
 
             let mut hasher = Sha256::new();
@@ -104,81 +103,8 @@ impl MerkleTree {
     }
 }
 
-pub struct MerkleTreeGadget;
-
-impl MerkleTreeGadget {
-    pub fn push_merkle_tree_path(merkle_path: &MerkleTreePath) -> Script {
-        script! {
-            for elem in merkle_path.0.iter() {
-                { elem.to_vec() }
-            }
-        }
-    }
-
-    /// input:
-    ///   root_hash
-    ///   v (qm31 -- 4 elements)
-    ///   pos
-    pub fn verify(logn: usize) -> Script {
-        script! {
-            { limb_to_be_bits_toaltstack(logn as u32) }
-            { CommitmentGadget::commit_qm31() }
-
-            for _ in 0..logn {
-                OP_DEPTH OP_1SUB OP_ROLL
-                OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
-                OP_CAT OP_SHA256
-            }
-
-            OP_EQUALVERIFY
-        }
-    }
-}
-
 #[derive(Default, Clone, Debug)]
-pub struct MerkleTreePath(pub Vec<[u8; 32]>);
-
-#[cfg(test)]
-mod test {
-    use crate::fields::{CM31, M31, QM31};
-    use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
-    use bitvm::treepp::*;
-    use rand::{Rng, RngCore, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
-
-    #[test]
-    fn test_merkle_tree_verify() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        for logn in 12..=20 {
-            let verify_script = MerkleTreeGadget::verify(logn);
-            println!("MT.verify(2^{}) = {} bytes", logn, verify_script.len());
-
-            let mut last_layer = vec![];
-            for _ in 0..(1 << logn) {
-                last_layer.push(QM31(
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                ));
-            }
-
-            let merkle_tree = MerkleTree::new(last_layer);
-
-            let mut pos: u32 = prng.gen();
-            pos &= (1 << logn) - 1;
-
-            let (v, path) = merkle_tree.query(pos as usize);
-
-            let script = script! {
-                { MerkleTreeGadget::push_merkle_tree_path(&path) }
-                { merkle_tree.root_hash.to_vec() }
-                { v.clone() }
-                { pos }
-                { verify_script.clone() }
-                OP_TRUE
-            };
-            let exec_result = execute_script(script);
-            assert!(exec_result.success);
-        }
-    }
+pub struct MerkleTreeProof {
+    pub(crate) leaf: QM31,
+    siblings: Vec<[u8; 32]>,
 }

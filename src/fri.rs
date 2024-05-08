@@ -2,7 +2,7 @@ use crate::channel::Channel;
 use crate::channel_commit::Commitment;
 use crate::fft::{get_twiddles, ibutterfly};
 use crate::fields::{Field, QM31};
-use crate::merkle_tree::{MerkleTree, MerkleTreePath};
+use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 
 #[derive(Clone, Debug)]
 pub struct FriProof {
@@ -10,7 +10,7 @@ pub struct FriProof {
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
     siblings: Vec<Vec<QM31>>,
-    decommitments: Vec<Vec<MerkleTreePath>>,
+    decommitments: Vec<Vec<MerkleTreeProof>>,
 }
 
 const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
@@ -68,7 +68,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
         for (layer, tree) in layers.iter().zip(trees.iter()) {
             layer_sibling.push(layer[query ^ 1]);
 
-            layer_decommitments.push(tree.query(query ^ 1).1);
+            layer_decommitments.push(tree.query(query ^ 1));
             query >>= 1;
         }
         siblings.push(layer_sibling);
@@ -113,10 +113,10 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
             .zip(twiddles.iter().take(n_layers))
             .enumerate()
         {
+            assert_eq!(decommitments[i].leaf, sibling);
             assert!(MerkleTree::verify(
                 proof.commitments[i].0,
                 logn - i,
-                sibling,
                 &decommitments[i],
                 query ^ 1
             ));
