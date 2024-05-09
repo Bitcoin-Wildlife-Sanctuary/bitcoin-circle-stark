@@ -25,7 +25,7 @@ impl TwiddleMerkleTreeGadget {
     /// output:
     ///   v (m31 -- [num_layer] elements)
     pub fn query_and_verify(logn: usize) -> Script {
-        let num_layer = logn - 1;
+        let num_layer = logn;
         script! {
             for _ in 0..num_layer {
                 OP_DEPTH OP_1SUB OP_ROLL
@@ -77,7 +77,7 @@ mod test {
             let twiddle_merkle_tree = TwiddleMerkleTree::new(logn);
 
             let mut pos: u32 = prng.gen();
-            pos &= (1 << (logn - 1)) - 1;
+            pos &= (1 << logn) - 1;
 
             let proof = twiddle_merkle_tree.query(pos as usize);
 
@@ -86,8 +86,8 @@ mod test {
                 { twiddle_merkle_tree.root_hash.to_vec() }
                 { pos }
                 { verify_script.clone() }
-                for i in 0..(logn - 1) {
-                    { proof.leaf[(logn - 1) - 1 - i] }
+                for i in 0..logn {
+                    { proof.leaf[logn - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE

@@ -1,10 +1,13 @@
 use crate::math::fft::get_twiddles;
-use crate::math::M31;
+use crate::math::{Field, M31};
 use crate::utils::num_to_bytes;
 use sha2::{Digest, Sha256};
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
+
+mod constants;
+pub use constants::*;
 
 pub struct TwiddleMerkleTree {
     pub leaf_layer: Vec<Vec<M31>>,
@@ -15,30 +18,33 @@ pub struct TwiddleMerkleTree {
 
 impl TwiddleMerkleTree {
     pub fn new(logn: usize) -> Self {
-        let twiddles = get_twiddles(logn).to_vec();
-        let num_layer = logn - 1;
+        let mut twiddles = get_twiddles(logn + 1).to_vec();
 
-        let mut leaf_layer: Vec<Vec<M31>> = Vec::with_capacity(1 << num_layer);
-        let mut leaf_hashes: Vec<[u8; 32]> = Vec::with_capacity(1 << num_layer);
+        twiddles
+            .iter_mut()
+            .for_each(|row| row.iter_mut().for_each(|cell| *cell = cell.inverse()));
 
-        for i in 0..(1 << num_layer) {
-            let mut leaf = Vec::with_capacity(num_layer);
+        let mut leaf_layer: Vec<Vec<M31>> = Vec::with_capacity(1 << logn);
+        let mut leaf_hashes: Vec<[u8; 32]> = Vec::with_capacity(1 << logn);
+
+        for i in 0..(1 << logn) {
+            let mut leaf = Vec::with_capacity(logn);
 
             let mut cur = i;
-            for j in 0..num_layer {
-                leaf.push(twiddles[j][cur ^ 1]);
+            for j in 0..logn {
+                leaf.push(twiddles[j][cur]);
                 cur >>= 1;
             }
 
             let mut hash = {
                 let mut sha256 = Sha256::new();
-                Digest::update(&mut sha256, num_to_bytes(leaf[num_layer - 1]));
+                Digest::update(&mut sha256, num_to_bytes(leaf[logn - 1]));
                 sha256.finalize().to_vec()
             };
 
-            for j in 1..num_layer {
+            for j in 1..logn {
                 let mut sha256 = Sha256::new();
-                Digest::update(&mut sha256, num_to_bytes(leaf[num_layer - 1 - j]));
+                Digest::update(&mut sha256, num_to_bytes(leaf[logn - 1 - j]));
                 Digest::update(&mut sha256, &hash);
                 hash = sha256.finalize().to_vec();
             }
@@ -110,7 +116,7 @@ impl TwiddleMerkleTree {
         proof: &TwiddleMerkleTreeProof,
         mut query: usize,
     ) -> bool {
-        let num_layer = logn - 1;
+        let num_layer = logn;
         assert_eq!(proof.leaf.len(), num_layer);
         assert_eq!(proof.siblings.len(), num_layer);
 
@@ -149,6 +155,7 @@ impl TwiddleMerkleTree {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TwiddleMerkleTreeProof {
     pub leaf: Vec<M31>,
     pub siblings: Vec<[u8; 32]>,
@@ -167,7 +174,7 @@ mod test {
         let twiddle_merkle_tree = TwiddleMerkleTree::new(20);
 
         for _ in 0..10 {
-            let query = (prng.gen::<u32>() % (1 << 19)) as usize;
+            let query = (prng.gen::<u32>() % (1 << 20)) as usize;
 
             let proof = twiddle_merkle_tree.query(query);
             assert!(TwiddleMerkleTree::verify(

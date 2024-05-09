@@ -3,6 +3,7 @@ use crate::channel_commit::Commitment;
 use crate::math::fft::{get_twiddles, ibutterfly};
 use crate::math::{Field, QM31};
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
+use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -12,8 +13,8 @@ pub struct FriProof {
     commitments: Vec<Commitment>,
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
-    siblings: Vec<Vec<QM31>>,
-    decommitments: Vec<Vec<MerkleTreeProof>>,
+    evaluations_decommitments: Vec<Vec<MerkleTreeProof>>,
+    twiddle_decommitments: Vec<TwiddleMerkleTreeProof>,
 }
 
 const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
@@ -62,32 +63,31 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     // Decommit.
     let mut leaves = Vec::with_capacity(N_QUERIES);
-    let mut siblings = Vec::with_capacity(N_QUERIES);
-    let mut decommitments = Vec::with_capacity(n_layers);
+    let mut evaluations_decommitments = Vec::with_capacity(n_layers);
+    let mut twiddle_decommitments = Vec::with_capacity(N_QUERIES);
+
+    let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);
+
     for mut query in queries {
         leaves.push(layers[0][query]);
-        let mut layer_sibling = Vec::with_capacity(n_layers);
+        twiddle_decommitments.push(twiddle_merkle_tree.query(query >> 1));
         let mut layer_decommitments = Vec::with_capacity(n_layers);
-        for (layer, tree) in layers.iter().zip(trees.iter()) {
-            layer_sibling.push(layer[query ^ 1]);
-
+        for tree in trees.iter() {
             layer_decommitments.push(tree.query(query ^ 1));
             query >>= 1;
         }
-        siblings.push(layer_sibling);
-        decommitments.push(layer_decommitments);
+        evaluations_decommitments.push(layer_decommitments);
     }
     FriProof {
         commitments,
         last_layer,
         leaves,
-        siblings,
-        decommitments,
+        evaluations_decommitments,
+        twiddle_decommitments,
     }
 }
 
 pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
-    let twiddles = get_twiddles(logn).to_vec();
     let n_layers = logn - 1;
 
     // Draw factors.
@@ -103,37 +103,36 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
     // Queries.
     let queries = channel.draw_5queries(logn).0.to_vec();
     // Decommit.
-    for (mut query, (mut leaf, (siblings, decommitments))) in queries.iter().copied().zip(
-        proof
-            .leaves
-            .iter()
-            .copied()
-            .zip(proof.siblings.iter().zip(proof.decommitments.iter())),
-    ) {
-        for (i, ((&sibling, &alpha), layer_twiddles)) in siblings
+    for (mut query, ((mut leaf, evaluations_decommitments), twiddle_merkle_tree_proof)) in
+        queries.iter().copied().zip(
+            proof
+                .leaves
+                .iter()
+                .copied()
+                .zip(proof.evaluations_decommitments.iter())
+                .zip(proof.twiddle_decommitments.iter()),
+        )
+    {
+        for (i, (&ref eval_proof, &alpha)) in evaluations_decommitments
             .iter()
             .zip(factors.iter())
-            .zip(twiddles.iter().take(n_layers))
             .enumerate()
         {
-            assert_eq!(decommitments[i].leaf, sibling);
             assert!(MerkleTree::verify(
                 proof.commitments[i].0,
                 logn - i,
-                &decommitments[i],
+                &evaluations_decommitments[i],
                 query ^ 1
             ));
+
+            let sibling = eval_proof.leaf;
 
             let (mut f0, mut f1) = if query & 1 == 0 {
                 (leaf, sibling)
             } else {
                 (sibling, leaf)
             };
-            ibutterfly(
-                &mut f0,
-                &mut f1,
-                layer_twiddles[query >> 1].inverse().into(),
-            );
+            ibutterfly(&mut f0, &mut f1, twiddle_merkle_tree_proof.leaf[i].into());
             leaf = f0 + alpha * f1;
             query >>= 1;
         }
