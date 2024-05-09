@@ -52,9 +52,8 @@ impl ExtractorGadget {
                 // stack: abs(a)
                 // altstack: abs(a), is_positive
 
-                for _ in 0..3 {
-                    OP_SIZE 3 OP_LESSTHAN OP_IF OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
-                }
+                OP_SIZE 2 OP_LESSTHAN OP_IF OP_PUSHBYTES_2 OP_PUSHBYTES_0 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
+                OP_SIZE 3 OP_LESSTHAN OP_IF OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_ENDIF
 
                 OP_FROMALTSTACK
                 OP_IF
