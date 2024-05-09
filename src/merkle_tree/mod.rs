@@ -108,3 +108,33 @@ pub struct MerkleTreeProof {
     pub(crate) leaf: QM31,
     siblings: Vec<[u8; 32]>,
 }
+
+#[cfg(test)]
+mod test {
+    use crate::math::{CM31, M31, QM31};
+    use crate::merkle_tree::MerkleTree;
+    use rand::{Rng, RngCore, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+
+    #[test]
+    fn test_merkle_tree() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let mut last_layer = vec![];
+        for _ in 0..1 << 12 {
+            last_layer.push(QM31(
+                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
+                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
+            ));
+        }
+
+        let merkle_tree = MerkleTree::new(last_layer.clone());
+
+        for _ in 0..10 {
+            let query = (prng.gen::<u32>() % (1 << 12)) as usize;
+
+            let proof = merkle_tree.query(query);
+            assert!(MerkleTree::verify(merkle_tree.root_hash, 12, &proof, query));
+        }
+    }
+}
