@@ -3,7 +3,7 @@ pub use bitcoin_script::*;
 
 use std::ops::{Add, Neg, Sub};
 
-use crate::fields::M31;
+use crate::math::M31;
 
 /// A point on the complex circle. Treated as an additive group.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

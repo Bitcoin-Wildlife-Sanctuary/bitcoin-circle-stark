@@ -49,7 +49,7 @@ impl MerkleTreeGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::fields::{CM31, M31, QM31};
+    use crate::math::{CM31, M31, QM31};
     use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};

@@ -1,5 +1,5 @@
-use crate::fft::get_twiddles;
-use crate::fields::M31;
+use crate::math::fft::get_twiddles;
+use crate::math::M31;
 use crate::utils::num_to_bytes;
 use sha2::{Digest, Sha256};
 

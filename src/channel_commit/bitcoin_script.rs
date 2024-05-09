@@ -35,7 +35,7 @@ impl CommitmentGadget {
 #[cfg(test)]
 mod test {
     use crate::channel_commit::{Commitment, CommitmentGadget};
-    use crate::fields::{CM31, M31, QM31};
+    use crate::math::{CM31, M31, QM31};
     use bitcoin_script::script;
     use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};

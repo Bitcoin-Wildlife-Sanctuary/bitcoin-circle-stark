@@ -53,7 +53,7 @@ mod test {
     use crate::channel::{Channel, ChannelGadget};
     use crate::channel_commit::Commitment;
     use crate::channel_extract::ExtractorGadget;
-    use crate::fields::{CM31, M31, QM31};
+    use crate::math::{CM31, M31, QM31};
     use bitcoin_script::script;
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};

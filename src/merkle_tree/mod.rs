@@ -1,5 +1,5 @@
 use crate::channel_commit::Commitment;
-use crate::fields::QM31;
+use crate::math::QM31;
 use sha2::{Digest, Sha256};
 
 mod bitcoin_script;

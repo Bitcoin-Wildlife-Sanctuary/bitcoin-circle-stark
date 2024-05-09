@@ -1,8 +1,8 @@
-use crate::fields::{CM31, M31, QM31};
 use crate::utils::num_to_bytes;
 use sha2::{Digest, Sha256};
 
 mod bitcoin_script;
+use crate::math::{CM31, M31, QM31};
 pub use bitcoin_script::*;
 
 // every commitment is a 32-bytes SHA256 hash

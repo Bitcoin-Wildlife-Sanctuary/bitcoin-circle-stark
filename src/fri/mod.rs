@@ -1,8 +1,11 @@
 use crate::channel::Channel;
 use crate::channel_commit::Commitment;
-use crate::fft::{get_twiddles, ibutterfly};
-use crate::fields::{Field, QM31};
+use crate::math::fft::{get_twiddles, ibutterfly};
+use crate::math::{Field, QM31};
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
+
+mod bitcoin_script;
+pub use bitcoin_script::*;
 
 #[derive(Clone, Debug)]
 pub struct FriProof {

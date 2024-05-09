@@ -1,7 +1,7 @@
-use crate::fields::{CM31, M31, QM31};
 use core::ops::Neg;
 
 mod bitcoin_script;
+use crate::math::{CM31, M31, QM31};
 pub use bitcoin_script::*;
 
 pub struct Extractor;

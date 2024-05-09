@@ -1,5 +1,5 @@
 use crate::circle::CirclePoint;
-use crate::fields::{Field, M31};
+use crate::math::{Field, M31};
 use crate::utils::bit_reverse_index;
 
 pub fn ibutterfly<F: Field>(v0: &mut F, v1: &mut F, itwid: F) {

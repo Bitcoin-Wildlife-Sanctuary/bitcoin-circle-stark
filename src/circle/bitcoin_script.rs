@@ -114,7 +114,7 @@ impl CirclePointGadget {
 mod test {
     use crate::circle::CirclePoint;
     use crate::circle::CirclePointGadget;
-    use crate::fields::M31;
+    use crate::math::M31;
     use bitvm::treepp::*;
     use rand::Rng;
     use rand_chacha::rand_core::{RngCore, SeedableRng};

@@ -1,13 +1,12 @@
-use crate::fields::{CM31, M31, QM31};
 use bitvm::treepp::pushable::{Builder, Pushable};
+use math::{CM31, M31, QM31};
 
 pub mod channel;
 pub mod channel_commit;
 pub mod channel_extract;
 pub mod circle;
-pub mod fft;
-pub(crate) mod fields;
 pub mod fri;
+pub mod math;
 pub mod merkle_tree;
 pub mod twiddle_merkle_tree;
 pub mod utils;
@@ -36,8 +35,8 @@ impl Pushable for QM31 {
 mod test {
     use crate::channel::Channel;
     use crate::circle::CirclePoint;
-    use crate::fields::Field;
     use crate::fri;
+    use crate::math::Field;
     use crate::utils::permute_eval;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;

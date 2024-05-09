@@ -1,5 +1,6 @@
 mod bitcoin_script;
-use crate::fields::{Field, M31, QM31};
+
+use crate::math::{Field, M31, QM31};
 pub use bitcoin_script::*;
 
 pub fn num_to_bytes(v: M31) -> Vec<u8> {

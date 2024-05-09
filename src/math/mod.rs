@@ -1,12 +1,10 @@
-#![allow(unused)]
+use std::fmt::Display;
+use std::ops::{Add, Mul, Neg, Sub};
 
-use std::{
-    fmt::Display,
-    ops::{Add, Mul, Neg, Sub},
-};
+pub mod fft;
 
 const MODULUS_BITS: u32 = 31;
-pub const P: u32 = 2147483647; // 2 ** 31 - 1
+pub const P: u32 = 2147483647;
 
 pub trait Field:
     Neg<Output = Self>
@@ -57,11 +55,13 @@ impl M31 {
         Self((((((val >> MODULUS_BITS) + val + 1) >> MODULUS_BITS) + val) & (P as u64)) as u32)
     }
 }
+
 impl Display for M31 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
+
 impl Add for M31 {
     type Output = Self;
 
@@ -69,6 +69,7 @@ impl Add for M31 {
         Self::reduce((self.0 as u64) + (rhs.0 as u64))
     }
 }
+
 impl Neg for M31 {
     type Output = Self;
 
@@ -76,6 +77,7 @@ impl Neg for M31 {
         Self::reduce(P as u64 - (self.0 as u64))
     }
 }
+
 impl Sub for M31 {
     type Output = Self;
 
@@ -83,6 +85,7 @@ impl Sub for M31 {
         Self::reduce((self.0 as u64) + (P as u64) - (rhs.0 as u64))
     }
 }
+
 impl Mul for M31 {
     type Output = Self;
 
@@ -90,11 +93,13 @@ impl Mul for M31 {
         Self::reduce((self.0 as u64) * (rhs.0 as u64))
     }
 }
+
 impl From<u32> for M31 {
     fn from(value: u32) -> Self {
         M31::reduce(value.into())
     }
 }
+
 impl Field for M31 {
     fn zero() -> Self {
         M31::from(0)
@@ -110,11 +115,13 @@ impl Field for M31 {
 // CM31
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CM31(pub M31, pub M31);
+
 impl Display for CM31 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} + {}i", self.0, self.1)
     }
 }
+
 impl Mul for CM31 {
     type Output = Self;
 
@@ -126,6 +133,7 @@ impl Mul for CM31 {
         )
     }
 }
+
 impl Add for CM31 {
     type Output = Self;
 
@@ -133,6 +141,7 @@ impl Add for CM31 {
         Self(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
+
 impl Neg for CM31 {
     type Output = Self;
 
@@ -140,6 +149,7 @@ impl Neg for CM31 {
         Self(-self.0, -self.1)
     }
 }
+
 impl Field for CM31 {
     fn zero() -> Self {
         Self(M31::zero(), M31::zero())
@@ -158,6 +168,7 @@ pub const R: CM31 = CM31(M31(1), M31(2));
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QM31(pub CM31, pub CM31);
+
 impl QM31 {
     pub const fn from_u32(a: u32, b: u32, c: u32, d: u32) -> Self {
         Self(CM31(M31(a), M31(b)), CM31(M31(c), M31(d)))
@@ -171,11 +182,13 @@ impl QM31 {
         Self::from_m31(array[0], array[1], array[2], array[3])
     }
 }
+
 impl Display for QM31 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}) + ({})u", self.0, self.1)
     }
 }
+
 impl std::fmt::Debug for QM31 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.1 == CM31::zero() && self.0 .1 == M31::zero() {
@@ -185,6 +198,7 @@ impl std::fmt::Debug for QM31 {
         }
     }
 }
+
 impl Mul for QM31 {
     type Output = Self;
 
@@ -196,6 +210,7 @@ impl Mul for QM31 {
         )
     }
 }
+
 impl Add for QM31 {
     type Output = Self;
 
@@ -203,6 +218,7 @@ impl Add for QM31 {
         Self(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
+
 impl Neg for QM31 {
     type Output = Self;
 
@@ -210,6 +226,7 @@ impl Neg for QM31 {
         Self(-self.0, -self.1)
     }
 }
+
 impl Field for QM31 {
     fn zero() -> Self {
         Self(CM31::zero(), CM31::zero())

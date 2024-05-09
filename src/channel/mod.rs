@@ -1,6 +1,6 @@
 use crate::channel_commit::Commitment;
 use crate::channel_extract::{Extraction5M31, ExtractionQM31, Extractor};
-use crate::fields::QM31;
+use crate::math::QM31;
 use crate::utils::trim_m31;
 use sha2::{Digest, Sha256};
 
