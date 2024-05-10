@@ -20,8 +20,9 @@ impl ChannelGadget {
 
     pub fn absorb_qm31() -> Script {
         script! {
+            OP_TOALTSTACK
             { CommitmentGadget::commit_qm31() }
-            OP_CAT OP_SHA256
+            OP_FROMALTSTACK OP_CAT OP_SHA256
         }
     }
 
@@ -70,22 +71,22 @@ mod test {
             channel_script.len()
         );
 
-        let mut a = [0u8; 32];
-        a.iter_mut().for_each(|v| *v = prng.gen());
+        let mut init_state = [0u8; 32];
+        init_state.iter_mut().for_each(|v| *v = prng.gen());
 
-        let mut b = [0u8; 32];
-        b.iter_mut().for_each(|v| *v = prng.gen());
+        let mut elem = [0u8; 32];
+        elem.iter_mut().for_each(|v| *v = prng.gen());
 
-        let mut channel = Channel::new(a);
-        channel.absorb_commitment(&Commitment(b));
+        let mut channel = Channel::new(init_state);
+        channel.absorb_commitment(&Commitment(elem));
 
-        let c = channel.state;
+        let final_state = channel.state;
 
         let script = script! {
-            { a.to_vec() }
-            { b.to_vec() }
+            { elem.to_vec() }
+            { init_state.to_vec() }
             { channel_script.clone() }
-            { c.to_vec() }
+            { final_state.to_vec() }
             OP_EQUAL
         };
         let exec_result = execute_script(script);
@@ -99,24 +100,24 @@ mod test {
         let channel_script = ChannelGadget::absorb_qm31();
         println!("Channel.absorb_qm31() = {} bytes", channel_script.len());
 
-        let mut a = [0u8; 32];
-        a.iter_mut().for_each(|v| *v = prng.gen());
+        let mut init_state = [0u8; 32];
+        init_state.iter_mut().for_each(|v| *v = prng.gen());
 
-        let b = QM31(
+        let elem = QM31(
             CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
             CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
         );
 
-        let mut channel = Channel::new(a);
-        channel.absorb_qm31(&b);
+        let mut channel = Channel::new(init_state);
+        channel.absorb_qm31(&elem);
 
-        let c = channel.state;
+        let final_state = channel.state;
 
         let script = script! {
-            { a.to_vec() }
-            { b }
+            { elem }
+            { init_state.to_vec() }
             { channel_script.clone() }
-            { c.to_vec() }
+            { final_state.to_vec() }
             OP_EQUAL
         };
         let exec_result = execute_script(script);

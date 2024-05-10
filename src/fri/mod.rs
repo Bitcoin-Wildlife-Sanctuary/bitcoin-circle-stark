@@ -13,8 +13,8 @@ pub struct FriProof {
     commitments: Vec<Commitment>,
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
-    evaluations_decommitments: Vec<Vec<MerkleTreeProof>>,
-    twiddle_decommitments: Vec<TwiddleMerkleTreeProof>,
+    merkle_proofs: Vec<Vec<MerkleTreeProof>>,
+    twiddle_merkle_proofs: Vec<TwiddleMerkleTreeProof>,
 }
 
 const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
@@ -63,27 +63,27 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     // Decommit.
     let mut leaves = Vec::with_capacity(N_QUERIES);
-    let mut evaluations_decommitments = Vec::with_capacity(n_layers);
-    let mut twiddle_decommitments = Vec::with_capacity(N_QUERIES);
+    let mut merkle_proofs = Vec::with_capacity(n_layers);
+    let mut twiddle_merkle_proofs = Vec::with_capacity(N_QUERIES);
 
     let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);
 
     for mut query in queries {
         leaves.push(layers[0][query]);
-        twiddle_decommitments.push(twiddle_merkle_tree.query(query >> 1));
+        twiddle_merkle_proofs.push(twiddle_merkle_tree.query(query >> 1));
         let mut layer_decommitments = Vec::with_capacity(n_layers);
         for tree in trees.iter() {
             layer_decommitments.push(tree.query(query ^ 1));
             query >>= 1;
         }
-        evaluations_decommitments.push(layer_decommitments);
+        merkle_proofs.push(layer_decommitments);
     }
     FriProof {
         commitments,
         last_layer,
         leaves,
-        evaluations_decommitments,
-        twiddle_decommitments,
+        merkle_proofs,
+        twiddle_merkle_proofs,
     }
 }
 
@@ -103,25 +103,21 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
     // Queries.
     let queries = channel.draw_5queries(logn).0.to_vec();
     // Decommit.
-    for (mut query, ((mut leaf, evaluations_decommitments), twiddle_merkle_tree_proof)) in
+    for (mut query, ((mut leaf, merkle_proof), twiddle_merkle_tree_proof)) in
         queries.iter().copied().zip(
             proof
                 .leaves
                 .iter()
                 .copied()
-                .zip(proof.evaluations_decommitments.iter())
-                .zip(proof.twiddle_decommitments.iter()),
+                .zip(proof.merkle_proofs.iter())
+                .zip(proof.twiddle_merkle_proofs.iter()),
         )
     {
-        for (i, (&ref eval_proof, &alpha)) in evaluations_decommitments
-            .iter()
-            .zip(factors.iter())
-            .enumerate()
-        {
+        for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {
             assert!(MerkleTree::verify(
                 proof.commitments[i].0,
                 logn - i,
-                &evaluations_decommitments[i],
+                &merkle_proof[i],
                 query ^ 1
             ));
 

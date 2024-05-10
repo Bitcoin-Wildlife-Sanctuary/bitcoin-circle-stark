@@ -17,15 +17,15 @@ impl Channel {
     }
     pub fn absorb_commitment(&mut self, commitment: &Commitment) {
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
         Digest::update(&mut hasher, commitment.0);
+        Digest::update(&mut hasher, &self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
     pub fn absorb_qm31(&mut self, el: &QM31) {
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
         Digest::update(&mut hasher, Commitment::commit_qm31(el.clone()).0);
+        Digest::update(&mut hasher, &self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
