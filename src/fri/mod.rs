@@ -87,7 +87,12 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
     }
 }
 
-pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
+pub fn fri_verify(
+    channel: &mut Channel,
+    logn: usize,
+    proof: FriProof,
+    twiddle_merkle_tree_root: [u8; 32],
+) {
     let n_layers = logn - 1;
 
     // Draw factors.
@@ -113,6 +118,12 @@ pub fn fri_verify(channel: &mut Channel, logn: usize, proof: FriProof) {
                 .zip(proof.twiddle_merkle_proofs.iter()),
         )
     {
+        assert!(TwiddleMerkleTree::verify(
+            twiddle_merkle_tree_root.clone(),
+            logn - 1,
+            &twiddle_merkle_tree_proof,
+            query >> 1
+        ));
         for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {
             assert!(MerkleTree::verify(
                 proof.commitments[i].0,

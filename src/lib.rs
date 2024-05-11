@@ -37,6 +37,7 @@ mod test {
     use crate::circle::CirclePoint;
     use crate::fri;
     use crate::math::Field;
+    use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::utils::permute_eval;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -60,6 +61,11 @@ mod test {
 
         // FRI.
         let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-        fri::fri_verify(&mut Channel::new(channel_init_state), logn, proof);
+        fri::fri_verify(
+            &mut Channel::new(channel_init_state),
+            logn,
+            proof,
+            TWIDDLE_MERKLE_TREE_ROOT_4,
+        );
     }
 }

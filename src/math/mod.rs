@@ -1,7 +1,9 @@
 use std::fmt::Display;
 use std::ops::{Add, Mul, Neg, Sub};
 
+mod bitcoin_script;
 pub mod fft;
+pub use bitcoin_script::*;
 
 const MODULUS_BITS: u32 = 31;
 pub const P: u32 = 2147483647;

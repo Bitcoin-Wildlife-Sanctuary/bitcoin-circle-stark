@@ -1,3 +1,7 @@
+pub const TWIDDLE_MERKLE_TREE_ROOT_4: [u8; 32] = [
+    157, 98, 193, 174, 27, 36, 189, 253, 190, 175, 131, 160, 254, 48, 128, 105, 61, 66, 56, 88, 21,
+    233, 188, 21, 12, 192, 39, 153, 90, 78, 226, 237,
+];
 pub const TWIDDLE_MERKLE_TREE_ROOT_12: [u8; 32] = [
     249, 145, 180, 224, 61, 120, 220, 4, 111, 108, 202, 88, 205, 230, 50, 56, 142, 218, 146, 215,
     47, 74, 219, 54, 186, 118, 106, 216, 0, 220, 101, 18,
@@ -60,6 +64,12 @@ mod test {
 
     #[test]
     fn test_consistency() {
+        // for the testing
+        assert_eq!(
+            TwiddleMerkleTree::new(4).root_hash,
+            TWIDDLE_MERKLE_TREE_ROOT_4
+        );
+
         // unit tests are running until 18.
 
         assert_eq!(
