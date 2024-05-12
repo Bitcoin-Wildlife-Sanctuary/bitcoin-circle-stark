@@ -1,5 +1,4 @@
 use crate::pow::hash_with_nonce;
-use bitcoin::opcodes::all::{OP_GREATERTHAN, OP_GREATERTHANOREQUAL};
 use bitvm::treepp::*;
 
 pub struct PowGadget;
