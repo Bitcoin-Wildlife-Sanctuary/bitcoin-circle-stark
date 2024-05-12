@@ -1,4 +1,5 @@
 use crate::pow::hash_with_nonce;
+use bitcoin::opcodes::all::{OP_GREATERTHAN, OP_GREATERTHANOREQUAL};
 use bitvm::treepp::*;
 
 pub struct PowGadget;
@@ -18,6 +19,8 @@ impl PowGadget {
     //  msb starts with n_bits % 8 (which would be at least 1) zero bits.
     //
     pub fn verify_pow(n_bits: usize) -> Script {
+        assert!(n_bits > 0);
+
         script! {
             // move the msb away for simplicity
             if n_bits % 8 != 0 {
@@ -48,12 +51,16 @@ impl PowGadget {
             // push the necessary number of zeroes
             if n_bits / 8 > 0 {
                 { vec![0u8; n_bits / 8] }
+            } else {
+                OP_0
             }
 
             // if msb is present, check the msb is small enough,
             // and if it is a zero, make it `0x00`
             if n_bits % 8 != 0 {
                 OP_FROMALTSTACK
+                OP_DUP
+                0 OP_GREATERTHANOREQUAL OP_VERIFY
                 OP_DUP
                 { 1 << (8 - n_bits % 8)  } OP_LESSTHAN OP_VERIFY
                 OP_DUP
@@ -82,6 +89,8 @@ impl PowGadget {
     //  suffix
     //  msb (if applicable)
     pub fn push_pow_hint(channel_digest: Vec<u8>, nonce: u64, n_bits: usize) -> Script {
+        assert!(n_bits > 0);
+
         let digest = hash_with_nonce(&channel_digest, nonce);
 
         script! {
@@ -126,62 +135,37 @@ mod test {
         assert!(exec_result.success);
     }
 
-    // need to test prove and verify separately with hardcoded stuff
-
     #[test]
     fn test_pow() {
-        let n_bits: usize = 12; // 23?
 
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        for prng_seed in 0..5 {
+            for n_bits in 1..=20 {
 
-        for _ in 0..100 {
-            let mut channel_digest = [0u8; 32].to_vec();
+                let mut prng = ChaCha20Rng::seed_from_u64(prng_seed);
 
-            for i in 0..32 {
-                channel_digest[i] = prng.gen();
+                let mut channel_digest = [0u8; 32].to_vec();
+
+                for i in 0..32 {
+                    channel_digest[i] = prng.gen();
+                }
+
+                let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
+
+                let script = script! {
+                    { channel_digest.clone() }
+                    { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
+                    { PowGadget::verify_pow(n_bits)}
+                    { channel_digest.clone() }
+                    { nonce.to_le_bytes().to_vec() }
+                    OP_CAT
+                    OP_SHA256
+                    OP_EQUALVERIFY // checking that indeed channel' = sha256(channel||nonce)
+                    OP_TRUE
+                };
+                let exec_result = execute_script(script);
+                assert!(exec_result.success);
             }
-
-            let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
-
-            let script = script! {
-                { channel_digest.clone() }
-                { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
-                { PowGadget::verify_pow(n_bits)}
-                { channel_digest.clone() }
-                { nonce.to_le_bytes().to_vec() }
-                OP_CAT
-                OP_SHA256
-                OP_EQUALVERIFY // checking that indeed channel' = sha256(channel||nonce)
-                OP_TRUE
-            };
-            let exec_result = execute_script(script);
-            assert!(exec_result.success);
         }
-
-        let n_bits: usize = 8;
-
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        let mut channel_digest = [0u8; 32].to_vec();
-
-        for i in 0..32 {
-            channel_digest[i] = prng.gen();
-        }
-
-        let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
-
-        let script = script! {
-            { channel_digest.clone() }
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
-            { PowGadget::verify_pow(n_bits)}
-            { channel_digest.clone() }
-            { nonce.to_le_bytes().to_vec() }
-            OP_CAT
-            OP_SHA256
-            OP_EQUALVERIFY // checking that indeed channel' = sha256(channel||nonce)
-            OP_TRUE
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
+        
     }
 }
