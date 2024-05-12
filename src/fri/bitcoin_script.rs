@@ -98,6 +98,28 @@ impl FRIGadget {
             }
         }
     }
+
+    pub fn push_single_query_merkle_tree_proof(idx: usize, fri_proof: &FriProof) -> Script {
+        script! {
+            for proof in fri_proof.merkle_proofs[idx].iter() {
+                { proof.leaf }
+
+                for elem in proof.siblings.iter() {
+                    { elem.to_vec() }
+                }
+            }
+        }
+    }
+
+    pub fn check_single_query_merkle_tree_proof() -> Script {
+        // input:
+        //   proof, roots, query
+        //
+        // output:
+        //   elems
+
+        script! {}
+    }
 }
 
 #[cfg(test)]
@@ -238,6 +260,8 @@ mod test {
             }
             OP_TRUE
         };
+
+        println!("FRI.Twiddle-Tree = {} bytes", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);

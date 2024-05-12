@@ -105,8 +105,8 @@ impl MerkleTree {
 
 #[derive(Default, Clone, Debug)]
 pub struct MerkleTreeProof {
-    pub(crate) leaf: QM31,
-    siblings: Vec<[u8; 32]>,
+    pub leaf: QM31,
+    pub siblings: Vec<[u8; 32]>,
 }
 
 #[cfg(test)]
