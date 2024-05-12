@@ -64,7 +64,6 @@ impl PowGadget {
             { nonce.to_le_bytes().to_vec() }
             { digest[(n_bits-n_bits%8)/8+1..].to_vec() }
             { digest[(n_bits-n_bits%8)/8] as u32 }
-            { 0x79u8 }
         }
     }
 }
