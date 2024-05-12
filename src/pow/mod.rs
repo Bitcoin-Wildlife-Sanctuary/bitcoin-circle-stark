@@ -27,14 +27,13 @@ fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
     hasher.finalize().as_slice().to_vec()
 }
 
-
 fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
     let mut nonce = 0u64;
-    
+
     loop {
         let hash = hash_with_nonce(&channel_digest, nonce);
         if check_leading_zeros(hash.as_ref(), n_bits) {
-            return nonce
+            return nonce;
         }
         nonce += 1;
     }

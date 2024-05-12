@@ -8,6 +8,7 @@ pub mod circle;
 pub mod fri;
 pub mod math;
 pub mod merkle_tree;
+pub mod pow;
 pub mod twiddle_merkle_tree;
 pub mod utils;
 
