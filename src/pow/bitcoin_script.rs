@@ -55,7 +55,7 @@ impl PowGadget {
             if n_bits % 8 != 0 {
                 OP_FROMALTSTACK
                 OP_DUP
-                { 1 << (7 - n_bits % 8)  } OP_LESSTHAN OP_VERIFY
+                { 1 << (8 - n_bits % 8)  } OP_LESSTHAN OP_VERIFY
                 OP_DUP
                 0 OP_EQUAL OP_IF
                     OP_DROP OP_PUSHBYTES_1 OP_PUSHBYTES_0
