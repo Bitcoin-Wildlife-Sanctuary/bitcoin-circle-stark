@@ -155,5 +155,31 @@ mod test {
         };
         let exec_result = execute_script(script);
         assert!(exec_result.success);
+
+        let n_bits: usize = 8;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let mut channel_digest = [0u8; 32].to_vec();
+
+        for i in 0..32 {
+            channel_digest[i] = prng.gen();
+        }
+
+        let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
+
+        let script = script! {
+            { channel_digest.clone() }
+            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
+            { PowGadget::verify_pow(n_bits)}
+            { channel_digest.clone() }
+            { nonce.to_le_bytes().to_vec() }
+            OP_CAT
+            OP_SHA256
+            OP_EQUALVERIFY // checking that indeed channel' = sha256(channel||nonce)
+            OP_TRUE
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }
