@@ -1,3 +1,4 @@
+use bitcoin::opcodes::Ordinary::OP_TOALTSTACK;
 use bitvm::treepp::*;
 
 pub fn trim_m31_gadget(logn: usize) -> Script {
@@ -16,6 +17,28 @@ pub fn trim_m31_gadget(logn: usize) -> Script {
                 OP_2DUP OP_GREATERTHANOREQUAL
                 OP_IF OP_SUB OP_ELSE OP_DROP OP_ENDIF
             }
+        }
+    }
+}
+
+pub fn copy_to_altstack_top_item_first_in(n: usize) -> Script {
+    script! {
+        if n > 0 {
+            OP_DUP OP_TOALTSTACK
+        }
+        if n > 1 {
+            OP_OVER OP_TOALTSTACK
+        }
+        for i in 2..n {
+            { i } OP_PICK OP_TOALTSTACK
+        }
+    }
+}
+
+pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
+    script! {
+        for i in 0..n {
+            { n - 1 - i } OP_PICK OP_TOALTSTACK
         }
     }
 }

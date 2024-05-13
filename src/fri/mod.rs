@@ -63,7 +63,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     // Decommit.
     let mut leaves = Vec::with_capacity(N_QUERIES);
-    let mut merkle_proofs = Vec::with_capacity(n_layers);
+    let mut merkle_proofs = Vec::with_capacity(N_QUERIES);
     let mut twiddle_merkle_proofs = Vec::with_capacity(N_QUERIES);
 
     let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);

@@ -1,7 +1,10 @@
 use crate::channel::{Channel, ChannelGadget};
 use crate::channel_extract::{ExtractionQM31, ExtractorGadget};
 use crate::fri::{FriProof, N_QUERIES};
+use crate::merkle_tree::MerkleTreeGadget;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
+use crate::utils::copy_to_altstack_top_item_first_in;
+use bitvm::bigint::bits::limb_to_be_bits;
 use bitvm::treepp::*;
 use rust_bitcoin_u31_or_u30::{u31ext_fromaltstack, u31ext_toaltstack, QM31 as QM31Gadget};
 
@@ -101,7 +104,7 @@ impl FRIGadget {
 
     pub fn push_single_query_merkle_tree_proof(idx: usize, fri_proof: &FriProof) -> Script {
         script! {
-            for proof in fri_proof.merkle_proofs[idx].iter() {
+            for proof in fri_proof.merkle_proofs[idx].iter().rev() {
                 { proof.leaf }
 
                 for elem in proof.siblings.iter() {
@@ -111,14 +114,45 @@ impl FRIGadget {
         }
     }
 
-    pub fn check_single_query_merkle_tree_proof() -> Script {
+    pub fn check_single_query_merkle_tree_proof(logn: usize) -> Script {
         // input:
-        //   proof, roots, query
+        //   proofs (as hints, smaller trees at the beginning)
+        //   roots (as hints, larger trees at the beginning), query
         //
         // output:
         //   elems
 
-        script! {}
+        script! {
+            // convert query into bits
+            { limb_to_be_bits(logn as u32) }
+
+            // for each of the logn proofs
+            for i in 2..=logn {
+                // copy the bits
+                { copy_to_altstack_top_item_first_in(i) }
+
+                // copy the root
+                { logn } OP_ROLL
+
+                { MerkleTreeGadget::query_and_verify_internal(i, true) }
+
+                { u31ext_toaltstack::<QM31Gadget>() }
+            }
+
+            // drop the bits
+            for _ in 0..(logn/2) {
+                OP_2DROP
+            }
+
+            if logn % 2 == 1 {
+                OP_DROP
+            }
+
+            // recover all the elements
+            for _ in 2..=logn {
+                { u31ext_fromaltstack::<QM31Gadget>() }
+            }
+        }
     }
 }
 
@@ -262,6 +296,67 @@ mod test {
         };
 
         println!("FRI.Twiddle-Tree = {} bytes", script.len());
+
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_single_query_merkle_tree() {
+        let logn = 5;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        let mut channel_init_state = [0u8; 32];
+        channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+
+        let proof = {
+            let p = CirclePoint::subgroup_gen(logn + 1);
+
+            let evaluation = (0..(1 << logn))
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .collect();
+            let evaluation = permute_eval(evaluation);
+
+            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
+            proof
+        };
+
+        let queries = {
+            let mut channel = Channel::new(channel_init_state);
+
+            for c in proof.commitments.iter() {
+                channel.absorb_commitment(c);
+                let _ = channel.draw_element();
+            }
+
+            proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
+            channel.draw_5queries(logn).0
+        };
+
+        let expected = {
+            let mut expected = vec![];
+
+            for query in proof.merkle_proofs[0].iter().rev() {
+                expected.push(query.leaf);
+            }
+            expected
+        };
+
+        let script = script! {
+            { FRIGadget::push_single_query_merkle_tree_proof(0, &proof) }
+            for c in proof.commitments.iter() {
+                { c.clone() }
+            }
+            { queries[0] }
+            { FRIGadget::check_single_query_merkle_tree_proof(logn) }
+            for elem in expected.iter() {
+                { *elem }
+                { u31ext_equalverify::<QM31Gadget>() }
+            }
+            OP_TRUE
+        };
+
+        println!("FRI.Single-Query-Tree = {} bytes", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);
