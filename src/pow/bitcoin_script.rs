@@ -50,8 +50,6 @@ impl PowGadget {
             // push the necessary number of zeroes
             if n_bits / 8 > 0 {
                 { vec![0u8; n_bits / 8] }
-            } else {
-                OP_0
             }
 
             // if msb is present, check the msb is small enough,
@@ -67,7 +65,9 @@ impl PowGadget {
                     OP_DROP OP_PUSHBYTES_1 OP_PUSHBYTES_0
                 OP_ENDIF
 
-                OP_CAT
+                if n_bits / 8 > 0 {
+                    OP_CAT
+                }
             }
 
             // current stack:
@@ -119,12 +119,14 @@ mod test {
         let mut channel_digest = vec![0u8; 32];
         prng.fill_bytes(&mut channel_digest);
 
-        let nonce = prng.gen();
+        let nonce = grind_find_nonce(channel_digest.clone(), 1);
         let new_channel = hash_with_nonce(&channel_digest, nonce);
 
         let script = script! {
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, 0) }
-            { new_channel.to_vec() }
+            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, 1) }
+            { new_channel[0] }
+            OP_EQUALVERIFY
+            { new_channel[1..].to_vec() }
             OP_EQUALVERIFY
             { nonce.to_le_bytes().to_vec() }
             OP_EQUALVERIFY
