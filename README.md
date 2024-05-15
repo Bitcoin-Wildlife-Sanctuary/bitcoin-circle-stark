@@ -10,6 +10,9 @@ This repository includes Bitcoin script implementations of various cryptographic
   * aka "channel", which is the name used in Starkware's [stwo](https://github.com/starkware-libs/stwo) library.
   * absorbing commitments and QM31 elements through `OP_CAT + OP_SHA256`.
   * squeezing random elements for Fiat-Shamir transform using hints and `OP_CAT + OP_SHA256`.
+- **Proof-of-Work Check**
+  * calculating a proof-of-work nonce for the "channel", based on specified security bits.
+  * verifying the proof-of-work nonce and computing the new "channel" state.
 - **Merkle Tree**
   * implementation of Merkle path verification using hints and `OP_CAT + OP_SHA256`.
 
@@ -139,6 +142,26 @@ OP_NOTIF OP_1SUB OP_ENDIF
 ```
 
 After such adjustment, one obtains an element. 
+
+---
+
+### Proof of Work
+
+The Proof-of-Work check accepts two inputs: `channel` and `nonce`, and checks whether the new channel state `channel'=sha256(channel||nonce)` has sufficiently many security bits, namely, `n_bits`.
+
+Since we don't have `OP_SUBSTR`, the check also requires hints that change depending on whether `n_bis` is divisible by 8 or not. 
+
+If `n_bits % 8==0`, there is a single hint `suffix`, and the script checks that
+```
+0^(n_bits//8)||suffix==channel'
+``` 
+
+If `n_bits % 8!=0`, together with `suffix`, there is an additional byte-sized hint `msb`. Consequently, the script checks that
+```
+0^(n_bits//8)||msb||suffix==channel'
+``` 
+and also that `msb` starts with `n_bits % 8` (which would be at least 1) zero bits.
+
 
 ---
 

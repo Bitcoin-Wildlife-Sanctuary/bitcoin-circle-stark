@@ -107,7 +107,7 @@ impl PowGadget {
 #[cfg(test)]
 mod test {
     use bitvm::treepp::*;
-    use rand::{Rng, RngCore, SeedableRng};
+    use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     use crate::pow::{bitcoin_script::PowGadget, grind_find_nonce, hash_with_nonce};
@@ -137,6 +137,71 @@ mod test {
     }
 
     #[test]
+    fn test_fail_verify(){
+        let n_bits = 8;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(1337);
+
+        let mut channel_digest = [0u8; 32].to_vec();
+        prng.fill_bytes(&mut channel_digest);
+
+        let nonce=1337;
+
+        let script = script! {
+            { channel_digest.clone() }
+            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
+            { PowGadget::verify_pow(n_bits)}
+            OP_DROP
+            OP_TRUE
+        };
+
+        let exec_result = execute_script(script);
+        assert!(!exec_result.success);
+
+        let n_bits = 1;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(1337);
+
+        let mut channel_digest = [0u8; 32].to_vec();
+        prng.fill_bytes(&mut channel_digest);
+
+        let nonce=1337+4;
+
+        let script = script! {
+            { channel_digest.clone() }
+            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
+            { PowGadget::verify_pow(n_bits)}
+            OP_DROP
+            OP_TRUE
+        };
+
+        let exec_result = execute_script(script);
+        assert!(!exec_result.success);
+
+        let n_bits = 12;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(1337);
+
+        let mut channel_digest = [0u8; 32].to_vec();
+        prng.fill_bytes(&mut channel_digest);
+
+        let nonce=1337;
+
+        let script = script! {
+            { channel_digest.clone() }
+            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
+            { PowGadget::verify_pow(n_bits)}
+            OP_DROP
+            OP_TRUE
+        };
+
+        let exec_result = execute_script(script);
+        assert!(!exec_result.success);
+    
+
+    }
+
+    #[test]
     fn test_pow() {
 
         for prng_seed in 0..5 {
@@ -145,10 +210,7 @@ mod test {
                 let mut prng = ChaCha20Rng::seed_from_u64(prng_seed);
 
                 let mut channel_digest = [0u8; 32].to_vec();
-
-                for i in 0..32 {
-                    channel_digest[i] = prng.gen();
-                }
+                prng.fill_bytes(&mut channel_digest);
 
                 let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
 
