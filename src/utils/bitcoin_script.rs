@@ -1,4 +1,3 @@
-use bitcoin::opcodes::Ordinary::OP_TOALTSTACK;
 use bitvm::treepp::*;
 
 pub fn trim_m31_gadget(logn: usize) -> Script {

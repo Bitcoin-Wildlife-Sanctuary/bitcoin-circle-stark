@@ -134,13 +134,29 @@ pub fn fri_verify(
 
             let sibling = eval_proof.leaf;
 
+            println!(
+                "query = {}, i= {}, leaf = {}, sibling = {}",
+                query, i, leaf, sibling
+            );
+
             let (mut f0, mut f1) = if query & 1 == 0 {
                 (leaf, sibling)
             } else {
                 (sibling, leaf)
             };
+
+            println!("i= {}, f0 = {}, f1 = {}", i, f0, f1);
+            println!("i= {}, twiddle = {}", i, twiddle_merkle_tree_proof.leaf[i]);
+
             ibutterfly(&mut f0, &mut f1, twiddle_merkle_tree_proof.leaf[i].into());
+
+            println!("i= {}, f0 = {}, f1 = {}", i, f0, f1);
+            println!("i= {}, alpha * f1 = {}", i, alpha * f1);
+
             leaf = f0 + alpha * f1;
+
+            println!("i= {}, leaf = {}, alpha = {}", i, leaf, alpha);
+
             query >>= 1;
         }
         // Check against last layer

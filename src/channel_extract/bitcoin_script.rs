@@ -109,7 +109,6 @@ impl ExtractorGadget {
             { Self::reduce() }
             OP_FROMALTSTACK
             { Self::reduce() }
-            OP_SWAP
         }
     }
 
@@ -137,9 +136,6 @@ impl ExtractorGadget {
             { Self::reduce() }
             OP_FROMALTSTACK
             { Self::reduce() }
-            OP_SWAP
-            2 OP_ROLL
-            3 OP_ROLL
         }
     }
 

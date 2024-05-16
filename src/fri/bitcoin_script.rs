@@ -1,12 +1,16 @@
 use crate::channel::{Channel, ChannelGadget};
 use crate::channel_extract::{ExtractionQM31, ExtractorGadget};
 use crate::fri::{FriProof, N_QUERIES};
+use crate::math::FFTGadget;
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;
-use bitvm::bigint::bits::limb_to_be_bits;
+use bitvm::bigint::bits::{limb_to_be_bits, limb_to_be_bits_toaltstack};
 use bitvm::treepp::*;
-use rust_bitcoin_u31_or_u30::{u31ext_fromaltstack, u31ext_toaltstack, QM31 as QM31Gadget};
+use rust_bitcoin_u31_or_u30::{
+    u31ext_add, u31ext_equalverify, u31ext_fromaltstack, u31ext_mul, u31ext_roll,
+    u31ext_toaltstack, QM31 as QM31Gadget,
+};
 
 pub struct FRIGadget;
 
@@ -154,6 +158,67 @@ impl FRIGadget {
             }
         }
     }
+
+    pub fn push_last_layer(fri_proof: &FriProof) -> Script {
+        script! {
+            for elem in fri_proof.last_layer.iter().rev() {
+                { *elem }
+            }
+        }
+    }
+
+    pub fn check_single_query_ibutterfly(logn: usize) -> Script {
+        // input:
+        //  last_layer (as hints, last elem first, assuming 2 elements)
+        //  twiddle factors (logn - 1) m31
+        //  alphas (logn - 1) qm31
+        //  siblings (logn - 1) qm31
+        //  leaf qm31
+        //  pos
+        // output:
+        //  last_layer (keep it unchanged)
+        // mark the transaction as invalid if the check fails
+
+        script! {
+            { limb_to_be_bits_toaltstack(logn as u32) }
+
+            for i in 1..logn {
+                // the top element is right, the second-to-top element is left
+                OP_FROMALTSTACK
+                OP_NOTIF
+                    { u31ext_roll::<QM31Gadget>(1) }
+                OP_ENDIF
+
+                // pull the twiddle factor
+                { 4 * (1 + (logn - i) * 2) } OP_ROLL
+
+                // ibutterfly
+                { FFTGadget::ibutterfly() }
+
+                // pull the alpha
+                { u31ext_roll::<QM31Gadget>(1 + (logn - i)) }
+
+                // mul
+                { u31ext_mul::<QM31Gadget>() }
+
+                // add
+                { u31ext_add::<QM31Gadget>() }
+            }
+
+            OP_DEPTH 3 OP_SUB
+            OP_FROMALTSTACK
+            OP_NOTIF
+                4 OP_SUB
+            OP_ENDIF
+
+            OP_DUP OP_PICK OP_TOALTSTACK
+            OP_1ADD OP_DUP OP_PICK OP_TOALTSTACK
+            OP_1ADD OP_DUP OP_PICK OP_TOALTSTACK
+            OP_PICK
+            OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
+            { u31ext_equalverify::<QM31Gadget>() }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -163,7 +228,7 @@ mod test {
     use crate::fri;
     use crate::fri::FRIGadget;
     use crate::math::Field;
-    use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_4};
+    use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
     use bitvm::treepp::*;
     use rand::{Rng, SeedableRng};
@@ -182,7 +247,7 @@ mod test {
         };
 
         let mut channel = Channel::new(channel_init_state.clone());
-        let logn = 5;
+        let logn = 19;
 
         let proof = {
             let p = CirclePoint::subgroup_gen(logn + 1);
@@ -241,7 +306,7 @@ mod test {
 
     #[test]
     fn test_twiddle_merkle_tree() {
-        let logn = 5;
+        let logn = 19;
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let mut channel_init_state = [0u8; 32];
@@ -287,7 +352,7 @@ mod test {
             for query in queries.iter() {
                 { query >> 1 }
             }
-            { FRIGadget::check_twiddle_merkle_tree_proof(logn, TWIDDLE_MERKLE_TREE_ROOT_4) }
+            { FRIGadget::check_twiddle_merkle_tree_proof(logn, TWIDDLE_MERKLE_TREE_ROOT_18) }
             for elem in expected.iter().rev() {
                 { *elem }
                 OP_EQUALVERIFY
@@ -303,7 +368,7 @@ mod test {
 
     #[test]
     fn test_single_query_merkle_tree() {
-        let logn = 5;
+        let logn = 19;
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let mut channel_init_state = [0u8; 32];
@@ -357,6 +422,81 @@ mod test {
         };
 
         println!("FRI.Single-Query-Tree = {} bytes", script.len());
+
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_single_query_butterfly() {
+        let logn = 19;
+
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        let mut channel_init_state = [0u8; 32];
+        channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+
+        let proof = {
+            let p = CirclePoint::subgroup_gen(logn + 1);
+
+            let evaluation = (0..(1 << logn))
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .collect();
+            let evaluation = permute_eval(evaluation);
+
+            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
+            proof
+        };
+
+        let (alphas, queries) = {
+            let mut alphas = vec![];
+
+            let mut channel = Channel::new(channel_init_state);
+
+            for c in proof.commitments.iter() {
+                channel.absorb_commitment(c);
+                let res = channel.draw_element();
+                alphas.push(res.0);
+            }
+
+            proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
+
+            let queries = channel.draw_5queries(logn).0;
+
+            (alphas, queries)
+        };
+
+        //  last_layer (as hints, last elem first, assuming 2 elements)
+        //  twiddle factors (logn - 1) m31
+        //  alphas (logn - 1) qm31
+        //  siblings (logn - 1) qm31
+        //  leaf qm31
+        //  pos
+
+        let script = script! {
+            { FRIGadget::push_last_layer(&proof) }
+            for elem in proof.twiddle_merkle_proofs[0].leaf.iter().rev() {
+                { *elem }
+            }
+            for elem in alphas.iter().rev() {
+                { *elem }
+            }
+            for elem in proof.merkle_proofs[0].iter().rev() {
+                { elem.leaf }
+            }
+            { proof.leaves[0] }
+            { queries[0] }
+            { FRIGadget::check_single_query_ibutterfly(logn) }
+
+            { proof.last_layer[0] }
+            { u31ext_equalverify::<QM31Gadget>() }
+
+            { proof.last_layer[1] }
+            { u31ext_equalverify::<QM31Gadget>() }
+
+            OP_TRUE
+        };
+
+        println!("FRI.Single-Query-Butterfly = {} bytes", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);

@@ -19,15 +19,15 @@ impl Pushable for M31 {
 
 impl Pushable for CM31 {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let builder = self.0.bitcoin_script_push(builder);
-        self.1.bitcoin_script_push(builder)
+        let builder = self.1.bitcoin_script_push(builder);
+        self.0.bitcoin_script_push(builder)
     }
 }
 
 impl Pushable for QM31 {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let builder = self.0.bitcoin_script_push(builder);
-        self.1.bitcoin_script_push(builder)
+        let builder = self.1.bitcoin_script_push(builder);
+        self.0.bitcoin_script_push(builder)
     }
 }
 

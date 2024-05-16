@@ -53,35 +53,6 @@ impl CirclePointGadget {
         }
     }
 
-    pub fn mul(num_bits: usize) -> Script {
-        script! {
-            { Self::zero() }
-            OP_TOALTSTACK OP_TOALTSTACK
-            { num_bits + 1 } OP_ROLL
-            { num_bits + 1 } OP_ROLL
-
-            for _ in 0..num_bits - 1 {
-                OP_ROT
-                OP_IF
-                    OP_2DUP
-                    OP_FROMALTSTACK OP_FROMALTSTACK
-                    { Self::add() }
-                    OP_TOALTSTACK OP_TOALTSTACK
-                OP_ENDIF
-                { Self::double() }
-            }
-
-            OP_ROT
-            OP_IF
-                OP_FROMALTSTACK OP_FROMALTSTACK
-                { Self::add() }
-            OP_ELSE
-                OP_2DROP
-                OP_FROMALTSTACK OP_FROMALTSTACK
-            OP_ENDIF
-        }
-    }
-
     pub fn repeated_double(n: usize) -> Script {
         script! {
             for _ in 0..n {
@@ -139,47 +110,6 @@ mod test {
                 { CirclePointGadget::push(&a) }
                 { double_script.clone() }
                 { CirclePointGadget::push(&b) }
-                { CirclePointGadget::equalverify() }
-                OP_TRUE
-            };
-            let exec_result = execute_script(script);
-            assert!(exec_result.success);
-        }
-    }
-
-    #[test]
-    fn test_mul() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        let mul_script = CirclePointGadget::mul(128);
-        println!("CirclePoint.mul(128) = {} bytes", mul_script.len());
-
-        for _ in 0..10 {
-            let a = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
-            };
-            let scalar: u128 = prng.gen();
-            let b = a.mul(scalar);
-
-            let mut bits = vec![];
-            let mut cur = scalar;
-            for _ in 0..128 {
-                bits.push((cur & 1) as u8);
-                cur >>= 1;
-            }
-
-            let script = script! {
-                { CirclePointGadget::push(&a) }
-
-                for i in 0..128 {
-                    { bits[127 - i] }
-                }
-
-                { mul_script.clone() }
-
-                { CirclePointGadget::push(&b) }
-
                 { CirclePointGadget::equalverify() }
                 OP_TRUE
             };

@@ -29,7 +29,7 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * QM31.mul_by_m31() = 4702 bytes
   * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
   * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
-  * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes, CirclePoint.mul(128) = 1109139 bytes
+  * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes
 - **Fiat-Shamir Transcript**
   * Channel.absorb_commitment = 2 bytes
   * Channel.absorb_qm31() = 9 bytes

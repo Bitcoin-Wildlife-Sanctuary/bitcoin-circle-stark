@@ -24,9 +24,9 @@ impl Commitment {
     pub fn commit_cm31(v: CM31) -> Self {
         let mut res = Self::default();
 
-        let c1 = Self::commit_m31(v.1);
+        let c1 = Self::commit_m31(v.0);
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.0));
+        Digest::update(&mut hasher, &num_to_bytes(v.1));
         Digest::update(&mut hasher, &c1.0);
 
         res.0.copy_from_slice(hasher.finalize().as_slice());
@@ -38,17 +38,17 @@ impl Commitment {
         let mut res = Self::default();
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.1 .0));
-        Digest::update(&mut hasher, &Self::commit_m31(v.1 .1).0);
+        Digest::update(&mut hasher, &num_to_bytes(v.0 .1));
+        Digest::update(&mut hasher, &Self::commit_m31(v.0 .0).0);
         res.0.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.0 .1));
+        Digest::update(&mut hasher, &num_to_bytes(v.1 .0));
         Digest::update(&mut hasher, &res.0);
         res.0.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.0 .0));
+        Digest::update(&mut hasher, &num_to_bytes(v.1 .1));
         Digest::update(&mut hasher, &res.0);
         res.0.copy_from_slice(hasher.finalize().as_slice());
 

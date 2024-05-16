@@ -166,7 +166,7 @@ impl Field for CM31 {
 }
 
 // QM31
-pub const R: CM31 = CM31(M31(1), M31(2));
+pub const R: CM31 = CM31(M31(2), M31(1));
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QM31(pub CM31, pub CM31);
