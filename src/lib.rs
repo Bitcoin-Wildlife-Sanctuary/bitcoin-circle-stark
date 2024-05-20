@@ -5,6 +5,7 @@ pub mod channel;
 pub mod channel_commit;
 pub mod channel_extract;
 pub mod circle;
+pub mod circle_secure;
 pub mod fri;
 pub mod math;
 pub mod merkle_tree;
