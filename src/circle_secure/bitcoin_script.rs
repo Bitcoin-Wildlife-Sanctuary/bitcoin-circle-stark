@@ -1,12 +1,15 @@
 
+
 use rust_bitcoin_u31_or_u30::{u31ext_double, u31ext_mul, u31ext_sub, QM31 as QM31Gadget};
 use bitvm::treepp::*;
+
+use crate::{channel_extract::Extractor, math::{Field, QM31}};
 
 pub struct CirclePointSecureGadget;
 
 impl CirclePointSecureGadget {
 
-    // Rationale: cos(2*a) = 2*cos(a)^2-1
+    // Rationale: cos(2*theta) = 2*cos(theta)^2-1
     //
     // input:
     //  x (QM31)
@@ -49,7 +52,13 @@ impl CirclePointSecureGadget {
     //  NONE - this function does not update the channel, only peeks at its value
     // output:
     //  (1+t^2)^1 - hint, where t is a QM31 squeezed from channel
-    pub fn push_1plustsquaredinv_hint(channel_digest: Vec<u8>) -> Script{
+    pub fn push_oneplustsquaredinv_hint(channel_digest: Vec<u8>) -> Script{
+        //let mut hash: [u8; 32] = channel_digest.as_slice().try_into().clone();
+        //let (t, _) = Extractor::extract_qm31(&hash);
+
+        //let oneplustsquaredinv = t.square().add(QM31::one()).inverse();
+        
+
         script! {
             OP_TRUE
         }
@@ -58,38 +67,32 @@ impl CirclePointSecureGadget {
 
 #[cfg(test)]
 mod test {
+    use std::ops::{Add, Neg};
+
     use bitvm::treepp::*;
-    use p3_field::extension::Complex;
-    use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
-    use rand::{Rng, SeedableRng};
+    use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_u31_or_u30::{u31ext_equalverify, QM31 as QM31Gadget};
 
-    type F = p3_field::extension::BinomialExtensionField<Complex<p3_mersenne_31::Mersenne31>, 2>;
-
-    use crate::circle_secure::bitcoin_script::CirclePointSecureGadget;
+    use crate::{circle_secure::bitcoin_script::CirclePointSecureGadget, math::{Field, M31, QM31}};
 
     #[test]
     fn test_double_x(){
         for seed in 0..20 {
-            let mut rng = ChaCha20Rng::seed_from_u64(seed);
+            let mut prng = ChaCha20Rng::seed_from_u64(seed);
 
-            let a = rng.gen::<F>();
-            let double_a = a.square().double()-F::one();
-
-            let a: &[Complex<p3_mersenne_31::Mersenne31>] = a.as_base_slice();
-            let double_a: &[Complex<p3_mersenne_31::Mersenne31>] = double_a.as_base_slice();
+            let a = QM31::from_m31(
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+            );
+            let double_a = a.square().double().add(QM31::one().neg());
 
             let script = script! {
-                { a[1].imag().as_canonical_u32() }
-                { a[1].real().as_canonical_u32() }
-                { a[0].imag().as_canonical_u32() }
-                { a[0].real().as_canonical_u32() }
+                { a }
                 { CirclePointSecureGadget::double_x() }
-                { double_a[1].imag().as_canonical_u32() }
-                { double_a[1].real().as_canonical_u32() }
-                { double_a[0].imag().as_canonical_u32() }
-                { double_a[0].real().as_canonical_u32() }
+                { double_a }
                 { u31ext_equalverify::<QM31Gadget>() }
                 OP_PUSHNUM_1
             };
