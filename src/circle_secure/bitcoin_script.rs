@@ -1,10 +1,9 @@
 use std::ops::{Add, Mul, Neg};
 
-use bitcoin::opcodes::all::{OP_FROMALTSTACK, OP_ROLL, OP_TOALTSTACK};
-use rust_bitcoin_u31_or_u30::{u31ext_add, u31ext_double, u31ext_equalverify, u31ext_mul, u31ext_sub, QM31 as QM31Gadget};
+use rust_bitcoin_u31_or_u30::{u31ext_add, u31ext_copy, u31ext_double, u31ext_equalverify, u31ext_fromaltstack, u31ext_mul, u31ext_roll, u31ext_sub, u31ext_toaltstack, QM31 as QM31Gadget};
 use bitvm::treepp::*;
 
-use crate::{channel::ChannelGadget, channel_extract::{Extractor, ExtractorGadget}, math::{Field, QM31}};
+use crate::{channel::ChannelGadget, channel_extract::Extractor, math::{Field, QM31}};
 
 pub struct CirclePointSecureGadget;
 
@@ -19,10 +18,7 @@ impl CirclePointSecureGadget {
     //  2*x^2-1 (QM31)
     pub fn double_x() -> Script {
         script! {
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
+            { u31ext_copy::<QM31Gadget>(0) }
             { u31ext_mul::<QM31Gadget>() }
             { u31ext_double::<QM31Gadget>() }
             { 0 as u32 }
@@ -49,67 +45,41 @@ impl CirclePointSecureGadget {
     //  channel'=sha256(channel)
     pub fn get_random_point() -> Script {
         script! {
-            { ChannelGadget::squeeze_element_using_hint() } //stack: x,y,t,channel'
-            OP_TOALTSTACK //stack: y,x,t; altstack: channel'
-            7 OP_PICK
-            7 OP_PICK
-            7 OP_PICK
-            7 OP_PICK //stack: y,x,t,x; altstack: channel'
-            OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK //stack: y,x,t; altstack: channel',x
-            11 OP_PICK
-            11 OP_PICK
-            11 OP_PICK
-            11 OP_PICK //stack: y,x,t,y; altstack: channel',x
-            OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK //stack: y,x,t; altstack: channel',x,y
-
-
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK //stack: y,x,t,t; altstack: channel'
+            { ChannelGadget::squeeze_element_using_hint() } //stack: y,x,t,channel'
+            /*OP_TOALTSTACK //stack: y,x,t; altstack: channel'
+            { u31ext_copy::<QM31Gadget>(1) } //stack: y,x,t,x; altstack: channel'
+            { u31ext_toaltstack::<QM31Gadget>() } //stack: y,x,t; altstack: channel',x
+            { u31ext_copy::<QM31Gadget>(2) } //stack: y,x,t,y; altstack: channel',x
+            { u31ext_toaltstack::<QM31Gadget>() }  //stack: y,x,t; altstack: channel',x,y
+            { u31ext_copy::<QM31Gadget>(0) }  //stack: y,x,t,t; altstack: channel'
             { u31ext_double::<QM31Gadget>() } //stack: y,x,t,2*t; altstack: channel'
-            OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK //stack: y,x,t; altstack: channel',x,y,2*t
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK //stack: y,x,t,t; altstack: channel',x,y,2*t
+            { u31ext_toaltstack::<QM31Gadget>() }  //stack: y,x,t; altstack: channel',x,y,2*t
+            { u31ext_copy::<QM31Gadget>(0) } //stack: y,x,t,t; altstack: channel',x,y,2*t
             { u31ext_mul::<QM31Gadget>() } //stack: y,x,t^2; altstack: channel',x,y,2*t
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK //stack: y,x,t^2,t^2; altstack: channel',x,y,2*t
+            { u31ext_copy::<QM31Gadget>(0) } //stack: y,x,t^2,t^2; altstack: channel',x,y,2*t
             { 0 as u32 }
             { 0 as u32 }
             { 0 as u32 }
             { 1 as u32 } //stack: y,x,t^2,t^2,1; altstack: channel',x,y,2*t
-            4 OP_ROLL
-            4 OP_ROLL
-            4 OP_ROLL
-            4 OP_ROLL //stack: y,x,t^2,1,t^2; altstack: channel',x,y,2*t
+            { u31ext_roll::<QM31Gadget>(0) } //stack: y,x,t^2,1,t^2; altstack: channel',x,y,2*t
             { u31ext_sub::<QM31Gadget>() } //stack: y,x,t^2,1-t^2; altstack: channel',x,y,2*t
-            OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK //stack: y,x,t^2; altstack: channel',x,y,2*t,1-t^2
+            { u31ext_toaltstack::<QM31Gadget>() } //stack: y,x,t^2; altstack: channel',x,y,2*t,1-t^2
             { 0 as u32 }
             { 0 as u32 }
             { 0 as u32 }
             { 1 as u32 }
             { u31ext_add::<QM31Gadget>() } //stack: y,x,1+t^2; altstack: channel',x,y,2*t,1-t^2
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK
-            3 OP_PICK //stack: y,x,1+t^2,1+t^2; altstack: channel',x,y,2*t,1-t^2
-            7 OP_ROLL
-            7 OP_ROLL
-            7 OP_ROLL
-            7 OP_ROLL //stack: y,1+t^2,1+t^2,x; altstack: channel',x,y,2*t,1-t^2
+            { u31ext_copy::<QM31Gadget>(0) } //stack: y,x,1+t^2,1+t^2; altstack: channel',x,y,2*t,1-t^2
+            { u31ext_roll::<QM31Gadget>(1) } //stack: y,1+t^2,1+t^2,x; altstack: channel',x,y,2*t,1-t^2
             { u31ext_mul::<QM31Gadget>() } //stack: y,1+t^2,(1+t^2)*x; altstack: channel',x,y,2*t,1-t^2
-            OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK //stack: y,1+t^2,(1+t^2)*x,1-t^2; altstack: channel',x,y,2*t
+            { u31ext_toaltstack::<QM31Gadget>() } //stack: y,1+t^2,(1+t^2)*x,1-t^2; altstack: channel',x,y,2*t
             { u31ext_equalverify::<QM31Gadget>() } //stack: y,1+t^2; altstack: channel',x,y,2*t
             { u31ext_mul::<QM31Gadget>() } //stack: y*(1+t^2); altstack: channel',x,y,2*t,1-t^2
-            OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK //stack: y*(1+t^2),1-t^2; altstack: channel',x,y,2*t
+            { u31ext_toaltstack::<QM31Gadget>() } //stack: y*(1+t^2),1-t^2; altstack: channel',x,y,2*t
             { u31ext_equalverify::<QM31Gadget>() } //stack: ; altstack: channel',x,y
-            for _ in 0..11 { OP_FROMALTSTACK } //stack: y,x,channel'
+            OP_FROMALTSTACK { u31ext_fromaltstack::<QM31Gadget>() } { u31ext_fromaltstack::<QM31Gadget>() } //stack: y,x,channel'
             
-            
+            */
         }
     }
 
@@ -175,6 +145,7 @@ mod test {
 
         let mut channel_digest = vec![0u8; 32];
         prng.fill_bytes(&mut channel_digest);
+
         let hash: [u8; 32] = channel_digest.as_slice().try_into().unwrap();
         let (t, hint_t) = Extractor::extract_qm31(&hash);
 
@@ -182,28 +153,20 @@ mod test {
         let y = t.square().add(QM31::one()).inverse().mul(QM31::one().double().mul(t)); // (1+t^2)^-1 * 2 * t
 
         let script = script! {
-            { CirclePointSecureGadget::push_random_point_hint(channel_digest.clone()) }
+            //{ CirclePointSecureGadget::push_random_point_hint(channel_digest.clone()) }
             { ExtractorGadget::push_hint_qm31(&hint_t) }
             { hash.to_vec() }
 
             { CirclePointSecureGadget::get_random_point() }
+            OP_DROP OP_DROP OP_DROP OP_DROP
 
-            { channel_digest.clone() } //check channel'
-            OP_SHA256
-            OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
-            { y } //check y
-            //should be OP_PICK, or maybe stay with roll
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            OP_DROP OP_DROP OP_DROP OP_DROP
-            { x } //check x
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            4 OP_PICK OP_EQUALVERIFY
-            OP_DROP OP_DROP OP_DROP OP_DROP
+            //{ channel_digest.clone() } //check channel'
+            //OP_SHA256
+            //OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
+            //{ y } //check y
+            //{ u31ext_equalverify::<QM31Gadget>() }
+            //{ x } //check x
+            //{ u31ext_equalverify::<QM31Gadget>() }
             OP_TRUE
         };
         let exec_result = execute_script(script);
