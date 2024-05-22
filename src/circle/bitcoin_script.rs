@@ -87,7 +87,6 @@ mod test {
     use crate::circle::CirclePointGadget;
     use crate::math::M31;
     use bitvm::treepp::*;
-    use rand::Rng;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use std::ops::{Add, Sub};

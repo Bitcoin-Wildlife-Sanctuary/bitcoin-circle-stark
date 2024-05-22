@@ -8,7 +8,7 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 pub struct Channel {
-    state: [u8; 32],
+    pub state: [u8; 32],
 }
 
 impl Channel {
