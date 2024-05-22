@@ -6,6 +6,9 @@ This repository includes Bitcoin script implementations of various cryptographic
   * implementation of add, sub, mul of Mersenne-31 (M31) and its complex extension (CM31) and its degree-4 extension (QM31), 
     which is imported from [BitVM/rust-bitcoin-m31-or-babybear](https://github.com/BitVM/rust-bitcoin-m31-or-babybear).
   * implementation of add, sub, mul of circle points, which are over the circle curve `x^2 + y^2 = 1`.
+- **CirclePoint over QM31**
+  * implementation of double of a circle point over QM31.
+  * implementation of drawing a random point on the circle over QM31, which is useful for OODS.
 - **Fiat-Shamir Transcript**
   * aka "channel", which is the name used in Starkware's [stwo](https://github.com/starkware-libs/stwo) library.
   * absorbing commitments and QM31 elements through `OP_CAT + OP_SHA256`.
@@ -33,11 +36,35 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
   * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
   * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes
+- **CirclePoint over QM31**
+  * CirclePointSecure.double_x() = 13505 bytes
+  * CirclePointSecure.get_random_point() = 40546 bytes
 - **Fiat-Shamir Transcript**
   * Channel.absorb_commitment = 2 bytes
   * Channel.absorb_qm31() = 9 bytes
   * Channel.squeeze_element_using_hint() = 257 bytes (require 5 hint elements)
   * Channel.squeeze_5queries_using_hint() = 1222 bytes (require 6 hint elements)
+- **Proof-of-Work Check**
+  * POW.verify_pow(1 bits) = 39 bytes
+  * POW.verify_pow(2 bits) = 38 bytes
+  * POW.verify_pow(3 bits) = 38 bytes
+  * POW.verify_pow(4 bits) = 37 bytes
+  * POW.verify_pow(5 bits) = 37 bytes
+  * POW.verify_pow(6 bits) = 37 bytes
+  * POW.verify_pow(7 bits) = 37 bytes
+  * POW.verify_pow(8 bits) = 21 bytes
+  * POW.verify_pow(9 bits) = 42 bytes
+  * POW.verify_pow(10 bits) = 41 bytes
+  * POW.verify_pow(11 bits) = 41 bytes
+  * POW.verify_pow(12 bits) = 40 bytes
+  * POW.verify_pow(13 bits) = 40 bytes
+  * POW.verify_pow(14 bits) = 40 bytes
+  * POW.verify_pow(15 bits) = 40 bytes
+  * POW.verify_pow(16 bits) = 22 bytes
+  * POW.verify_pow(17 bits) = 43 bytes
+  * POW.verify_pow(18 bits) = 42 bytes
+  * POW.verify_pow(19 bits) = 42 bytes
+  * POW.verify_pow(20 bits) = 41 bytes
 - **Merkle tree**
   * MT.verify(2^12) = 263 bytes (require 11 hint elements)
   * MT.verify(2^14) = 309 bytes (require 13 hint elements)

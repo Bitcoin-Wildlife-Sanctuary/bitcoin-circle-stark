@@ -202,6 +202,7 @@ mod test {
 
     #[test]
     fn test_pow() {
+
         for prng_seed in 0..5 {
             for n_bits in 1..=20 {
                 let mut prng = ChaCha20Rng::seed_from_u64(prng_seed);
@@ -211,10 +212,19 @@ mod test {
 
                 let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
 
+                let verify_pow_script = PowGadget::verify_pow(n_bits);
+                if prng_seed == 0 {
+                    println!(
+                        "POW.verify_pow({} bits) = {} bytes",
+                        n_bits,
+                        verify_pow_script.len()
+                    );
+                }
+
                 let script = script! {
                     { channel_digest.clone() }
                     { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
-                    { PowGadget::verify_pow(n_bits)}
+                    { verify_pow_script.clone() }
                     { channel_digest.clone() }
                     { nonce.to_le_bytes().to_vec() }
                     OP_CAT
