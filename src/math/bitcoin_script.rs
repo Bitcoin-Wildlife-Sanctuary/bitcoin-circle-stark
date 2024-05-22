@@ -1,6 +1,6 @@
 use bitvm::treepp::*;
 use rust_bitcoin_m31::{
-    qm31_add, qm31_copy, qm31_fromaltstack, qm31_mul_m31, qm31_sub, qm31_toaltstack,
+    qm31_add, qm31_fromaltstack, qm31_mul_m31, qm31_over, qm31_sub, qm31_toaltstack,
 };
 
 pub struct FFTGadget;
@@ -19,8 +19,8 @@ impl FFTGadget {
         script! {
             OP_TOALTSTACK
 
-            { qm31_copy(1) }
-            { qm31_copy(1) }
+            qm31_over
+            qm31_over
             qm31_sub
 
             OP_FROMALTSTACK

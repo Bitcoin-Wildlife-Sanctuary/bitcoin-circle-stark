@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 bitvm = { git = "https://github.com/BitVM/BitVM/" }
-rust-bitcoin-u31-or-u30 = { git = "https://github.com/BitVM/rust-bitcoin-m31-or-babybear/" }
+rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
 bitcoin-script = { git = "https://github.com/BitVM/rust-bitcoin-script" }
 bitcoin = { git = "https://github.com/rust-bitcoin/rust-bitcoin", branch = "bitvm" }
 bitcoin-scriptexec = { git = "https://github.com/BitVM/rust-bitcoin-scriptexec/"}

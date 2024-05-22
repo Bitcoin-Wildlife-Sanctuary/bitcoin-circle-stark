@@ -1,7 +1,8 @@
 use bitvm::treepp::*;
 use rust_bitcoin_m31::{
-    qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll,
-    qm31_sub, qm31_toaltstack,
+    m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_double, qm31_dup,
+    qm31_equalverify, qm31_from_bottom, qm31_mul, qm31_neg, qm31_roll, qm31_rot, qm31_square,
+    qm31_sub, qm31_swap,
 };
 use std::ops::{Add, Mul, Neg};
 
@@ -22,13 +23,9 @@ impl CirclePointSecureGadget {
     //  2*x^2-1 (QM31)
     pub fn double_x() -> Script {
         script! {
-            { qm31_copy(0) }
-            qm31_mul
+            qm31_square
             qm31_double
-            { 0 }
-            { 0 }
-            { 0 }
-            { 1 }
+            push_qm31_one
             qm31_sub
         }
     }
@@ -36,71 +33,66 @@ impl CirclePointSecureGadget {
     // Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
     //
     // input:
-    //  qm31 hint (5 elements) --- as hints
-    //  y - hint such that 2*t = y*(1+t^2)
-    //  x - hint such that 1-t^2 = x*(1+t^2)
-    //      where t is extracted from channel
+    //  w - qm31 hint (5 elements)
+    //  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
+    //  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
     //  channel
     //
     // output:
-    //  y
-    //  x
-    //      where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     //  channel'=sha256(channel)
-    //
-    // WARNING!!: y & x are read using u31ext_copy(), and not via the hint convention of repeating `OP_DEPTH OP_1SUB OP_ROLL`
-    //
-    pub fn verify_sampling_random_point() -> Script {
+    //  x
+    //  y
+    // where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
+    pub fn get_random_point() -> Script {
         script! {
-            { ChannelGadget::squeeze_element_using_hint() } //stack: y,x,channel',t
-            4 OP_ROLL //stack: y,x,t,channel'
-            OP_TOALTSTACK //stack: y,x,t; altstack: channel'
-            { qm31_copy(1) } //stack: y,x,t,x; altstack: channel'
-            qm31_toaltstack //stack: y,x,t; altstack: channel',x
-            { qm31_copy(2) } //stack: y,x,t,y; altstack: channel',x
-            qm31_toaltstack  //stack: y,x,t; altstack: channel',x,y
-            { qm31_copy(0) }  //stack: y,x,t,t; altstack: channel'
-            qm31_double //stack: y,x,t,2*t; altstack: channel'
-            qm31_toaltstack  //stack: y,x,t; altstack: channel',x,y,2*t
-            { qm31_copy(0) } //stack: y,x,t,t; altstack: channel',x,y,2*t
-            qm31_mul //stack: y,x,t^2; altstack: channel',x,y,2*t
-            { qm31_copy(0) } //stack: y,x,t^2,t^2; altstack: channel',x,y,2*t
-            { 0 as u32 }
-            { 0 as u32 }
-            { 0 as u32 }
-            { 1 as u32 } //stack: y,x,t^2,t^2,1; altstack: channel',x,y,2*t
-            { qm31_roll(1) } //stack: y,x,t^2,1,t^2; altstack: channel',x,y,2*t
-            qm31_sub //stack: y,x,t^2,1-t^2; altstack: channel',x,y,2*t
-            qm31_toaltstack //stack: y,x,t^2; altstack: channel',x,y,2*t,1-t^2
-            { 0 as u32 }
-            { 0 as u32 }
-            { 0 as u32 }
-            { 1 as u32 }
-            qm31_add //stack: y,x,1+t^2; altstack: channel',x,y,2*t,1-t^2
-            { qm31_copy(0) } //stack: y,x,1+t^2,1+t^2; altstack: channel',x,y,2*t,1-t^2
-            { qm31_roll(2) } //stack: y,1+t^2,1+t^2,x; altstack: channel',x,y,2*t,1-t^2
-            qm31_mul //stack: y,1+t^2,(1+t^2)*x; altstack: channel',x,y,2*t,1-t^2
-            qm31_fromaltstack //stack: y,1+t^2,(1+t^2)*x,1-t^2; altstack: channel',x,y,2*t
-            qm31_equalverify //stack: y,1+t^2; altstack: channel',x,y,2*t
-            qm31_mul //stack: y*(1+t^2); altstack: channel',x,y,2*t,1-t^2
-            qm31_fromaltstack //stack: y*(1+t^2),1-t^2; altstack: channel',x,y,2*t
-            qm31_equalverify //stack: ; altstack: channel',x,y
-            OP_FROMALTSTACK qm31_fromaltstack qm31_fromaltstack //stack: y,x,channel'
+            { ChannelGadget::squeeze_element_using_hint() }
+            // stack: x, y, channel', t
+
+            // compute t^2 from t
+            qm31_dup
+            qm31_square
+
+            // compute t^2 - 1
+            qm31_dup
+            push_m31_one
+            m31_sub // a trick
+
+            // compute t^2 + 1
+            qm31_swap
+            push_n31_one
+            m31_add_n31
+            qm31_dup
+
+            // stack: x, y, channel', t, t^2 - 1, t^2 + 1, t^2 + 1
+
+            // pull the hint x and verify
+            qm31_from_bottom
+            qm31_dup
+            qm31_rot
+            qm31_mul
+            qm31_neg
+            { qm31_roll(3) }
+            qm31_equalverify
+
+            // stack: y, channel', t, t^2 + 1, x
+
+            // pull the hint y
+            qm31_from_bottom
+            qm31_dup
+            { qm31_roll(3) }
+            qm31_mul
+            { qm31_roll(3) }
+            qm31_double
+            qm31_equalverify
         }
     }
 
-    // input:
-    //  NONE - this function does not update the channel, only peeks at its value
-    //
-    // output:
-    //  y
-    //  x
     pub fn push_random_point_hint(t: QM31) -> Script {
-        let oneplustsquaredinv = t.square().add(QM31::one()).inverse(); //(1+t^2)^-1
+        let one_plus_tsquared_inv = t.square().add(QM31::one()).inverse();
 
         script! {
-            { t.double().mul(oneplustsquaredinv) }
-            { QM31::one().add(t.square().neg()).mul(oneplustsquaredinv) }
+            { QM31::one().add(t.square().neg()).mul(one_plus_tsquared_inv) } // x = (1 - t^2) / (1 + t^2)
+            { t.double().mul(one_plus_tsquared_inv) } // y = 2t / (1 + t^2)
         }
     }
 }
@@ -156,7 +148,7 @@ mod test {
     fn test_get_random_point() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let get_random_point_script = CirclePointSecureGadget::verify_sampling_random_point();
+        let get_random_point_script = CirclePointSecureGadget::get_random_point();
         println!(
             "CirclePointSecure.get_random_point() = {} bytes",
             get_random_point_script.len()
@@ -185,14 +177,13 @@ mod test {
             { ExtractorGadget::push_hint_qm31(&hint_t) }
             { CirclePointSecureGadget::push_random_point_hint(t.clone()) }
             { a.to_vec() }
-
             { get_random_point_script.clone() }
-            { c.to_vec() } //check channel'
+            { y } // check y
+            qm31_equalverify
+            { x } // check x
+            qm31_equalverify
+            { c.to_vec() } // check channel'
             OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
-            { x } //check x
-            qm31_equalverify
-            { y } //check y
-            qm31_equalverify
             OP_TRUE
         };
         let exec_result = execute_script(script);

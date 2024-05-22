@@ -8,7 +8,7 @@ use crate::utils::copy_to_altstack_top_item_first_in;
 use bitvm::bigint::bits::{limb_to_be_bits, limb_to_be_bits_toaltstack};
 use bitvm::treepp::*;
 use rust_bitcoin_m31::{
-    qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_toaltstack,
+    qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_swap, qm31_toaltstack,
 };
 
 pub struct FRIGadget;
@@ -185,7 +185,7 @@ impl FRIGadget {
                 // the top element is right, the second-to-top element is left
                 OP_FROMALTSTACK
                 OP_NOTIF
-                    { qm31_roll(1) }
+                    qm31_swap
                 OP_ENDIF
 
                 // pull the twiddle factor
