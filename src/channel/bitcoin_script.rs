@@ -59,7 +59,7 @@ mod test {
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_u31_or_u30::{u31ext_equalverify, QM31 as QM31Gadget};
+    use rust_bitcoin_m31::qm31_equalverify;
 
     #[test]
     fn test_absorb_commitment() {
@@ -147,7 +147,7 @@ mod test {
             { a.to_vec() }
             { channel_script.clone() }
             { b }
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
             { c.to_vec() }
             OP_EQUAL
         };

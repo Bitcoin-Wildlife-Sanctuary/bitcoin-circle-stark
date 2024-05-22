@@ -86,7 +86,7 @@ mod test {
     use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_u31_or_u30::{u31ext_equalverify, QM31 as QM31Gadget};
+    use rust_bitcoin_m31::qm31_equalverify;
 
     #[test]
     fn test_merkle_tree_verify() {
@@ -117,7 +117,7 @@ mod test {
                 { pos }
                 { verify_script.clone() }
                 { last_layer[pos as usize] }
-                { u31ext_equalverify::<QM31Gadget>() }
+                qm31_equalverify
                 OP_TRUE
             };
 
@@ -154,7 +154,7 @@ mod test {
                 { pos }
                 { verify_script.clone() }
                 { last_layer[(pos ^ 1) as usize] }
-                { u31ext_equalverify::<QM31Gadget>() }
+                qm31_equalverify
                 OP_TRUE
             };
 

@@ -1,7 +1,6 @@
 use bitvm::treepp::*;
-use rust_bitcoin_u31_or_u30::QM31 as QM31Gadget;
-use rust_bitcoin_u31_or_u30::{
-    u31ext_add, u31ext_copy, u31ext_fromaltstack, u31ext_mul_u31, u31ext_sub, u31ext_toaltstack,
+use rust_bitcoin_m31::{
+    qm31_add, qm31_copy, qm31_fromaltstack, qm31_mul_m31, qm31_sub, qm31_toaltstack,
 };
 
 pub struct FFTGadget;
@@ -20,18 +19,18 @@ impl FFTGadget {
         script! {
             OP_TOALTSTACK
 
-            { u31ext_copy::<QM31Gadget>(1) }
-            { u31ext_copy::<QM31Gadget>(1) }
-            { u31ext_sub::<QM31Gadget>() }
+            { qm31_copy(1) }
+            { qm31_copy(1) }
+            qm31_sub
 
             OP_FROMALTSTACK
-            { u31ext_mul_u31::<QM31Gadget>() }
+            qm31_mul_m31
 
-            { u31ext_toaltstack::<QM31Gadget>() }
+            qm31_toaltstack
 
-            { u31ext_add::<QM31Gadget>() }
+            qm31_add
 
-            { u31ext_fromaltstack::<QM31Gadget>() }
+            qm31_fromaltstack
         }
     }
 }
@@ -43,8 +42,7 @@ mod test {
     use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_u31_or_u30::u31ext_equalverify;
-    use rust_bitcoin_u31_or_u30::QM31 as QM31Gadget;
+    use rust_bitcoin_m31::qm31_equalverify;
 
     #[test]
     fn test_ibutterfly() {
@@ -77,9 +75,9 @@ mod test {
             { itwid }
             { FFTGadget::ibutterfly() }
             { v1 }
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
             { v0 }
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
             OP_TRUE
         };
 

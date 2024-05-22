@@ -1,9 +1,10 @@
 mod bitcoin_script;
+pub use bitcoin_script::*;
 
 use sha2::{Digest, Sha256};
 
 /// Check that the prefix leading zeros is greater than `bound_bits`.
-fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
+pub fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
     let mut n_bits = 0;
     // bytes are in little endian order.
     for byte in bytes.iter() {
@@ -17,7 +18,7 @@ fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
     n_bits >= bound_bits
 }
 
-fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
+pub fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
     let mut concat = seed.clone();
     concat.extend(nonce.to_le_bytes().to_vec());
 
@@ -27,7 +28,7 @@ fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
     hasher.finalize().as_slice().to_vec()
 }
 
-fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
+pub fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
     let mut nonce = 0u64;
 
     loop {

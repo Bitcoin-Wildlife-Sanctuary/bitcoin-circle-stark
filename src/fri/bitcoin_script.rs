@@ -7,9 +7,8 @@ use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;
 use bitvm::bigint::bits::{limb_to_be_bits, limb_to_be_bits_toaltstack};
 use bitvm::treepp::*;
-use rust_bitcoin_u31_or_u30::{
-    u31ext_add, u31ext_equalverify, u31ext_fromaltstack, u31ext_mul, u31ext_roll,
-    u31ext_toaltstack, QM31 as QM31Gadget,
+use rust_bitcoin_m31::{
+    qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_toaltstack,
 };
 
 pub struct FRIGadget;
@@ -55,7 +54,7 @@ impl FRIGadget {
             for _ in 0..n_layers {
                 { ChannelGadget::absorb_commitment() }
                 { ChannelGadget::squeeze_element_using_hint() }
-                { u31ext_toaltstack::<QM31Gadget>() }
+                qm31_toaltstack
             }
 
             for _ in 0..n_last_layer {
@@ -68,7 +67,7 @@ impl FRIGadget {
             5 OP_ROLL OP_DROP
 
             for _ in 0..n_layers {
-                { u31ext_fromaltstack::<QM31Gadget>() }
+                qm31_fromaltstack
             }
         }
     }
@@ -140,7 +139,7 @@ impl FRIGadget {
 
                 { MerkleTreeGadget::query_and_verify_internal(i, true) }
 
-                { u31ext_toaltstack::<QM31Gadget>() }
+                qm31_toaltstack
             }
 
             // drop the bits
@@ -154,7 +153,7 @@ impl FRIGadget {
 
             // recover all the elements
             for _ in 2..=logn {
-                { u31ext_fromaltstack::<QM31Gadget>() }
+                qm31_fromaltstack
             }
         }
     }
@@ -186,7 +185,7 @@ impl FRIGadget {
                 // the top element is right, the second-to-top element is left
                 OP_FROMALTSTACK
                 OP_NOTIF
-                    { u31ext_roll::<QM31Gadget>(1) }
+                    { qm31_roll(1) }
                 OP_ENDIF
 
                 // pull the twiddle factor
@@ -196,13 +195,13 @@ impl FRIGadget {
                 { FFTGadget::ibutterfly() }
 
                 // pull the alpha
-                { u31ext_roll::<QM31Gadget>(1 + (logn - i)) }
+                { qm31_roll(1 + (logn - i)) }
 
                 // mul
-                { u31ext_mul::<QM31Gadget>() }
+                qm31_mul
 
                 // add
-                { u31ext_add::<QM31Gadget>() }
+                qm31_add
             }
 
             OP_DEPTH 3 OP_SUB
@@ -216,7 +215,7 @@ impl FRIGadget {
             OP_1ADD OP_DUP OP_PICK OP_TOALTSTACK
             OP_PICK
             OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
         }
     }
 }
@@ -233,8 +232,7 @@ mod test {
     use bitvm::treepp::*;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_u31_or_u30::u31ext_equalverify;
-    use rust_bitcoin_u31_or_u30::QM31 as QM31Gadget;
+    use rust_bitcoin_m31::qm31_equalverify;
 
     #[test]
     fn test_fiat_shamir() {
@@ -289,7 +287,7 @@ mod test {
             { FRIGadget::check_fiat_shamir(&channel_init_state, logn, logn - 1) }
             for elem in expected.0.iter() {
                 { *elem }
-                { u31ext_equalverify::<QM31Gadget>() }
+                qm31_equalverify
             }
             for elem in expected.1.iter().rev() {
                 { *elem }
@@ -416,7 +414,7 @@ mod test {
             { FRIGadget::check_single_query_merkle_tree_proof(logn) }
             for elem in expected.iter() {
                 { *elem }
-                { u31ext_equalverify::<QM31Gadget>() }
+                qm31_equalverify
             }
             OP_TRUE
         };
@@ -488,10 +486,10 @@ mod test {
             { FRIGadget::check_single_query_ibutterfly(logn) }
 
             { proof.last_layer[0] }
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
 
             { proof.last_layer[1] }
-            { u31ext_equalverify::<QM31Gadget>() }
+            qm31_equalverify
 
             OP_TRUE
         };

@@ -2,6 +2,7 @@ use crate::pow::hash_with_nonce;
 use bitvm::treepp::*;
 
 pub struct PowGadget;
+
 impl PowGadget {
     // input:
     //  channel (32 bytes)
@@ -137,7 +138,7 @@ mod test {
     }
 
     #[test]
-    fn test_fail_verify(){
+    fn test_fail_verify() {
         let n_bits = 8;
 
         let mut prng = ChaCha20Rng::seed_from_u64(1337);
@@ -145,7 +146,7 @@ mod test {
         let mut channel_digest = [0u8; 32].to_vec();
         prng.fill_bytes(&mut channel_digest);
 
-        let nonce=1337;
+        let nonce = 1337;
 
         let script = script! {
             { channel_digest.clone() }
@@ -165,7 +166,7 @@ mod test {
         let mut channel_digest = [0u8; 32].to_vec();
         prng.fill_bytes(&mut channel_digest);
 
-        let nonce=1337+4;
+        let nonce = 1337 + 4;
 
         let script = script! {
             { channel_digest.clone() }
@@ -185,7 +186,7 @@ mod test {
         let mut channel_digest = [0u8; 32].to_vec();
         prng.fill_bytes(&mut channel_digest);
 
-        let nonce=1337;
+        let nonce = 1337;
 
         let script = script! {
             { channel_digest.clone() }
@@ -197,16 +198,12 @@ mod test {
 
         let exec_result = execute_script(script);
         assert!(!exec_result.success);
-    
-
     }
 
     #[test]
     fn test_pow() {
-
         for prng_seed in 0..5 {
             for n_bits in 1..=20 {
-
                 let mut prng = ChaCha20Rng::seed_from_u64(prng_seed);
 
                 let mut channel_digest = [0u8; 32].to_vec();
@@ -229,6 +226,5 @@ mod test {
                 assert!(exec_result.success);
             }
         }
-        
     }
 }

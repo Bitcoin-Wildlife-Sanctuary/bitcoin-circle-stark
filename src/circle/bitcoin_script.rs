@@ -1,6 +1,6 @@
 use crate::circle::CirclePoint;
 use bitvm::treepp::*;
-use rust_bitcoin_u31_or_u30::{u31_add, u31_mul, u31_neg, u31_sub, M31 as M31Gadget};
+use rust_bitcoin_m31::{m31_add, m31_mul, m31_neg, m31_sub};
 
 pub struct CirclePointGadget;
 
@@ -23,25 +23,25 @@ impl CirclePointGadget {
         script! {
             3 OP_PICK
             2 OP_PICK
-            { u31_mul::<M31Gadget>() }
+            m31_mul
             3 OP_PICK
             2 OP_PICK
-            { u31_mul::<M31Gadget>() }
+            m31_mul
             5 OP_ROLL
             5 OP_ROLL
-            { u31_add::<M31Gadget>() }
+            m31_add
             4 OP_ROLL
             4 OP_ROLL
-            { u31_add::<M31Gadget>() }
-            { u31_mul::<M31Gadget>() }
+            m31_add
+            m31_mul
             OP_TOALTSTACK
             OP_2DUP
-            { u31_add::<M31Gadget>() }
+            m31_add
             OP_FROMALTSTACK
             OP_SWAP
-            { u31_sub::<M31Gadget>() }
+            m31_sub
             OP_TOALTSTACK
-            { u31_sub::<M31Gadget>() }
+            m31_sub
             OP_FROMALTSTACK
         }
     }
@@ -62,7 +62,7 @@ impl CirclePointGadget {
     }
 
     pub fn conjugate() -> Script {
-        u31_neg::<M31Gadget>()
+        m31_neg()
     }
 
     pub fn sub() -> Script {
