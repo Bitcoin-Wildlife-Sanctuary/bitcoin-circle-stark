@@ -3,7 +3,7 @@ use std::ops::{Add, Mul, Neg};
 use rust_bitcoin_u31_or_u30::{u31ext_add, u31ext_copy, u31ext_double, u31ext_equalverify, u31ext_fromaltstack, u31ext_mul, u31ext_roll, u31ext_sub, u31ext_toaltstack, QM31 as QM31Gadget};
 use bitvm::treepp::*;
 
-use crate::{channel::{Channel, ChannelGadget}, channel_extract::Extractor, math::{Field, QM31}};
+use crate::{channel::ChannelGadget, math::{Field, QM31}};
 
 pub struct CirclePointSecureGadget;
 
@@ -21,10 +21,10 @@ impl CirclePointSecureGadget {
             { u31ext_copy::<QM31Gadget>(0) }
             { u31ext_mul::<QM31Gadget>() }
             { u31ext_double::<QM31Gadget>() }
-            { 0 as u32 }
-            { 0 as u32 }
-            { 0 as u32 }
-            { 1 as u32 }
+            { 0 }
+            { 0 }
+            { 0 }
+            { 1 }
             { u31ext_sub::<QM31Gadget>() }
         }
     }
@@ -32,7 +32,7 @@ impl CirclePointSecureGadget {
     // Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
     //
     // input:
-    //  qm31 hint (5 elements)
+    //  qm31 hint (5 elements) --- as hints
     //  y - hint such that 2*t = y*(1+t^2)
     //  x - hint such that 1-t^2 = x*(1+t^2)
     //      where t is extracted from channel
@@ -46,7 +46,7 @@ impl CirclePointSecureGadget {
     //
     // WARNING!!: y & x are read using u31ext_copy(), and not via the hint convention of repeating `OP_DEPTH OP_1SUB OP_ROLL`
     //
-    pub fn get_random_point() -> Script {
+    pub fn verify_sampling_random_point() -> Script {
         script! {
             { ChannelGadget::squeeze_element_using_hint() } //stack: y,x,channel',t
             4 OP_ROLL //stack: y,x,t,channel'
@@ -92,7 +92,6 @@ impl CirclePointSecureGadget {
     //  y
     //  x
     pub fn push_random_point_hint(t: QM31) -> Script{
-
         let oneplustsquaredinv = t.square().add(QM31::one()).inverse(); //(1+t^2)^-1
         
         script! {
@@ -149,7 +148,7 @@ mod test {
     fn test_get_random_point(){
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let get_random_point_script = CirclePointSecureGadget::get_random_point();
+        let get_random_point_script = CirclePointSecureGadget::verify_sampling_random_point();
         println!(
             "CirclePointSecure.get_random_point() = {} bytes",
             get_random_point_script.len()
