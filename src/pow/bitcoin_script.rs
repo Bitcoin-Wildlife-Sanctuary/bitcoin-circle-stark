@@ -202,7 +202,6 @@ mod test {
 
     #[test]
     fn test_pow() {
-
         for prng_seed in 0..5 {
             for n_bits in 1..=20 {
                 let mut prng = ChaCha20Rng::seed_from_u64(prng_seed);
@@ -236,5 +235,10 @@ mod test {
                 assert!(exec_result.success);
             }
         }
+
+        println!(
+            "POW.verify_pow(78 bits) = {} bytes",
+            PowGadget::verify_pow(78).len(),
+        );
     }
 }

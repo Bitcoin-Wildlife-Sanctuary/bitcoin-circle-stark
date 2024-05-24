@@ -25,7 +25,7 @@ impl TwiddleMerkleTreeGadget {
     /// output:
     ///   v (m31 -- [num_layer] elements)
     pub fn query_and_verify(logn: usize) -> Script {
-        let num_layer = logn;
+        let num_layer = logn - 1;
         script! {
             for _ in 0..num_layer {
                 OP_DEPTH OP_1SUB OP_ROLL
@@ -42,7 +42,8 @@ impl TwiddleMerkleTreeGadget {
             OP_SHA256
 
             OP_SWAP
-            { limb_to_be_bits_toaltstack(num_layer as u32) }
+            { limb_to_be_bits_toaltstack(logn as u32) }
+            OP_FROMALTSTACK OP_DROP
 
              for _ in 0..num_layer {
                 OP_DEPTH OP_1SUB OP_ROLL
@@ -74,7 +75,9 @@ mod test {
             let verify_script = TwiddleMerkleTreeGadget::query_and_verify(logn);
             println!("TMT.verify(2^{}) = {} bytes", logn, verify_script.len());
 
-            let twiddle_merkle_tree = TwiddleMerkleTree::new(logn);
+            let n_layers = logn - 1;
+
+            let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);
 
             let mut pos: u32 = prng.gen();
             pos &= (1 << logn) - 1;
@@ -86,8 +89,8 @@ mod test {
                 { twiddle_merkle_tree.root_hash.to_vec() }
                 { pos }
                 { verify_script.clone() }
-                for i in 0..logn {
-                    { proof.leaf[logn - 1 - i] }
+                for i in 0..n_layers {
+                    { proof.leaf[n_layers - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE

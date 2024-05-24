@@ -35,6 +35,7 @@ impl TwiddleMerkleTree {
                 leaf.push(twiddles[j][cur]);
                 cur >>= 1;
             }
+            leaf.reverse();
 
             let mut hash = {
                 let mut sha256 = Sha256::new();
@@ -96,6 +97,7 @@ impl TwiddleMerkleTree {
 
     pub fn query(&self, mut pos: usize) -> TwiddleMerkleTreeProof {
         let num_layers = self.intermediate_layers.len();
+        pos >>= 1;
 
         let leaf = self.leaf_layer[pos].clone();
 
@@ -112,13 +114,14 @@ impl TwiddleMerkleTree {
 
     pub fn verify(
         root_hash: [u8; 32],
-        logn: usize,
+        num_layer: usize,
         proof: &TwiddleMerkleTreeProof,
         mut query: usize,
     ) -> bool {
-        let num_layer = logn;
         assert_eq!(proof.leaf.len(), num_layer);
         assert_eq!(proof.siblings.len(), num_layer);
+
+        query >>= 1;
 
         let mut hash = {
             let mut sha256 = Sha256::new();
@@ -174,7 +177,7 @@ mod test {
         let twiddle_merkle_tree = TwiddleMerkleTree::new(20);
 
         for _ in 0..10 {
-            let query = (prng.gen::<u32>() % (1 << 20)) as usize;
+            let query = (prng.gen::<u32>() % (1 << 21)) as usize;
 
             let proof = twiddle_merkle_tree.query(query);
             assert!(TwiddleMerkleTree::verify(

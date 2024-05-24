@@ -70,7 +70,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     for mut query in queries {
         leaves.push(layers[0][query]);
-        twiddle_merkle_proofs.push(twiddle_merkle_tree.query(query >> 1));
+        twiddle_merkle_proofs.push(twiddle_merkle_tree.query(query));
         let mut layer_decommitments = Vec::with_capacity(n_layers);
         for tree in trees.iter() {
             layer_decommitments.push(tree.query(query ^ 1));
@@ -122,7 +122,7 @@ pub fn fri_verify(
             twiddle_merkle_tree_root.clone(),
             logn - 1,
             &twiddle_merkle_tree_proof,
-            query >> 1
+            query
         ));
         for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {
             assert!(MerkleTree::verify(
@@ -134,28 +134,19 @@ pub fn fri_verify(
 
             let sibling = eval_proof.leaf;
 
-            println!(
-                "query = {}, i= {}, leaf = {}, sibling = {}",
-                query, i, leaf, sibling
-            );
-
             let (mut f0, mut f1) = if query & 1 == 0 {
                 (leaf, sibling)
             } else {
                 (sibling, leaf)
             };
 
-            println!("i= {}, f0 = {}, f1 = {}", i, f0, f1);
-            println!("i= {}, twiddle = {}", i, twiddle_merkle_tree_proof.leaf[i]);
-
-            ibutterfly(&mut f0, &mut f1, twiddle_merkle_tree_proof.leaf[i].into());
-
-            println!("i= {}, f0 = {}, f1 = {}", i, f0, f1);
-            println!("i= {}, alpha * f1 = {}", i, alpha * f1);
+            ibutterfly(
+                &mut f0,
+                &mut f1,
+                twiddle_merkle_tree_proof.leaf[logn - 2 - i].into(),
+            );
 
             leaf = f0 + alpha * f1;
-
-            println!("i= {}, leaf = {}, alpha = {}", i, leaf, alpha);
 
             query >>= 1;
         }
