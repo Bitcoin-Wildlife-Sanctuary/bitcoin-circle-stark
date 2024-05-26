@@ -18,6 +18,7 @@ pub fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
     n_bits >= bound_bits
 }
 
+/// Compute the hash from a seed and a nonce.
 pub fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
     let mut concat = seed.clone();
     concat.extend(nonce.to_le_bytes().to_vec());
@@ -28,6 +29,7 @@ pub fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
     hasher.finalize().as_slice().to_vec()
 }
 
+/// A handy function for grinding, which finds a nonce that makes the resulting hash with enough zeroes.
 pub fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
     let mut nonce = 0u64;
 

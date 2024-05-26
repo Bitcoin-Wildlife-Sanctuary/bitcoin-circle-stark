@@ -1,5 +1,6 @@
 use crate::treepp::*;
 
+/// Gadget for trimming away a m31 element to keep only logn bits.
 pub fn trim_m31_gadget(logn: usize) -> Script {
     if logn == 31 {
         script! {}
@@ -20,6 +21,7 @@ pub fn trim_m31_gadget(logn: usize) -> Script {
     }
 }
 
+/// Copy some stack elements to the altstack, where the stack top is being inserted first.
 pub fn copy_to_altstack_top_item_first_in(n: usize) -> Script {
     script! {
         if n > 0 {
@@ -34,6 +36,7 @@ pub fn copy_to_altstack_top_item_first_in(n: usize) -> Script {
     }
 }
 
+/// Copy some stack elements to the altstack, where the altstack head is the stack top.
 pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
     script! {
         for i in 0..n {

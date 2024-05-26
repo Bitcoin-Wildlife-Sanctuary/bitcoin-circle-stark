@@ -9,14 +9,20 @@ pub use bitcoin_script::*;
 mod constants;
 pub use constants::*;
 
+/// A twiddle Merkle tree.
 pub struct TwiddleMerkleTree {
+    /// Leaf layer preimages, where each leaf contains all the necessary twiddle factors for this point.
     pub leaf_layer: Vec<Vec<M31>>,
+    /// Leaf layer, which are hashes of those preimages.
     pub leaf_hashes: Vec<[u8; 32]>,
+    /// Intermediate layers.
     pub intermediate_layers: Vec<Vec<[u8; 32]>>,
+    /// Root hash.
     pub root_hash: [u8; 32],
 }
 
 impl TwiddleMerkleTree {
+    /// Construct the twiddle Merkle tree.
     pub fn new(logn: usize) -> Self {
         let mut twiddles = get_twiddles(logn + 1).to_vec();
 
@@ -95,6 +101,7 @@ impl TwiddleMerkleTree {
         }
     }
 
+    /// Query the twiddle Merkle tree and generate a proof.
     pub fn query(&self, mut pos: usize) -> TwiddleMerkleTreeProof {
         let num_layers = self.intermediate_layers.len();
         pos >>= 1;
@@ -112,6 +119,7 @@ impl TwiddleMerkleTree {
         TwiddleMerkleTreeProof { leaf, siblings }
     }
 
+    /// Verify a twiddle Merkle tree proof.
     pub fn verify(
         root_hash: [u8; 32],
         num_layer: usize,
@@ -158,9 +166,12 @@ impl TwiddleMerkleTree {
     }
 }
 
+/// A Merkle path proof for twiddle tree.
 #[derive(Debug, Clone)]
 pub struct TwiddleMerkleTreeProof {
+    /// Leaf, which contains about (logn -1) inverse twiddle factors.
     pub leaf: Vec<M31>,
+    /// Sibling elements (in hashes).
     pub siblings: Vec<[u8; 32]>,
 }
 

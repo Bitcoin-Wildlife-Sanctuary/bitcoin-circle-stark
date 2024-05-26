@@ -3,19 +3,20 @@ use rust_bitcoin_m31::{
     qm31_add, qm31_fromaltstack, qm31_mul_m31, qm31_over, qm31_sub, qm31_toaltstack,
 };
 
+/// Gadget for FFT.
 pub struct FFTGadget;
 
 impl FFTGadget {
+    /// Perform inverse butterfly in Bitcoin script.
+    /// input:
+    ///  v0 (qm31)
+    ///  v1 (qm31)
+    ///  itwid (m31)
+    ///
+    /// output:
+    ///  v0' (qm31)
+    ///  v1' (qm31)
     pub fn ibutterfly() -> Script {
-        // input:
-        //  v0 (qm31)
-        //  v1 (qm31)
-        //  itwid (m31)
-        //
-        // output:
-        //  v0' (qm31)
-        //  v1' (qm31)
-
         script! {
             OP_TOALTSTACK
 

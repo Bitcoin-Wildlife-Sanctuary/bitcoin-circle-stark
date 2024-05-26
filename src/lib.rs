@@ -1,21 +1,38 @@
+//! The bitcoin-circle-stark crate implements a number of Bitcoin script gadgets for
+//! a stwo proof verifier.
+
+#![deny(missing_docs)]
+
 use crate::treepp::pushable::{Builder, Pushable};
 use math::{CM31, M31, QM31};
 
+/// Module for absorbing and squeezing of the channel.
 pub mod channel;
+/// Module for committing data.
 pub mod channel_commit;
+/// Module for extracting elements from a channel.
 pub mod channel_extract;
+/// Module for the circle curve over the m31 field.
 pub mod circle;
+/// Module for the circle curve over the qm31 field.
 pub mod circle_secure;
+/// Module for FRI.
 pub mod fri;
+/// Module for the field and group arithmetics.
 pub mod math;
+/// Module for the Merkle tree.
 pub mod merkle_tree;
+/// Module for PoW.
 pub mod pow;
+/// Module for the twiddle Merkle tree.
 pub mod twiddle_merkle_tree;
+/// Module for utility functions.
 pub mod utils;
 
-pub mod treepp {
+pub(crate) mod treepp {
     pub use bitcoin_script::{define_pushable, script};
-    pub use bitcoin_scriptexec::{convert_to_witness, execute_script, execute_script_with_witness};
+    #[cfg(test)]
+    pub use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
     define_pushable!();
     pub use bitcoin::ScriptBuf as Script;

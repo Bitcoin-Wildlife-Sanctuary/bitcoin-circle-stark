@@ -8,6 +8,7 @@ use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 mod bitcoin_script;
 pub use bitcoin_script::*;
 
+/// A FRI proof.
 #[derive(Clone, Debug)]
 pub struct FriProof {
     commitments: Vec<Commitment>,
@@ -19,6 +20,7 @@ pub struct FriProof {
 
 const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
 
+/// Generate a FRI proof.
 pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
     let logn = evaluation.len().ilog2() as usize;
     let n_layers = logn - 1;
@@ -41,7 +43,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
         trees.push(tree);
 
-        let (alpha, _) = channel.draw_element();
+        let (alpha, _) = channel.draw_qm31();
 
         layer = layer
             .chunks_exact(2)
@@ -87,6 +89,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
     }
 }
 
+/// Verify the FRI proof.
 pub fn fri_verify(
     channel: &mut Channel,
     logn: usize,
@@ -99,7 +102,7 @@ pub fn fri_verify(
     let mut factors = Vec::with_capacity(n_layers);
     for c in proof.commitments.iter() {
         channel.absorb_commitment(c);
-        factors.push(channel.draw_element().0);
+        factors.push(channel.draw_qm31().0);
     }
     // Last layer.
     proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));

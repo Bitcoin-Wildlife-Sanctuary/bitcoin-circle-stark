@@ -11,20 +11,24 @@ impl Pushable for Commitment {
     }
 }
 
+/// Gadget for committing field elements.
 pub struct CommitmentGadget;
 impl CommitmentGadget {
+    /// Commit a m31 element.
     pub fn commit_m31() -> Script {
         script! {
             OP_SHA256
         }
     }
 
+    /// Commit a cm31 element.
     pub fn commit_cm31() -> Script {
         script! {
             OP_SHA256 OP_CAT OP_SHA256
         }
     }
 
+    /// Commit a qm31 element.
     pub fn commit_qm31() -> Script {
         script! {
             OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256

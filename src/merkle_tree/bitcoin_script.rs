@@ -3,9 +3,11 @@ use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
 use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
 
+/// Gadget for verifying a regular binary Merkle tree.
 pub struct MerkleTreeGadget;
 
 impl MerkleTreeGadget {
+    /// Push the Merkle tree proof into the stack (and used as a hint).
     pub fn push_merkle_tree_proof(merkle_proof: &MerkleTreeProof) -> Script {
         script! {
             { merkle_proof.leaf }
@@ -58,6 +60,7 @@ impl MerkleTreeGadget {
         }
     }
 
+    /// Query and verify using the Merkle path as a hint.
     /// input:
     ///   root_hash
     ///   pos
@@ -71,6 +74,7 @@ impl MerkleTreeGadget {
         }
     }
 
+    /// Query and verify using the Merkle path as a hint, but for its sibling instead.
     pub fn query_and_verify_sibling(logn: usize) -> Script {
         script! {
             { limb_to_be_bits_toaltstack(logn as u32) }

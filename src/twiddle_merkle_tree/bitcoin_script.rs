@@ -2,9 +2,11 @@ use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeProof;
 use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
 
+/// Gadget for verifying a Merkle tree path in a twiddle tree.
 pub struct TwiddleMerkleTreeGadget;
 
 impl TwiddleMerkleTreeGadget {
+    /// Push a Merkle tree proof for the twiddle tree into the stack.
     pub fn push_twiddle_merkle_tree_proof(
         twiddle_merkle_tree_proof: &TwiddleMerkleTreeProof,
     ) -> Script {
@@ -18,6 +20,11 @@ impl TwiddleMerkleTreeGadget {
         }
     }
 
+    /// Query the twiddle tree on a point and verify the Merkle tree proof (as a hint).
+    ///
+    /// hint:
+    ///   merkle path
+    ///
     /// input:
     ///   root_hash
     ///   pos

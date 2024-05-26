@@ -2,12 +2,14 @@ use crate::circle::CirclePoint;
 use crate::math::{Field, M31};
 use crate::utils::bit_reverse_index;
 
+/// Perform an inverse butterfly (for inverse FFT).
 pub fn ibutterfly<F: Field>(v0: &mut F, v1: &mut F, itwid: F) {
     let tmp = *v0;
     *v0 = tmp + *v1;
     *v1 = (tmp + (-*v1)) * itwid;
 }
 
+/// Compute all the twiddle factors.
 pub fn get_twiddles(mut logn: usize) -> Vec<Vec<M31>> {
     let mut twiddles = Vec::with_capacity(logn);
 

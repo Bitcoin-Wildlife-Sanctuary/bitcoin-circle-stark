@@ -2,9 +2,12 @@ use crate::circle::CirclePoint;
 use crate::treepp::*;
 use rust_bitcoin_m31::{m31_add, m31_mul, m31_neg, m31_sub};
 
+/// Gadget for points on the circle curve over the m31 field.
+/// This is not the secure field.
 pub struct CirclePointGadget;
 
 impl CirclePointGadget {
+    /// Push a zero point.
     pub fn zero() -> Script {
         script! {
             OP_PUSHNUM_1
@@ -12,6 +15,7 @@ impl CirclePointGadget {
         }
     }
 
+    /// Push a constant point.
     pub fn push(point: &CirclePoint) -> Script {
         script! {
             { point.x.0 }
@@ -19,6 +23,7 @@ impl CirclePointGadget {
         }
     }
 
+    /// Add two points.
     pub fn add() -> Script {
         script! {
             3 OP_PICK
@@ -46,6 +51,7 @@ impl CirclePointGadget {
         }
     }
 
+    /// Double the point.
     pub fn double() -> Script {
         script! {
             OP_2DUP
@@ -53,6 +59,7 @@ impl CirclePointGadget {
         }
     }
 
+    /// Double the point repeatedly for n times.
     pub fn repeated_double(n: usize) -> Script {
         script! {
             for _ in 0..n {
@@ -61,10 +68,12 @@ impl CirclePointGadget {
         }
     }
 
+    /// Negate a point.
     pub fn conjugate() -> Script {
         m31_neg()
     }
 
+    /// Subtract two points.
     pub fn sub() -> Script {
         script! {
             { Self::conjugate() }
@@ -72,6 +81,7 @@ impl CirclePointGadget {
         }
     }
 
+    /// Fail the execution if the two points are not equal.
     pub fn equalverify() -> Script {
         script! {
             OP_ROT

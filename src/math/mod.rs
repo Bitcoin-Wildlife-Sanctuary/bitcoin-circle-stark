@@ -2,12 +2,16 @@ use std::fmt::Display;
 use std::ops::{Add, Mul, Neg, Sub};
 
 mod bitcoin_script;
-pub mod fft;
 pub use bitcoin_script::*;
 
+/// Module for the FFT implementation.
+pub mod fft;
+
 const MODULUS_BITS: u32 = 31;
+/// Prime modulus for m31, cm31, qm31 elements.
 pub const P: u32 = 2147483647;
 
+/// A trait for finite field.
 pub trait Field:
     Neg<Output = Self>
     + Copy
@@ -20,17 +24,22 @@ pub trait Field:
     + Mul<Output = Self>
     + Add<Output = Self>
 {
+    /// Get the one field element.
     fn one() -> Self;
+    /// Get the zero field element.
     fn zero() -> Self;
 
+    /// Square a field element.
     fn square(&self) -> Self {
         (*self) * (*self)
     }
 
+    /// Double a field element.
     fn double(&self) -> Self {
         (*self) + (*self)
     }
 
+    /// Compute the exponentiation of a field element.
     fn pow(&self, exp: u128) -> Self {
         let mut res = Self::one();
         let mut base = *self;
@@ -45,15 +54,17 @@ pub trait Field:
         res
     }
 
+    /// Compute the inverse of a field element.
     fn inverse(&self) -> Self;
 }
 
-// M31
+/// A m31 element.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct M31(pub u32);
 
 impl M31 {
-    pub fn reduce(val: u64) -> Self {
+    /// Construct a m31 element from reducing from a u64 element.
+    pub const fn reduce(val: u64) -> Self {
         Self((((((val >> MODULUS_BITS) + val + 1) >> MODULUS_BITS) + val) & (P as u64)) as u32)
     }
 }
@@ -114,7 +125,7 @@ impl Field for M31 {
     }
 }
 
-// CM31
+/// A cm31 element.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CM31(pub M31, pub M31);
 
@@ -165,21 +176,28 @@ impl Field for CM31 {
     }
 }
 
-// QM31
+/// The remainder element, used for qm31 multiplication.
 pub const R: CM31 = CM31(M31(2), M31(1));
 
+/// A qm31 element.
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QM31(pub CM31, pub CM31);
 
 impl QM31 {
+    /// Construct a qm31 element from four u32 elements.
     pub const fn from_u32(a: u32, b: u32, c: u32, d: u32) -> Self {
-        Self(CM31(M31(a), M31(b)), CM31(M31(c), M31(d)))
+        Self(
+            CM31(M31::reduce(a as u64), M31::reduce(b as u64)),
+            CM31(M31::reduce(c as u64), M31::reduce(d as u64)),
+        )
     }
 
+    /// Construct a qm31 element from four m31 elements.
     pub fn from_m31(a: M31, b: M31, c: M31, d: M31) -> Self {
         Self(CM31(a, b), CM31(c, d))
     }
 
+    /// Construct a qm31 element from four m31 elements.
     pub fn from_m31_array(array: [M31; 4]) -> Self {
         Self::from_m31(array[0], array[1], array[2], array[3])
     }

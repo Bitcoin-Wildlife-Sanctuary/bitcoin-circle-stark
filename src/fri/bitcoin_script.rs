@@ -11,15 +11,17 @@ use rust_bitcoin_m31::{
     qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_swap, qm31_toaltstack,
 };
 
+/// Gadget for FRI.
 pub struct FRIGadget;
 
 impl FRIGadget {
+    /// Push the hints for Fiat-Shamir.
     pub fn push_fiat_shamir_hints(channel: &mut Channel, logn: usize, proof: &FriProof) -> Script {
         let mut factors_hints = Vec::<ExtractionQM31>::new();
 
         for c in proof.commitments.iter() {
             channel.absorb_commitment(c);
-            let res = channel.draw_element();
+            let res = channel.draw_qm31();
             factors_hints.push(res.1);
         }
         proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
@@ -35,6 +37,7 @@ impl FRIGadget {
         }
     }
 
+    /// Check the Fiat-Shamir computation.
     pub fn check_fiat_shamir(
         channel_init_state: &[u8; 32],
         logn: usize,
@@ -46,7 +49,7 @@ impl FRIGadget {
 
             for _ in 0..n_layers {
                 { ChannelGadget::absorb_commitment() }
-                { ChannelGadget::squeeze_element_using_hint() }
+                { ChannelGadget::squeeze_qm31_using_hint() }
                 qm31_toaltstack
             }
 
@@ -65,6 +68,7 @@ impl FRIGadget {
         }
     }
 
+    /// Push all the twiddle Merkle tree proofs.
     pub fn push_twiddle_merkle_tree_proof(fri_proof: &FriProof) -> Script {
         script! {
             for proof in fri_proof.twiddle_merkle_proofs.iter() {
@@ -78,13 +82,15 @@ impl FRIGadget {
         }
     }
 
+    /// Check all the twiddle Merkle tree proofs.
+    ///
+    /// hint: twiddle proof * 5 (as hints)
+    /// input: pos * 5
+    /// output: leaves * 5
     pub fn check_twiddle_merkle_tree_proof(
         logn: usize,
         twiddle_merkle_tree_root: [u8; 32],
     ) -> Script {
-        // input: twiddle proof * 5 (as hints), pos * 5
-        // output: leaves * 5
-
         script! {
             for _ in 0..N_QUERIES {
                 OP_TOALTSTACK
@@ -98,6 +104,7 @@ impl FRIGadget {
         }
     }
 
+    /// Push the several Merkle tree proofs for a specific query.
     pub fn push_single_query_merkle_tree_proof(idx: usize, fri_proof: &FriProof) -> Script {
         script! {
             for proof in fri_proof.merkle_proofs[idx].iter() {
@@ -110,15 +117,17 @@ impl FRIGadget {
         }
     }
 
+    /// Check the Merkle tree proofs for each query.
+    ///
+    /// hints:
+    ///   proofs (as hints, larger trees at the beginning)
+    /// input:
+    ///   roots (as inputs, smaller trees at the beginning),
+    ///   query
+    ///
+    /// output:
+    ///   elems
     pub fn check_single_query_merkle_tree_proof(logn: usize) -> Script {
-        // input:
-        //   proofs (as hints, larger trees at the beginning)
-        //   roots (as inputs, smaller trees at the beginning),
-        //   query
-        //
-        // output:
-        //   elems
-
         script! {
             // convert query into bits
             { limb_to_be_bits(logn as u32) }
@@ -152,6 +161,7 @@ impl FRIGadget {
         }
     }
 
+    /// Push the last layer elements from the FRI proof.
     pub fn push_last_layer(fri_proof: &FriProof) -> Script {
         script! {
             for elem in fri_proof.last_layer.iter().rev() {
@@ -160,19 +170,21 @@ impl FRIGadget {
         }
     }
 
+    /// Check the ibutterfly stage for one single query.
+    ///
+    ///  input:
+    ///  last_layer (as a given offset)
+    ///
+    ///  twiddle factors (logn - 1) m31
+    ///  alphas (logn - 1) qm31
+    ///  siblings (logn - 1) qm31
+    ///  leaf qm31
+    ///  pos
+    ///
+    /// output:
+    ///  none
+    /// mark the transaction as invalid if the check fails
     pub fn check_single_query_ibutterfly(logn: usize, last_layer_offset: usize) -> Script {
-        // input:
-        //  last_layer (as a given offset)
-        //
-        //  twiddle factors (logn - 1) m31
-        //  alphas (logn - 1) qm31
-        //  siblings (logn - 1) qm31
-        //  leaf qm31
-        //  pos
-        // output:
-        //  none
-        // mark the transaction as invalid if the check fails
-
         script! {
             { limb_to_be_bits_toaltstack(logn as u32) }
 
@@ -270,7 +282,7 @@ mod test {
 
             for c in proof.commitments.iter() {
                 channel.absorb_commitment(c);
-                let res = channel.draw_element();
+                let res = channel.draw_qm31();
                 expected_1.push(res.0);
             }
             proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
@@ -335,7 +347,7 @@ mod test {
 
             for c in proof.commitments.iter() {
                 channel.absorb_commitment(c);
-                let _ = channel.draw_element();
+                let _ = channel.draw_qm31();
             }
 
             proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
@@ -397,7 +409,7 @@ mod test {
 
             for c in proof.commitments.iter() {
                 channel.absorb_commitment(c);
-                let _ = channel.draw_element();
+                let _ = channel.draw_qm31();
             }
 
             proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
@@ -460,7 +472,7 @@ mod test {
 
             for c in proof.commitments.iter() {
                 channel.absorb_commitment(c);
-                let res = channel.draw_element();
+                let res = channel.draw_qm31();
                 alphas.push(res.0);
             }
 
@@ -544,7 +556,7 @@ mod test {
 
             for c in proof.commitments.iter() {
                 channel.absorb_commitment(c);
-                let res = channel.draw_element();
+                let res = channel.draw_qm31();
                 expected_1.push(res.0);
             }
             proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));

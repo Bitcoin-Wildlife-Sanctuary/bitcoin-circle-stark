@@ -11,16 +11,18 @@ use crate::{
     math::{Field, QM31},
 };
 
+/// Gadget for points on the circle curve in the qm31 field.
 pub struct CirclePointSecureGadget;
 
 impl CirclePointSecureGadget {
-    // Rationale: cos(2*theta) = 2*cos(theta)^2-1
-    //
-    // input:
-    //  x (QM31)
-    //
-    // output:
-    //  2*x^2-1 (QM31)
+    /// Double a point.
+    /// Rationale: cos(2*theta) = 2*cos(theta)^2-1
+    ///
+    /// input:
+    ///  x (QM31)
+    ///
+    /// output:
+    ///  2*x^2-1 (QM31)
     pub fn double_x() -> Script {
         script! {
             qm31_square
@@ -30,22 +32,24 @@ impl CirclePointSecureGadget {
         }
     }
 
-    // Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
-    //
-    // input:
-    //  w - qm31 hint (5 elements)
-    //  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
-    //  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
-    //  channel
-    //
-    // output:
-    //  channel'=sha256(channel)
-    //  x
-    //  y
-    // where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
+    /// Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
+    ///
+    /// hint:
+    ///  w - qm31 hint (5 elements)
+    ///
+    /// input:
+    ///  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
+    ///  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
+    ///  channel
+    ///
+    /// output:
+    ///  channel'=sha256(channel)
+    ///  x
+    ///  y
+    /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     pub fn get_random_point() -> Script {
         script! {
-            { ChannelGadget::squeeze_element_using_hint() }
+            { ChannelGadget::squeeze_qm31_using_hint() }
             // stack: x, y, channel', t
 
             // compute t^2 from t
@@ -87,6 +91,7 @@ impl CirclePointSecureGadget {
         }
     }
 
+    /// Push the hint for sampling a random circle curve point over qm31.
     pub fn push_random_point_hint(t: QM31) -> Script {
         let one_plus_tsquared_inv = t.square().add(QM31::one()).inverse();
 
@@ -158,7 +163,7 @@ mod test {
         a.iter_mut().for_each(|v| *v = prng.gen());
 
         let mut channel = Channel::new(a);
-        let (t, hint_t) = channel.draw_element();
+        let (t, hint_t) = channel.draw_qm31();
 
         let c = channel.state;
 

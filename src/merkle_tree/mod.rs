@@ -5,13 +5,18 @@ use sha2::{Digest, Sha256};
 mod bitcoin_script;
 pub use bitcoin_script::*;
 
+/// A Merkle tree.
 pub struct MerkleTree {
+    /// Leaf layers, consisting of qm31 elements.
     pub leaf_layer: Vec<QM31>,
+    /// Intermediate layers.
     pub intermediate_layers: Vec<Vec<[u8; 32]>>,
+    /// Root hash.
     pub root_hash: [u8; 32],
 }
 
 impl MerkleTree {
+    /// Create a new Merkle tree.
     pub fn new(leaf_layer: Vec<QM31>) -> Self {
         assert!(leaf_layer.len().is_power_of_two());
 
@@ -55,6 +60,7 @@ impl MerkleTree {
         }
     }
 
+    /// Query the Merkle tree and generate a corresponding proof.
     pub fn query(&self, mut pos: usize) -> MerkleTreeProof {
         let logn = self.intermediate_layers.len();
 
@@ -74,6 +80,7 @@ impl MerkleTree {
         merkle_tree_proof
     }
 
+    /// Verify a Merkle tree proof.
     pub fn verify(
         root_hash: [u8; 32],
         logn: usize,
@@ -103,9 +110,12 @@ impl MerkleTree {
     }
 }
 
+/// A Merkle tree proof.
 #[derive(Default, Clone, Debug)]
 pub struct MerkleTreeProof {
+    /// Leaf as a qm31 element.
     pub leaf: QM31,
+    /// All the intermediate sibling nodes.
     pub siblings: Vec<[u8; 32]>,
 }
 

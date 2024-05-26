@@ -1,23 +1,24 @@
 use crate::pow::hash_with_nonce;
 use crate::treepp::*;
 
+/// Gadget for verifying PoW.
 pub struct PowGadget;
 
 impl PowGadget {
-    // input:
-    //  channel (32 bytes)
-    //  nonce (64-bit string, aka 8 bytes)
-    //  suffix (the sha256 result after the leading zero bytes and the MSB [if applicable])
-    //  msb (applicable if n_bits % 8 != 0)
-    //
-    // output:
-    //  channel' = sha256(channel || nonce)
-    //
-    // require:
-    //  {0x00}^(n_bits // 8) || msb || suffix != sha256(channel||nonce)
-    //     where msb is required if n_bits % 8 != 0 and should not be present if it is not
-    //  msb starts with n_bits % 8 (which would be at least 1) zero bits.
-    //
+    /// Verify the PoW in Bitcoin script.
+    /// input:
+    ///  channel (32 bytes)
+    ///  nonce (64-bit string, aka 8 bytes)
+    ///  suffix (the sha256 result after the leading zero bytes and the MSB [if applicable])
+    ///  msb (applicable if n_bits % 8 != 0)
+    ///
+    /// output:
+    ///  channel' = sha256(channel || nonce)
+    ///
+    /// require:
+    ///  {0x00}^(n_bits // 8) || msb || suffix != sha256(channel||nonce)
+    ///     where msb is required if n_bits % 8 != 0 and should not be present if it is not
+    ///  msb starts with n_bits % 8 (which would be at least 1) zero bits.
     pub fn verify_pow(n_bits: usize) -> Script {
         assert!(n_bits > 0);
 
@@ -84,10 +85,10 @@ impl PowGadget {
         }
     }
 
-    // output:
-    //  nonce
-    //  suffix
-    //  msb (if applicable)
+    /// Push the hint for verifying the PoW.
+    /// It contains the nonce, the suffix, and the msb (if n_bits % 8 != 0).
+    ///
+    /// Need to be copied to the right location. `verify_pow` does not use the hint stack.
     pub fn push_pow_hint(channel_digest: Vec<u8>, nonce: u64, n_bits: usize) -> Script {
         assert!(n_bits > 0);
 

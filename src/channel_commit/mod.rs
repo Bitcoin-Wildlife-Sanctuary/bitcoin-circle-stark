@@ -5,11 +5,12 @@ mod bitcoin_script;
 use crate::math::{CM31, M31, QM31};
 pub use bitcoin_script::*;
 
-// every commitment is a 32-bytes SHA256 hash
+/// A commitment, which is a 32-byte SHA256 hash
 #[derive(Clone, Default, Debug)]
 pub struct Commitment(pub [u8; 32]);
 
 impl Commitment {
+    /// Commit a m31 element.
     pub fn commit_m31(v: M31) -> Self {
         let mut res = Self::default();
 
@@ -21,6 +22,7 @@ impl Commitment {
         res
     }
 
+    /// Commit a cm31 element.
     pub fn commit_cm31(v: CM31) -> Self {
         let mut res = Self::default();
 
@@ -34,6 +36,7 @@ impl Commitment {
         res
     }
 
+    /// Commit a qm31 element.
     pub fn commit_qm31(v: QM31) -> Self {
         let mut res = Self::default();
 

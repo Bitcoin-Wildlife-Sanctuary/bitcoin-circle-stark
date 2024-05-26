@@ -7,14 +7,19 @@ use sha2::{Digest, Sha256};
 mod bitcoin_script;
 pub use bitcoin_script::*;
 
+/// A channel.
 pub struct Channel {
+    /// Current state of the channel.
     pub state: [u8; 32],
 }
 
 impl Channel {
+    /// Initialize a new channel.
     pub fn new(hash: [u8; 32]) -> Self {
         Self { state: hash }
     }
+
+    /// Absorb a commitment.
     pub fn absorb_commitment(&mut self, commitment: &Commitment) {
         let mut hasher = Sha256::new();
         Digest::update(&mut hasher, commitment.0);
@@ -22,6 +27,7 @@ impl Channel {
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
+    /// Absorb a qm31 element.
     pub fn absorb_qm31(&mut self, el: &QM31) {
         let mut hasher = Sha256::new();
         Digest::update(&mut hasher, Commitment::commit_qm31(el.clone()).0);
@@ -29,7 +35,8 @@ impl Channel {
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
-    pub fn draw_element(&mut self) -> (QM31, ExtractionQM31) {
+    /// Draw one qm31 and compute the hints.
+    pub fn draw_qm31(&mut self) -> (QM31, ExtractionQM31) {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
@@ -44,6 +51,7 @@ impl Channel {
         Extractor::extract_qm31(&extract)
     }
 
+    /// Draw five queries and compute the hints.
     pub fn draw_5queries(&mut self, logn: usize) -> ([usize; 5], Extraction5M31) {
         let mut extract = [0u8; 32];
 

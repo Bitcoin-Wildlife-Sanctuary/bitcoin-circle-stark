@@ -3,21 +3,25 @@ use crate::channel_extract::ExtractorGadget;
 use crate::treepp::*;
 use crate::utils::trim_m31_gadget;
 
+/// Gadget for a channel.
 pub struct ChannelGadget;
 
 impl ChannelGadget {
+    /// Initialize a channel.
     pub fn new(hash: [u8; 32]) -> Script {
         script! {
             { hash.to_vec() }
         }
     }
 
+    /// Absorb a commitment.
     pub fn absorb_commitment() -> Script {
         script! {
             OP_CAT OP_SHA256
         }
     }
 
+    /// Absorb a qm31 element.
     pub fn absorb_qm31() -> Script {
         script! {
             OP_TOALTSTACK
@@ -26,7 +30,8 @@ impl ChannelGadget {
         }
     }
 
-    pub fn squeeze_element_using_hint() -> Script {
+    /// Squeeze a qm31 element using hints.
+    pub fn squeeze_qm31_using_hint() -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
             OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
@@ -34,6 +39,7 @@ impl ChannelGadget {
         }
     }
 
+    /// Squeeze five queries from the channel, each of logn bits, using hints.
     pub fn squeeze_5queries_using_hint(logn: usize) -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
@@ -128,7 +134,7 @@ mod test {
     fn test_squeeze_element_using_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::squeeze_element_using_hint();
+        let channel_script = ChannelGadget::squeeze_qm31_using_hint();
         println!(
             "Channel.squeeze_element_using_hint() = {} bytes",
             channel_script.len()
@@ -138,7 +144,7 @@ mod test {
         a.iter_mut().for_each(|v| *v = prng.gen());
 
         let mut channel = Channel::new(a);
-        let (b, hint) = channel.draw_element();
+        let (b, hint) = channel.draw_qm31();
 
         let c = channel.state;
 

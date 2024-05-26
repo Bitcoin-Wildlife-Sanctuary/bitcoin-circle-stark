@@ -1,12 +1,33 @@
+use crate::treepp::pushable::{Builder, Pushable};
+use bitcoin::script::PushBytesBuf;
 use core::ops::Neg;
 
 mod bitcoin_script;
 use crate::math::{CM31, M31, QM31};
 pub use bitcoin_script::*;
 
+/// Basic hint structure for extracting a single qm31 element.
+#[derive(Clone, Copy)]
+pub enum ExtractorHint {
+    /// negative zero (will be represented by 0x80).
+    NegativeZero,
+    /// any Bitcoin integer other than the negative zero.
+    Other(i64),
+}
+
+impl Pushable for ExtractorHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        match self {
+            ExtractorHint::NegativeZero => builder.push_slice(PushBytesBuf::from([0x80])),
+            ExtractorHint::Other(v) => builder.push_int(v),
+        }
+    }
+}
+
+/// An extractor for field elements.
 pub struct Extractor;
 impl Extractor {
-    fn extract_common(hash: &[u8]) -> (M31, i64) {
+    fn extract_common(hash: &[u8]) -> (M31, ExtractorHint) {
         let mut bytes = [0u8; 4];
         bytes.copy_from_slice(&hash[0..4]);
 
@@ -14,9 +35,13 @@ impl Extractor {
         res &= 0x7fffffff;
 
         let hint = if bytes[3] & 0x80 != 0 {
-            (res as i64).neg()
+            if res == 0 {
+                ExtractorHint::NegativeZero
+            } else {
+                ExtractorHint::Other((res as i64).neg())
+            }
         } else {
-            res as i64
+            ExtractorHint::Other(res as i64)
         };
 
         if res != 0 {
@@ -26,6 +51,7 @@ impl Extractor {
         (M31::from(res), hint)
     }
 
+    /// Extract a m31 element from a hash.
     pub fn extract_m31(hash: &[u8; 32]) -> (M31, ExtractionM31) {
         let (res, hint) = Self::extract_common(hash);
 
@@ -35,6 +61,7 @@ impl Extractor {
         (res, ExtractionM31(hint, hint_bytes))
     }
 
+    /// Extract a cm31 element from a hash.
     pub fn extract_cm31(hash: &[u8; 32]) -> (CM31, ExtractionCM31) {
         let (res_1, hint_1) = Self::extract_common(hash);
         let (res_2, hint_2) = Self::extract_common(&hash[4..]);
@@ -48,6 +75,7 @@ impl Extractor {
         )
     }
 
+    /// Extract a qm31 element from a hash.
     pub fn extract_qm31(hash: &[u8; 32]) -> (QM31, ExtractionQM31) {
         let (res_1, hint_1) = Self::extract_common(hash);
         let (res_2, hint_2) = Self::extract_common(&hash[4..]);
@@ -63,6 +91,7 @@ impl Extractor {
         )
     }
 
+    /// Extract five m31 elements from a hash.
     pub fn extract_5m31(hash: &[u8; 32]) -> ([M31; 5], Extraction5M31) {
         let (res_1, hint_1) = Self::extract_common(hash);
         let (res_2, hint_2) = Self::extract_common(&hash[4..]);
@@ -80,7 +109,23 @@ impl Extractor {
     }
 }
 
-pub struct ExtractionM31(pub i64, pub [u8; 28]);
-pub struct ExtractionCM31(pub (i64, i64), pub [u8; 24]);
-pub struct ExtractionQM31(pub (i64, i64, i64, i64), pub [u8; 16]);
-pub struct Extraction5M31(pub (i64, i64, i64, i64, i64), pub [u8; 12]);
+/// Extraction hint for a m31 element.
+pub struct ExtractionM31(pub ExtractorHint, pub [u8; 28]);
+/// Extraction hint for a cm31 element.
+pub struct ExtractionCM31(pub (ExtractorHint, ExtractorHint), pub [u8; 24]);
+/// Extraction hint for a qm31 element.
+pub struct ExtractionQM31(
+    pub (ExtractorHint, ExtractorHint, ExtractorHint, ExtractorHint),
+    pub [u8; 16],
+);
+/// Extraction hint for five m31 elements.
+pub struct Extraction5M31(
+    pub  (
+        ExtractorHint,
+        ExtractorHint,
+        ExtractorHint,
+        ExtractorHint,
+        ExtractorHint,
+    ),
+    pub [u8; 12],
+);
