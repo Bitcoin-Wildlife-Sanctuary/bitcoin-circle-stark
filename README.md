@@ -192,8 +192,27 @@ and also that `msb` starts with `n_bits % 8` (which would be at least 1) zero bi
 
 ---
 
-### License
+### License and contributors
 
 This repository is intended to be public good. It is under the MIT license. 
 
-We want to credit that the Rust FRI implementation code was based on code shared by Starkware. 
+A portion of the code is contributed by [L2 Iterative (L2IV)](https://www.l2iterative.com/), a crypto 
+VC based in San Francisco and Hong Kong. The work receives support from Starkware, who is a limited partner in L2IV. For 
+disclosure, L2IV has also invested into numerous companies active in the Bitcoin ecosystem, but this work is open-source 
+and nonprofit, and is not intended for competition. The code is not investment advice.
+
+Starkware contribtues a portion of the code, including the original Rust FRI implementation (from stwo) and some Bitcoin scripts.
+
+There are also community members contributing to the code and contributing to the ideas. Bitcoin Wildlife Sanctuary is a 
+public-good project supported by many people. 
+
+Below we reiterate the contributors to this repository.
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
