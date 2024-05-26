@@ -1,4 +1,4 @@
-use bitvm::treepp::*;
+use crate::treepp::*;
 
 pub fn trim_m31_gadget(logn: usize) -> Script {
     if logn == 31 {
@@ -45,8 +45,8 @@ pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
 #[cfg(test)]
 mod test {
     use crate::math::M31;
+    use crate::treepp::*;
     use crate::utils::{trim_m31, trim_m31_gadget};
-    use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

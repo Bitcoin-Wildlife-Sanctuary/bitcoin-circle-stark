@@ -1,4 +1,4 @@
-use bitvm::treepp::pushable::{Builder, Pushable};
+use crate::treepp::pushable::{Builder, Pushable};
 use math::{CM31, M31, QM31};
 
 pub mod channel;
@@ -12,6 +12,14 @@ pub mod merkle_tree;
 pub mod pow;
 pub mod twiddle_merkle_tree;
 pub mod utils;
+
+pub mod treepp {
+    pub use bitcoin_script::{define_pushable, script};
+    pub use bitcoin_scriptexec::{convert_to_witness, execute_script, execute_script_with_script};
+
+    define_pushable!();
+    pub use bitcoin::ScriptBuf as Script;
+}
 
 impl Pushable for M31 {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {

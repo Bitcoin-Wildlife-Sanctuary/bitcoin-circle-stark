@@ -1,7 +1,7 @@
 use crate::channel_commit::Commitment;
+use crate::treepp::pushable::{Builder, Pushable};
+use crate::treepp::*;
 use bitcoin::script::PushBytesBuf;
-use bitvm::treepp::pushable::{Builder, Pushable};
-use bitvm::treepp::*;
 
 impl Pushable for Commitment {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
@@ -36,8 +36,8 @@ impl CommitmentGadget {
 mod test {
     use crate::channel_commit::{Commitment, CommitmentGadget};
     use crate::math::{CM31, M31, QM31};
+    use crate::treepp::*;
     use bitcoin_script::script;
-    use bitvm::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

@@ -1,7 +1,7 @@
 use crate::channel_commit::CommitmentGadget;
 use crate::merkle_tree::MerkleTreeProof;
+use crate::treepp::*;
 use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
-use bitvm::treepp::*;
 
 pub struct MerkleTreeGadget;
 
@@ -83,7 +83,7 @@ impl MerkleTreeGadget {
 mod test {
     use crate::math::{CM31, M31, QM31};
     use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
-    use bitvm::treepp::*;
+    use crate::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;

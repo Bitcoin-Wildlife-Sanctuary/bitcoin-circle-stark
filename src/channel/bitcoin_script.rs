@@ -1,7 +1,7 @@
 use crate::channel_commit::CommitmentGadget;
 use crate::channel_extract::ExtractorGadget;
+use crate::treepp::*;
 use crate::utils::trim_m31_gadget;
-use bitvm::treepp::*;
 
 pub struct ChannelGadget;
 
@@ -55,8 +55,8 @@ mod test {
     use crate::channel_commit::Commitment;
     use crate::channel_extract::ExtractorGadget;
     use crate::math::{CM31, M31, QM31};
+    use crate::treepp::*;
     use bitcoin_script::script;
-    use bitvm::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;

@@ -1,5 +1,5 @@
 use crate::circle::CirclePoint;
-use bitvm::treepp::*;
+use crate::treepp::*;
 use rust_bitcoin_m31::{m31_add, m31_mul, m31_neg, m31_sub};
 
 pub struct CirclePointGadget;
@@ -86,7 +86,7 @@ mod test {
     use crate::circle::CirclePoint;
     use crate::circle::CirclePointGadget;
     use crate::math::M31;
-    use bitvm::treepp::*;
+    use crate::treepp::*;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use std::ops::{Add, Sub};

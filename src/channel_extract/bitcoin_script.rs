@@ -1,5 +1,5 @@
 use crate::channel_extract::{Extraction5M31, ExtractionCM31, ExtractionM31, ExtractionQM31};
-use bitvm::treepp::*;
+use crate::treepp::*;
 
 pub struct ExtractorGadget;
 impl ExtractorGadget {
@@ -175,8 +175,8 @@ impl ExtractorGadget {
 #[cfg(test)]
 mod test {
     use crate::channel_extract::{Extractor, ExtractorGadget};
+    use crate::treepp::*;
     use bitcoin_script::script;
-    use bitvm::treepp::*;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

@@ -1,4 +1,4 @@
-use bitvm::treepp::*;
+use crate::treepp::*;
 use rust_bitcoin_m31::{
     qm31_add, qm31_fromaltstack, qm31_mul_m31, qm31_over, qm31_sub, qm31_toaltstack,
 };
@@ -39,7 +39,7 @@ impl FFTGadget {
 mod test {
     use crate::math::fft::ibutterfly;
     use crate::math::{FFTGadget, M31, QM31};
-    use bitvm::treepp::*;
+    use crate::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;

@@ -1,5 +1,5 @@
 use crate::pow::hash_with_nonce;
-use bitvm::treepp::*;
+use crate::treepp::*;
 
 pub struct PowGadget;
 
@@ -107,7 +107,7 @@ impl PowGadget {
 
 #[cfg(test)]
 mod test {
-    use bitvm::treepp::*;
+    use crate::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

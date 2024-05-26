@@ -1,6 +1,6 @@
+use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeProof;
 use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
-use bitvm::treepp::*;
 
 pub struct TwiddleMerkleTreeGadget;
 
@@ -62,8 +62,8 @@ impl TwiddleMerkleTreeGadget {
 
 #[cfg(test)]
 mod test {
+    use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeGadget};
-    use bitvm::treepp::*;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

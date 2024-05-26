@@ -1,4 +1,4 @@
-use bitvm::treepp::*;
+use crate::treepp::*;
 use rust_bitcoin_m31::{
     m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_double, qm31_dup,
     qm31_equalverify, qm31_from_bottom, qm31_mul, qm31_neg, qm31_roll, qm31_rot, qm31_square,
@@ -101,7 +101,7 @@ impl CirclePointSecureGadget {
 mod test {
     use std::ops::{Add, Mul, Neg};
 
-    use bitvm::treepp::*;
+    use crate::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;

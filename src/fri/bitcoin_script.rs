@@ -3,10 +3,10 @@ use crate::channel_extract::{ExtractionQM31, ExtractorGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::math::FFTGadget;
 use crate::merkle_tree::MerkleTreeGadget;
+use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;
 use bitvm::bigint::bits::{limb_to_be_bits, limb_to_be_bits_toaltstack};
-use bitvm::treepp::*;
 use rust_bitcoin_m31::{
     qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_swap, qm31_toaltstack,
 };
@@ -224,12 +224,12 @@ mod test {
     use crate::fri;
     use crate::fri::{FRIGadget, N_QUERIES};
     use crate::math::Field;
+    use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
     use bitcoin::hashes::Hash;
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
-    use bitvm::treepp::*;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
@@ -567,7 +567,7 @@ mod test {
             expected
         };
 
-        let script = script! {
+        let witness = script! {
             // push all the hints
             { FRIGadget::push_fiat_shamir_hints(&mut channel, logn, &proof) }
             { FRIGadget::push_twiddle_merkle_tree_proof(&proof) }
@@ -589,7 +589,9 @@ mod test {
             for c in proof.commitments.iter().rev() {
                 { c.clone() }
             }
+        };
 
+        let script = script! {
             // copy the input for check_fiat_shamir
             for _ in 0..(proof.last_layer.len() * 4 + proof.commitments.len()) {
                 { proof.last_layer.len() * 4 + proof.commitments.len() - 1 } OP_PICK
@@ -713,7 +715,7 @@ mod test {
                 taproot_annex_scriptleaf: Some((TapLeafHash::all_zeros(), None)),
             },
             script,
-            vec![],
+            convert_to_witness(witness).unwrap(),
         )
         .expect("error creating exec");
 
