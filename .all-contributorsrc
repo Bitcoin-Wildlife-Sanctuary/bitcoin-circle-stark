@@ -1,4 +1,21 @@
 {
   "projectName": "bitcoin-circle-stark",
-  "projectOwner": "Bitcoin-Wildlife-Sanctuary"
+  "projectOwner": "Bitcoin-Wildlife-Sanctuary",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "victorkstarkware",
+      "name": "victorkstarkware",
+      "avatar_url": "https://avatars.githubusercontent.com/u/160594433?v=4",
+      "profile": "https://github.com/victorkstarkware",
+      "contributions": [
+        "code"
+      ]
+    }
+  ]
 }
