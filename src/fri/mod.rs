@@ -146,7 +146,7 @@ pub fn fri_verify(
             ibutterfly(
                 &mut f0,
                 &mut f1,
-                twiddle_merkle_tree_proof.leaf[logn - 2 - i].into(),
+                twiddle_merkle_tree_proof.elements[n_layers - 1 - i].into(),
             );
 
             leaf = f0 + alpha * f1;

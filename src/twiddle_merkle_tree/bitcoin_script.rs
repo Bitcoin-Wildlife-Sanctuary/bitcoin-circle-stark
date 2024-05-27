@@ -1,6 +1,6 @@
 use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeProof;
-use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
+use bitvm::bigint::bits::limb_to_le_bits;
 
 /// Gadget for verifying a Merkle tree path in a twiddle tree.
 pub struct TwiddleMerkleTreeGadget;
@@ -11,19 +11,19 @@ impl TwiddleMerkleTreeGadget {
         twiddle_merkle_tree_proof: &TwiddleMerkleTreeProof,
     ) -> Script {
         script! {
-            for elem in twiddle_merkle_tree_proof.leaf.iter() {
-                { *elem }
+            { twiddle_merkle_tree_proof.elements.last().unwrap().clone() }
+            for (element, sibling) in twiddle_merkle_tree_proof.elements.iter().rev().skip(1).zip(twiddle_merkle_tree_proof.siblings.iter()) {
+                { *element }
+                { sibling.to_vec() }
             }
-            for elem in twiddle_merkle_tree_proof.siblings.iter() {
-                { elem.to_vec() }
-            }
+            { twiddle_merkle_tree_proof.siblings.last().unwrap().to_vec() }
         }
     }
 
     /// Query the twiddle tree on a point and verify the Merkle tree proof (as a hint).
     ///
     /// hint:
-    ///   merkle path
+    ///   merkle path consisting of entries of the form (mid-element, sibling)
     ///
     /// input:
     ///   root_hash
@@ -34,29 +34,55 @@ impl TwiddleMerkleTreeGadget {
     pub fn query_and_verify(logn: usize) -> Script {
         let num_layer = logn - 1;
         script! {
-            for _ in 0..num_layer {
-                OP_DEPTH OP_1SUB OP_ROLL
-            }
+            // convert pos into bits and drop the LSB
+            { limb_to_le_bits(logn as u32) }
+            OP_DROP
 
+            // obtain the leaf element v
+            OP_DEPTH OP_1SUB OP_ROLL
             OP_DUP OP_TOALTSTACK
 
-            for _ in 1..num_layer {
-                OP_SHA256
-                OP_OVER OP_TOALTSTACK
-                OP_CAT
-            }
-
+            // compute the current element's hash
             OP_SHA256
 
-            OP_SWAP
-            { limb_to_be_bits_toaltstack(logn as u32) }
-            OP_FROMALTSTACK OP_DROP
+            // stack: root_hash, <bits>, leaf-hash
+            // altstack: leaf
 
-             for _ in 0..num_layer {
+            // for every layer
+            for _ in 0..num_layer - 1 {
+                // pull the middle element and copy to the altstack
                 OP_DEPTH OP_1SUB OP_ROLL
-                OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
-                OP_CAT OP_SHA256
+                OP_DUP OP_TOALTSTACK
+
+                // stack: root_hash, <bits>, leaf-hash, middle-element
+                // altstack: leaf, middle-element
+
+                // pull the sibling
+                OP_DEPTH OP_1SUB OP_ROLL
+
+                // stack: root_hash, <bits>, leaf-hash, middle-element, sibling
+                // altstack: leaf, middle-element
+
+                // pull a bit
+                3 OP_ROLL
+                // check if we need to swap, and swap if needed
+                OP_IF OP_SWAP OP_ROT OP_ENDIF
+
+                OP_CAT OP_CAT
+                OP_SHA256
             }
+
+            // pull the sibling
+            OP_DEPTH OP_1SUB OP_ROLL
+
+            // stack: root_hash, <bit>, leaf-hash, sibling
+
+            // pull a bit
+            OP_ROT
+            // check if we need to swap, and swap if needed
+            OP_IF OP_SWAP OP_ENDIF
+            OP_CAT
+            OP_SHA256
 
             OP_EQUALVERIFY
 
@@ -97,7 +123,7 @@ mod test {
                 { pos }
                 { verify_script.clone() }
                 for i in 0..n_layers {
-                    { proof.leaf[n_layers - 1 - i] }
+                    { proof.elements[n_layers - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE

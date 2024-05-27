@@ -72,12 +72,7 @@ impl FRIGadget {
     pub fn push_twiddle_merkle_tree_proof(fri_proof: &FriProof) -> Script {
         script! {
             for proof in fri_proof.twiddle_merkle_proofs.iter() {
-                for elem in proof.leaf.iter() {
-                    { *elem }
-                }
-                for elem in proof.siblings.iter() {
-                    { elem.to_vec() }
-                }
+                { TwiddleMerkleTreeGadget::push_twiddle_merkle_tree_proof(proof) }
             }
         }
     }
@@ -360,7 +355,7 @@ mod test {
             let twiddle_tree = TwiddleMerkleTree::new(logn - 1);
 
             for query in queries.iter() {
-                expected.extend_from_slice(&twiddle_tree.query(*query).leaf);
+                expected.extend_from_slice(&twiddle_tree.query(*query).elements);
             }
             expected
         };
@@ -381,6 +376,8 @@ mod test {
         println!("FRI.Twiddle-Tree = {} bytes", script.len());
 
         let exec_result = execute_script(script);
+        println!("{:8}", exec_result.final_stack);
+        println!("{:?}", exec_result.error);
         assert!(exec_result.success);
     }
 
@@ -492,7 +489,7 @@ mod test {
 
         let script = script! {
             { FRIGadget::push_last_layer(&proof) }
-            for elem in proof.twiddle_merkle_proofs[0].leaf.iter() {
+            for elem in proof.twiddle_merkle_proofs[0].elements.iter() {
                 { *elem }
             }
             for elem in alphas.iter().rev() {
@@ -574,7 +571,7 @@ mod test {
             let twiddle_tree = TwiddleMerkleTree::new(logn - 1);
 
             for query in expected_fiat_shamir.1.iter() {
-                expected.extend_from_slice(&twiddle_tree.query(*query).leaf);
+                expected.extend_from_slice(&twiddle_tree.query(*query).elements);
             }
             expected
         };
