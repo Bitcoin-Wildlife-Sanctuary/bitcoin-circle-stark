@@ -16,6 +16,8 @@ pub mod channel_extract;
 pub mod circle;
 /// Module for the circle curve over the qm31 field.
 pub mod circle_secure;
+/// Module for constraints over the circle curve
+pub mod constraints;
 /// Module for FRI.
 pub mod fri;
 /// Module for the field and group arithmetics.
