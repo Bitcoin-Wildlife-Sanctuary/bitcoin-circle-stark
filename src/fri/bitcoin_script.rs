@@ -251,7 +251,7 @@ mod test {
             channel_init_state
         };
 
-        let mut channel = Channel::new(channel_init_state.clone());
+        let mut channel = Channel::new(channel_init_state);
         let logn = 19;
 
         let proof = {
@@ -267,8 +267,7 @@ mod test {
                 .collect();
             let evaluation = permute_eval(evaluation);
 
-            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-            proof
+            fri::fri_prove(&mut Channel::new(channel_init_state), evaluation)
         };
 
         let expected = {
@@ -333,8 +332,7 @@ mod test {
                 .collect();
             let evaluation = permute_eval(evaluation);
 
-            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-            proof
+            fri::fri_prove(&mut Channel::new(channel_init_state), evaluation)
         };
 
         let queries = {
@@ -397,8 +395,7 @@ mod test {
                 .collect();
             let evaluation = permute_eval(evaluation);
 
-            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-            proof
+            fri::fri_prove(&mut Channel::new(channel_init_state), evaluation)
         };
 
         let queries = {
@@ -458,8 +455,7 @@ mod test {
                 .collect();
             let evaluation = permute_eval(evaluation);
 
-            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-            proof
+            fri::fri_prove(&mut Channel::new(channel_init_state), evaluation)
         };
 
         let (alphas, queries) = {
@@ -527,7 +523,7 @@ mod test {
             channel_init_state
         };
 
-        let mut channel = Channel::new(channel_init_state.clone());
+        let mut channel = Channel::new(channel_init_state);
         let logn = 19;
 
         let proof = {
@@ -543,8 +539,7 @@ mod test {
                 .collect();
             let evaluation = permute_eval(evaluation);
 
-            let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
-            proof
+            fri::fri_prove(&mut Channel::new(channel_init_state), evaluation)
         };
 
         let expected_fiat_shamir = {
@@ -657,7 +652,7 @@ mod test {
                 }
                 // alphas
                 for _ in 0..(logn - 1) * 4 {
-                    { (logn - 1) * 1 + 5 * (logn - 1) + (logn - 1) * 4 - 1 } OP_PICK
+                    { (logn - 1) + 5 * (logn - 1) + (logn - 1) * 4 - 1 } OP_PICK
                 }
                 // siblings
                 for _ in 0..(logn - 1) * 4 {

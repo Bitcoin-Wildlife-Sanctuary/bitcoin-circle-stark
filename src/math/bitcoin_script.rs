@@ -65,8 +65,8 @@ mod test {
 
         let itwid = M31::reduce(prng.next_u64());
 
-        let mut v0 = a.clone();
-        let mut v1 = b.clone();
+        let mut v0 = a;
+        let mut v1 = b;
 
         ibutterfly(&mut v0, &mut v1, itwid.into());
 
