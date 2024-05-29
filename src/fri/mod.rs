@@ -1,9 +1,11 @@
 use crate::channel::Channel;
 use crate::channel_commit::Commitment;
-use crate::math::fft::{get_twiddles, ibutterfly};
-use crate::math::{Field, QM31};
+use crate::math::fft::get_twiddles;
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
+use stwo_prover::core::fft::ibutterfly;
+use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::FieldExpOps;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -50,7 +52,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
             .zip(layer_twiddles)
             .map(|(f, twid)| {
                 let (mut f0, mut f1) = (f[0], f[1]);
-                ibutterfly(&mut f0, &mut f1, twid.inverse().into());
+                ibutterfly(&mut f0, &mut f1, twid.inverse());
                 f0 + alpha * f1
             })
             .collect();
@@ -146,7 +148,7 @@ pub fn fri_verify(
             ibutterfly(
                 &mut f0,
                 &mut f1,
-                twiddle_merkle_tree_proof.elements[n_layers - 1 - i].into(),
+                twiddle_merkle_tree_proof.elements[n_layers - 1 - i],
             );
 
             leaf = f0 + alpha * f1;

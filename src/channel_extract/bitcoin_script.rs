@@ -199,11 +199,12 @@ impl ExtractorGadget {
 #[cfg(test)]
 mod test {
     use crate::channel_extract::{Extractor, ExtractorGadget};
-    use crate::math::{Field, M31};
     use crate::treepp::*;
     use bitcoin_script::script;
+    use num_traits::Zero;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_unpack_negative_zero() {
@@ -226,8 +227,6 @@ mod test {
             OP_EQUAL
         };
         let exec_result = execute_script(script);
-        println!("{:8}", exec_result.final_stack);
-        println!("{:?}", exec_result.error);
         assert!(exec_result.success);
     }
 

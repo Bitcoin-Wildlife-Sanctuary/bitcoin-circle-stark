@@ -1,8 +1,8 @@
 use crate::channel_commit::Commitment;
 use crate::channel_extract::{Extraction5M31, ExtractionQM31, Extractor};
-use crate::math::QM31;
 use crate::utils::trim_m31;
 use sha2::{Digest, Sha256};
+use stwo_prover::core::fields::qm31::QM31;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;

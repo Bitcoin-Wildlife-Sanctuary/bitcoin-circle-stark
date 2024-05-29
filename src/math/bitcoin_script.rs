@@ -38,12 +38,14 @@ impl FFTGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::math::fft::ibutterfly;
-    use crate::math::{FFTGadget, M31, QM31};
+    use crate::math::FFTGadget;
     use crate::treepp::*;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::fft::ibutterfly;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_ibutterfly() {
@@ -68,7 +70,7 @@ mod test {
         let mut v0 = a;
         let mut v1 = b;
 
-        ibutterfly(&mut v0, &mut v1, itwid.into());
+        ibutterfly(&mut v0, &mut v1, itwid);
 
         let script = script! {
             { a }

@@ -1,9 +1,11 @@
 use crate::treepp::pushable::{Builder, Pushable};
 use bitcoin::script::PushBytesBuf;
 use core::ops::Neg;
+use stwo_prover::core::fields::cm31::CM31;
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 mod bitcoin_script;
-use crate::math::{CM31, M31, QM31};
 pub use bitcoin_script::*;
 
 /// Basic hint structure for extracting a single qm31 element.

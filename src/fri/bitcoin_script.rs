@@ -227,19 +227,21 @@ impl FRIGadget {
 #[cfg(test)]
 mod test {
     use crate::channel::Channel;
-    use crate::circle::CirclePoint;
     use crate::fri;
     use crate::fri::{FRIGadget, N_QUERIES};
-    use crate::math::Field;
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
     use bitcoin::hashes::Hash;
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
+    use num_traits::One;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::circle::CirclePointIndex;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
     fn test_fiat_shamir() {
@@ -255,7 +257,7 @@ mod test {
         let logn = 19;
 
         let proof = {
-            let p = CirclePoint::subgroup_gen(logn + 1);
+            let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
             let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -263,7 +265,7 @@ mod test {
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
             let evaluation = (0..(1 << logn))
-                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
                 .collect();
             let evaluation = permute_eval(evaluation);
 
@@ -325,10 +327,10 @@ mod test {
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
         let proof = {
-            let p = CirclePoint::subgroup_gen(logn + 1);
+            let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
             let evaluation = (0..(1 << logn))
-                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
                 .collect();
             let evaluation = permute_eval(evaluation);
 
@@ -388,10 +390,10 @@ mod test {
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
         let proof = {
-            let p = CirclePoint::subgroup_gen(logn + 1);
+            let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
             let evaluation = (0..(1 << logn))
-                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
                 .collect();
             let evaluation = permute_eval(evaluation);
 
@@ -448,10 +450,10 @@ mod test {
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
         let proof = {
-            let p = CirclePoint::subgroup_gen(logn + 1);
+            let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
             let evaluation = (0..(1 << logn))
-                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
                 .collect();
             let evaluation = permute_eval(evaluation);
 
@@ -527,7 +529,7 @@ mod test {
         let logn = 19;
 
         let proof = {
-            let p = CirclePoint::subgroup_gen(logn + 1);
+            let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
             let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -535,7 +537,7 @@ mod test {
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
             let evaluation = (0..(1 << logn))
-                .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
+                .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
                 .collect();
             let evaluation = permute_eval(evaluation);
 

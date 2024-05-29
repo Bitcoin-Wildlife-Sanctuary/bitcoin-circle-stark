@@ -12,6 +12,7 @@ sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", branch = "dev", commit = "2c8b6e5" }
+num-traits = "0.2.0"
 
 [profile.dev]
 opt-level = 3
