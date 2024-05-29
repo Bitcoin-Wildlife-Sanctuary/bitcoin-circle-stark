@@ -57,7 +57,7 @@ mod test {
             let b = Commitment::commit_m31(a);
 
             let script = script! {
-                { a.clone() }
+                { a }
                 { commit_script.clone() }
                 { b.clone() }
                 OP_EQUAL
@@ -79,7 +79,7 @@ mod test {
             let b = Commitment::commit_cm31(a);
 
             let script = script! {
-                { a.clone() }
+                { a }
                 { commit_script.clone() }
                 { b.clone() }
                 OP_EQUAL
@@ -104,7 +104,7 @@ mod test {
             let b = Commitment::commit_qm31(a);
 
             let script = script! {
-                { a.clone() }
+                { a }
                 { commit_script.clone() }
                 { b.clone() }
                 OP_EQUAL

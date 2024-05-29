@@ -210,8 +210,8 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let mut hash = [0u8; 32];
-        for i in 4..32 {
-            hash[i] = prng.gen();
+        for h in hash.iter_mut().skip(4) {
+            *h = prng.gen();
         }
         hash[3] = 0x80;
 
@@ -239,8 +239,8 @@ mod test {
         println!("M31.from_hash() = {} bytes", unpack_script.len());
 
         let mut hash = [0u8; 32];
-        for i in 0..32 {
-            hash[i] = prng.gen();
+        for h in &mut hash {
+            *h = prng.gen();
         }
         hash[3] |= 0x80;
 
@@ -312,8 +312,8 @@ mod test {
         assert!(exec_result.success);
 
         let mut hash = [0u8; 32];
-        for i in 0..32 {
-            hash[i] = prng.gen();
+        for h in &mut hash {
+            *h = prng.gen();
         }
         hash[3] |= 0x80;
         hash[2] = 0;
@@ -376,8 +376,8 @@ mod test {
 
         for _ in 0..300 {
             let mut hash = [0u8; 32];
-            for i in 0..32 {
-                hash[i] = prng.gen();
+            for h in &mut hash {
+                *h = prng.gen();
             }
 
             let (elem, e) = Extractor::extract_cm31(&hash);
@@ -404,8 +404,8 @@ mod test {
 
         for _ in 0..300 {
             let mut hash = [0u8; 32];
-            for i in 0..32 {
-                hash[i] = prng.gen();
+            for h in &mut hash {
+                *h = prng.gen();
             }
 
             let (elem, e) = Extractor::extract_qm31(&hash);
@@ -434,8 +434,8 @@ mod test {
 
         for _ in 0..300 {
             let mut hash = [0u8; 32];
-            for i in 0..32 {
-                hash[i] = prng.gen();
+            for h in &mut hash {
+                *h = prng.gen();
             }
 
             let (elem, e) = Extractor::extract_5m31(&hash);

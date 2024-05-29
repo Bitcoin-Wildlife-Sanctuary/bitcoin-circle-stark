@@ -180,7 +180,7 @@ mod test {
 
         let script = script! {
             { ExtractorGadget::push_hint_qm31(&hint_t) }
-            { CirclePointSecureGadget::push_random_point_hint(t.clone()) }
+            { CirclePointSecureGadget::push_random_point_hint(t) }
             { a.to_vec() }
             { get_random_point_script.clone() }
             { y } // check y
