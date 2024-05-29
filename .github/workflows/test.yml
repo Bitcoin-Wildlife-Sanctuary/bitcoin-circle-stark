@@ -22,6 +22,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -- --nocapture
+      - name: Generate coverage report
+        run: cargo install cargo-tarpaulin && cargo tarpaulin --out Xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   clippy:
     runs-on: ubuntu-latest
