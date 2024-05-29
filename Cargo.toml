@@ -5,43 +5,16 @@ edition = "2021"
 
 [dependencies]
 rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
-bitcoin-script = { git = "https://github.com/BitVM/rust-bitcoin-script" }
-bitcoin = { git = "https://github.com/rust-bitcoin/rust-bitcoin", branch = "bitvm" }
-bitcoin-scriptexec = { git = "https://github.com/BitVM/rust-bitcoin-scriptexec/"}
+bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script" }
+bitcoin = "0.32.0"
+bitcoin-scriptexec = { git =  "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec" }
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", branch = "dev", commit = "2c8b6e5" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "2c8b6e5" }
 
 [profile.dev]
 opt-level = 3
 
 [profile.release]
 lto = true
-
-[patch.crates-io.base58check]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.crates-io.bitcoin]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.crates-io.bitcoin_hashes]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.crates-io.bitcoin-internals]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.crates-io.bitcoin-io]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.crates-io.bitcoin-units]
-git = "https://github.com/rust-bitcoin/rust-bitcoin"
-branch = "bitvm"
-
-[patch.'https://github.com/BitVM/rust-bitcoin-scriptexec'.bitcoin-scriptexec]
-git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec"
