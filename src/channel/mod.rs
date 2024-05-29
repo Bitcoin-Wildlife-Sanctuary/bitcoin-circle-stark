@@ -23,15 +23,15 @@ impl Channel {
     pub fn absorb_commitment(&mut self, commitment: &Commitment) {
         let mut hasher = Sha256::new();
         Digest::update(&mut hasher, commitment.0);
-        Digest::update(&mut hasher, &self.state);
+        Digest::update(&mut hasher, self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
     /// Absorb a qm31 element.
     pub fn absorb_qm31(&mut self, el: &QM31) {
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, Commitment::commit_qm31(el.clone()).0);
-        Digest::update(&mut hasher, &self.state);
+        Digest::update(&mut hasher, Commitment::commit_qm31(*el).0);
+        Digest::update(&mut hasher, self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
     }
 
@@ -40,12 +40,12 @@ impl Channel {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
-        Digest::update(&mut hasher, &[0u8]);
+        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, [0u8]);
         extract.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
+        Digest::update(&mut hasher, self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
 
         Extractor::extract_qm31(&extract)
@@ -56,12 +56,12 @@ impl Channel {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
-        Digest::update(&mut hasher, &[0u8]);
+        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, [0u8]);
         extract.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &self.state);
+        Digest::update(&mut hasher, self.state);
         self.state.copy_from_slice(hasher.finalize().as_slice());
 
         let mut res = Extractor::extract_5m31(&extract);

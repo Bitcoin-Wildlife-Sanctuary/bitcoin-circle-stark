@@ -122,9 +122,9 @@ pub fn fri_verify(
         )
     {
         assert!(TwiddleMerkleTree::verify(
-            twiddle_merkle_tree_root.clone(),
+            twiddle_merkle_tree_root,
             logn - 1,
-            &twiddle_merkle_tree_proof,
+            twiddle_merkle_tree_proof,
             query
         ));
         for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {

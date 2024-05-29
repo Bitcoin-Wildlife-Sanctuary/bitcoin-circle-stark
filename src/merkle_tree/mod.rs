@@ -30,8 +30,8 @@ impl MerkleTree {
                 let mut hash_result = [0u8; 32];
 
                 let mut hasher = Sha256::new();
-                Digest::update(&mut hasher, &commit_1.0);
-                Digest::update(&mut hasher, &commit_2.0);
+                Digest::update(&mut hasher, commit_1.0);
+                Digest::update(&mut hasher, commit_2.0);
                 hash_result.copy_from_slice(hasher.finalize().as_slice());
                 hash_result
             })
@@ -44,8 +44,8 @@ impl MerkleTree {
                 .map(|v| {
                     let mut hash_result = [0u8; 32];
                     let mut hasher = Sha256::new();
-                    Digest::update(&mut hasher, &v[0]);
-                    Digest::update(&mut hasher, &v[1]);
+                    Digest::update(&mut hasher, v[0]);
+                    Digest::update(&mut hasher, v[1]);
                     hash_result.copy_from_slice(hasher.finalize().as_slice());
                     hash_result
                 })
@@ -64,7 +64,10 @@ impl MerkleTree {
     pub fn query(&self, mut pos: usize) -> MerkleTreeProof {
         let logn = self.intermediate_layers.len();
 
-        let mut merkle_tree_proof = MerkleTreeProof::default();
+        let mut merkle_tree_proof = MerkleTreeProof {
+            leaf: self.leaf_layer[pos],
+            ..Default::default()
+        };
         merkle_tree_proof.leaf = self.leaf_layer[pos];
         merkle_tree_proof
             .siblings
@@ -99,8 +102,8 @@ impl MerkleTree {
             };
 
             let mut hasher = Sha256::new();
-            Digest::update(&mut hasher, &f0);
-            Digest::update(&mut hasher, &f1);
+            Digest::update(&mut hasher, f0);
+            Digest::update(&mut hasher, f1);
             leaf_hash.copy_from_slice(hasher.finalize().as_slice());
 
             query >>= 1;

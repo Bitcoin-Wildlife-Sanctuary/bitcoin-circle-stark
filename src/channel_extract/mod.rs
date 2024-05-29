@@ -44,9 +44,7 @@ impl Extractor {
             ExtractorHint::Other(res as i64)
         };
 
-        if res != 0 {
-            res -= 1;
-        }
+        res = res.saturating_sub(1);
 
         (M31::from(res), hint)
     }

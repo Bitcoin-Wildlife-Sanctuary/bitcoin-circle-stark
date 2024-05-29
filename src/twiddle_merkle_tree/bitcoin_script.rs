@@ -11,7 +11,7 @@ impl TwiddleMerkleTreeGadget {
         twiddle_merkle_tree_proof: &TwiddleMerkleTreeProof,
     ) -> Script {
         script! {
-            { twiddle_merkle_tree_proof.elements.last().unwrap().clone() }
+            { *twiddle_merkle_tree_proof.elements.last().unwrap() }
             for (element, sibling) in twiddle_merkle_tree_proof.elements.iter().rev().skip(1).zip(twiddle_merkle_tree_proof.siblings.iter()) {
                 { *element }
                 { sibling.to_vec() }
