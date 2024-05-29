@@ -85,12 +85,14 @@ impl MerkleTreeGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::math::{CM31, M31, QM31};
     use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
     use crate::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::fields::cm31::CM31;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_merkle_tree_verify() {

@@ -47,11 +47,11 @@ pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
 
 #[cfg(test)]
 mod test {
-    use crate::math::M31;
     use crate::treepp::*;
     use crate::utils::{trim_m31, trim_m31_gadget};
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_trim_m31() {

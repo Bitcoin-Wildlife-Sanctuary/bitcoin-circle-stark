@@ -1,6 +1,7 @@
-use crate::circle::CirclePoint;
 use crate::treepp::*;
 use rust_bitcoin_m31::{m31_add, m31_mul, m31_neg, m31_sub};
+use stwo_prover::core::circle::CirclePoint;
+use stwo_prover::core::fields::m31::M31;
 
 /// Gadget for points on the circle curve over the m31 field.
 /// This is not the secure field.
@@ -16,7 +17,7 @@ impl CirclePointGadget {
     }
 
     /// Push a constant point.
-    pub fn push(point: &CirclePoint) -> Script {
+    pub fn push(point: &CirclePoint<M31>) -> Script {
         script! {
             { point.x.0 }
             { point.y.0 }
@@ -93,13 +94,13 @@ impl CirclePointGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::circle::CirclePoint;
     use crate::circle::CirclePointGadget;
-    use crate::math::M31;
     use crate::treepp::*;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use std::ops::{Add, Sub};
+    use stwo_prover::core::circle::CirclePoint;
+    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_double() {

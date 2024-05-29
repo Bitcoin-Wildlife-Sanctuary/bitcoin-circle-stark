@@ -39,11 +39,13 @@ impl CommitmentGadget {
 #[cfg(test)]
 mod test {
     use crate::channel_commit::{Commitment, CommitmentGadget};
-    use crate::math::{CM31, M31, QM31};
     use crate::treepp::*;
     use bitcoin_script::script;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::fields::cm31::CM31;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_commit_m31() {

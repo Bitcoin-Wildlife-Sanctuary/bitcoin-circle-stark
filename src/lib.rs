@@ -4,7 +4,9 @@
 #![deny(missing_docs)]
 
 use crate::treepp::pushable::{Builder, Pushable};
-use math::{CM31, M31, QM31};
+use stwo_prover::core::fields::cm31::CM31;
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
@@ -63,19 +65,22 @@ impl Pushable for QM31 {
 #[cfg(test)]
 mod test {
     use crate::channel::Channel;
-    use crate::circle::CirclePoint;
     use crate::fri;
-    use crate::math::Field;
     use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::utils::permute_eval;
+    use num_traits::One;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::circle::CirclePointIndex;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
     fn test_cfri_main() {
         // Prepare a low degree evaluation
         let logn = 5;
-        let p = CirclePoint::subgroup_gen(logn + 1);
+        let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -84,8 +89,8 @@ mod test {
 
         // Note: Add another .square() to make the proof fail.
         let evaluation = (0..(1 << logn))
-            .map(|i| (p.mul(i * 2 + 1).x.square().square() + 1.into()).into())
-            .collect();
+            .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
+            .collect::<Vec<QM31>>();
         let evaluation = permute_eval(evaluation);
 
         // FRI.

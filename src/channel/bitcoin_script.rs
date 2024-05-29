@@ -60,12 +60,14 @@ mod test {
     use crate::channel::{Channel, ChannelGadget};
     use crate::channel_commit::Commitment;
     use crate::channel_extract::ExtractorGadget;
-    use crate::math::{CM31, M31, QM31};
     use crate::treepp::*;
     use bitcoin_script::script;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::fields::cm31::CM31;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_absorb_commitment() {
