@@ -19,8 +19,8 @@ pub fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
 }
 
 /// Compute the hash from a seed and a nonce.
-pub fn hash_with_nonce(seed: &Vec<u8>, nonce: u64) -> Vec<u8> {
-    let mut concat = seed.clone();
+pub fn hash_with_nonce(seed: &[u8], nonce: u64) -> Vec<u8> {
+    let mut concat = seed.to_owned();
     concat.extend(nonce.to_le_bytes().to_vec());
 
     let mut hasher = Sha256::new();

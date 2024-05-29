@@ -52,9 +52,9 @@ impl TwiddleMerkleTree {
                 let mut hash_result = [0u8; 32];
 
                 let mut hasher = Sha256::new();
-                Digest::update(&mut hasher, &v[0]);
+                Digest::update(&mut hasher, v[0]);
                 Digest::update(&mut hasher, num_to_bytes(twiddles[cur_parent_layer_idx][i]));
-                Digest::update(&mut hasher, &v[1]);
+                Digest::update(&mut hasher, v[1]);
                 hash_result.copy_from_slice(hasher.finalize().as_slice());
                 hash_result
             })
@@ -70,14 +70,14 @@ impl TwiddleMerkleTree {
                 .map(|(i, v)| {
                     let mut hash_result = [0u8; 32];
                     let mut hasher = Sha256::new();
-                    Digest::update(&mut hasher, &v[0]);
+                    Digest::update(&mut hasher, v[0]);
                     if cur_parent_layer_idx != logn {
                         Digest::update(
                             &mut hasher,
                             num_to_bytes(twiddles[cur_parent_layer_idx][i]),
                         );
                     }
-                    Digest::update(&mut hasher, &v[1]);
+                    Digest::update(&mut hasher, v[1]);
                     hash_result.copy_from_slice(hasher.finalize().as_slice());
                     hash_result
                 })
@@ -140,11 +140,11 @@ impl TwiddleMerkleTree {
             };
 
             let mut hasher = Sha256::new();
-            Digest::update(&mut hasher, &f0);
+            Digest::update(&mut hasher, f0);
             if i != logn - 1 {
                 Digest::update(&mut hasher, num_to_bytes(proof.elements[logn - 2 - i]));
             }
-            Digest::update(&mut hasher, &f1);
+            Digest::update(&mut hasher, f1);
             hash.copy_from_slice(hasher.finalize().as_slice());
 
             query >>= 1;

@@ -8,7 +8,7 @@ pub struct ChannelGadget;
 
 impl ChannelGadget {
     /// Initialize a channel.
-    pub fn new(hash: [u8; 32]) -> Script {
+    pub fn create_channel(hash: [u8; 32]) -> Script {
         script! {
             { hash.to_vec() }
         }

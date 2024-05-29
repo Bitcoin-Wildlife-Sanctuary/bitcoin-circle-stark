@@ -1,12 +1,8 @@
 use crate::treepp::*;
-use rust_bitcoin_m31::{
-    m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_add, qm31_double, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_mul, qm31_neg, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap
-};
+use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
 use std::ops::{Add, Mul, Neg};
 
-use crate::{
-    math::{Field, QM31},
-};
+use crate::math::QM31;
 
 /// Gadget for constraints over the circle curve
 pub struct ConstraintsGadget;
@@ -20,7 +16,12 @@ impl ConstraintsGadget {
     ///
     /// output:
     ///  P(z)
-    pub fn pair_vanishing(excluded0x: QM31, excluded0y: QM31, excluded1x: QM31, excluded1y: QM31) -> Script {
+    pub fn pair_vanishing(
+        excluded0x: QM31,
+        excluded0y: QM31,
+        excluded1x: QM31,
+        excluded1y: QM31,
+    ) -> Script {
         script! {
             { excluded1x.add(excluded0x.neg()) }
             qm31_mul    //(excluded1.x - excluded0.x) * z.y
@@ -100,7 +101,9 @@ mod test {
             //(excluded0.y - excluded1.y) * z.x
             //    + (excluded1.x - excluded0.x) * z.y
             //    + (excluded0.x * excluded1.y - excluded0.y * excluded1.x)
-            let res = e0y.add(e1y.neg()).mul(zx)
+            let res = e0y
+                .add(e1y.neg())
+                .mul(zx)
                 .add(e1x.add(e0x.neg()).mul(zy))
                 .add(e0x.mul(e1y).add(e0y.mul(e1x).neg()));
 

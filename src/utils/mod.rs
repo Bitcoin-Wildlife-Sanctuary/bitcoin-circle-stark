@@ -1,9 +1,9 @@
 mod bitcoin_script;
 
-use std::cmp::min;
 use crate::math::{Field, M31, QM31};
 use crate::treepp::*;
 pub use bitcoin_script::*;
+use std::cmp::min;
 
 /// Convert a m31 element to its Bitcoin integer representation.
 pub fn num_to_bytes(v: M31) -> Vec<u8> {
@@ -15,11 +15,10 @@ pub fn num_to_bytes(v: M31) -> Vec<u8> {
         v >>= 8;
     }
 
-    if bytes.last().is_some() {
-        if bytes.last().unwrap() & 0x80 != 0 {
-            bytes.push(0);
-        }
+    if bytes.last().is_some() && bytes.last().unwrap() & 0x80 != 0 {
+        bytes.push(0);
     }
+
     bytes
 }
 
