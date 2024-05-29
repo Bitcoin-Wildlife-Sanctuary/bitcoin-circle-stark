@@ -1,6 +1,6 @@
 use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeProof;
-use bitvm::bigint::bits::limb_to_le_bits;
+use crate::utils::limb_to_le_bits;
 
 /// Gadget for verifying a Merkle tree path in a twiddle tree.
 pub struct TwiddleMerkleTreeGadget;

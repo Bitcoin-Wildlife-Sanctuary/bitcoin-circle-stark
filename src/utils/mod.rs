@@ -1,6 +1,8 @@
 mod bitcoin_script;
 
+use std::cmp::min;
 use crate::math::{Field, M31, QM31};
+use crate::treepp::*;
 pub use bitcoin_script::*;
 
 /// Convert a m31 element to its Bitcoin integer representation.
@@ -44,4 +46,156 @@ pub fn permute_eval(evaluation: Vec<QM31>) -> Vec<QM31> {
 /// Trim a m31 element to have only logn bits.
 pub fn trim_m31(v: u32, logn: usize) -> u32 {
     v & ((1 << logn) - 1)
+}
+
+// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+// due to inability to reconcile the dependency issues between BitVM and stwo.
+fn limb_to_be_bits_common(num_bits: u32) -> Script {
+    let min_i = min(22, num_bits - 1);
+    script! {
+        OP_TOALTSTACK
+
+        // Push the powers of 2 onto the stack
+        // First, all powers of 2 that we can push as 3-byte numbers
+        for i in 0..min_i  {
+            { 2 << i }
+        }
+        // Then, we double powers of 2 to generate the 4-byte numbers
+        for _ in min_i..num_bits - 1 {
+            OP_DUP
+            OP_DUP
+            OP_ADD
+        }
+
+        OP_FROMALTSTACK
+
+        for _ in 0..num_bits - 2 {
+            OP_2DUP OP_LESSTHANOREQUAL
+            OP_IF
+                OP_SWAP OP_SUB 1
+            OP_ELSE
+                OP_NIP 0
+            OP_ENDIF
+            OP_TOALTSTACK
+        }
+
+        OP_2DUP OP_LESSTHANOREQUAL
+        OP_IF
+            OP_SWAP OP_SUB 1
+        OP_ELSE
+            OP_NIP 0
+        OP_ENDIF
+    }
+}
+
+// Convert a limb to low-endian bits
+// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+// due to inability to reconcile the dependency issues between BitVM and stwo.
+fn limb_to_le_bits_common(num_bits: u32) -> Script {
+    let min_i = min(22, num_bits - 1);
+    script! {
+        // Push the powers of 2 onto the stack
+        // First, all powers of 2 that we can push as 3-byte numbers
+        for i in 0..min_i - 1  {
+            { 2 << i } OP_TOALTSTACK
+        }
+        if num_bits - 1 > min_i {
+            { 2 << (min_i - 1) } OP_DUP OP_TOALTSTACK
+
+            // Then, we double powers of 2 to generate the 4-byte numbers
+            for _ in min_i..num_bits - 2 {
+                OP_DUP
+                OP_ADD
+                OP_DUP OP_TOALTSTACK
+            }
+
+            OP_DUP
+            OP_ADD OP_TOALTSTACK
+        } else {
+            { 2 << (min_i - 1) } OP_TOALTSTACK
+        }
+
+        for _ in 0..num_bits - 2 {
+            OP_FROMALTSTACK
+            OP_2DUP OP_GREATERTHANOREQUAL
+            OP_IF
+                OP_SUB 1
+            OP_ELSE
+                OP_DROP 0
+            OP_ENDIF
+            OP_SWAP
+        }
+
+        OP_FROMALTSTACK
+        OP_2DUP OP_GREATERTHANOREQUAL
+        OP_IF
+            OP_SUB 1
+        OP_ELSE
+            OP_DROP 0
+        OP_ENDIF
+
+        OP_SWAP
+    }
+}
+
+/// Convert a limb to low-endian bits
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_le_bits(num_bits: u32) -> Script {
+    if num_bits >= 2 {
+        script! {
+            { limb_to_le_bits_common(num_bits) }
+        }
+    } else {
+        script! {}
+    }
+}
+
+/// Convert a limb to low-endian bits but store them in the altstack for now
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_le_bits_toaltstack(num_bits: u32) -> Script {
+    if num_bits >= 2 {
+        script! {
+            { limb_to_le_bits_common(num_bits) }
+            for _ in 0..num_bits {
+                OP_TOALTSTACK
+            }
+        }
+    } else {
+        script! {}
+    }
+}
+
+/// Convert a limb to big-endian bits
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_be_bits(num_bits: u32) -> Script {
+    if num_bits >= 2 {
+        script! {
+            { limb_to_be_bits_common(num_bits) }
+            for _ in 0..num_bits - 2 {
+                OP_FROMALTSTACK
+            }
+        }
+    } else {
+        script! {}
+    }
+}
+
+/// Convert a limb to big-endian bits but store them in the altstack for now
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_be_bits_toaltstack(num_bits: u32) -> Script {
+    if num_bits >= 2 {
+        script! {
+            { limb_to_be_bits_common(num_bits) }
+            OP_TOALTSTACK
+            OP_TOALTSTACK
+        }
+    } else {
+        script! {
+            OP_TOALTSTACK
+        }
+    }
 }

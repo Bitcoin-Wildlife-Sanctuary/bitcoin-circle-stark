@@ -1,7 +1,7 @@
 use crate::channel_commit::CommitmentGadget;
 use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
-use bitvm::bigint::bits::limb_to_be_bits_toaltstack;
+use crate::utils::limb_to_be_bits_toaltstack;
 
 /// Gadget for verifying a regular binary Merkle tree.
 pub struct MerkleTreeGadget;

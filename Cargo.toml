@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bitvm = { git = "https://github.com/BitVM/BitVM/" }
 rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
 bitcoin-script = { git = "https://github.com/BitVM/rust-bitcoin-script" }
 bitcoin = { git = "https://github.com/rust-bitcoin/rust-bitcoin", branch = "bitvm" }
@@ -12,6 +11,7 @@ bitcoin-scriptexec = { git = "https://github.com/BitVM/rust-bitcoin-scriptexec/"
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", branch = "dev", commit = "2c8b6e5" }
 
 [profile.dev]
 opt-level = 3
