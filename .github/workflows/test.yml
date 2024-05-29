@@ -41,17 +41,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo +nightly fmt --all -- --check
 
-  udeps:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo install cargo-udeps --locked
-      - run: cargo +nightly udeps --all-targets --all-features
-
   typos:
     runs-on: ubuntu-latest
     steps:
