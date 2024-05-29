@@ -5,6 +5,11 @@ on:
     branches:
       - main
   pull_request:
+<<<<<<< HEAD
+=======
+    branches:
+      - main
+>>>>>>> afb77db (💚 run book CI for PRs)
 
 jobs:
   deploy:
