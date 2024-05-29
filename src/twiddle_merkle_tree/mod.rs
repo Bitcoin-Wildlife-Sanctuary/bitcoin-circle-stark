@@ -1,7 +1,8 @@
 use crate::math::fft::get_twiddles;
-use crate::math::{Field, M31};
 use crate::utils::num_to_bytes;
 use sha2::{Digest, Sha256};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::FieldExpOps;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;

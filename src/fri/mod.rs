@@ -1,9 +1,11 @@
 use crate::channel::Channel;
 use crate::channel_commit::Commitment;
-use crate::math::fft::{get_twiddles, ibutterfly};
-use crate::math::{Field, QM31};
+use crate::math::fft::get_twiddles;
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
+use stwo_prover::core::fft::ibutterfly;
+use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::FieldExpOps;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;

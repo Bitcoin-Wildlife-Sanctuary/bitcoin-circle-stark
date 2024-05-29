@@ -1,6 +1,6 @@
 use crate::channel_commit::Commitment;
-use crate::math::QM31;
 use sha2::{Digest, Sha256};
+use stwo_prover::core::fields::qm31::QM31;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -124,10 +124,12 @@ pub struct MerkleTreeProof {
 
 #[cfg(test)]
 mod test {
-    use crate::math::{CM31, M31, QM31};
     use crate::merkle_tree::MerkleTree;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::fields::cm31::CM31;
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_merkle_tree() {

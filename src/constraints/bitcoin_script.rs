@@ -1,8 +1,7 @@
 use crate::treepp::*;
 use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
 use std::ops::{Add, Mul, Neg};
-
-use crate::math::QM31;
+use stwo_prover::core::fields::qm31::QM31;
 
 /// Gadget for constraints over the circle curve
 pub struct ConstraintsGadget;
@@ -48,8 +47,8 @@ mod test {
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-
-    use crate::math::{M31, QM31};
+    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_pair_vanishing() {
