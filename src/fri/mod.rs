@@ -52,7 +52,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
             .zip(layer_twiddles)
             .map(|(f, twid)| {
                 let (mut f0, mut f1) = (f[0], f[1]);
-                ibutterfly(&mut f0, &mut f1, twid.inverse().into());
+                ibutterfly(&mut f0, &mut f1, twid.inverse());
                 f0 + alpha * f1
             })
             .collect();
@@ -148,7 +148,7 @@ pub fn fri_verify(
             ibutterfly(
                 &mut f0,
                 &mut f1,
-                twiddle_merkle_tree_proof.elements[n_layers - 1 - i].into(),
+                twiddle_merkle_tree_proof.elements[n_layers - 1 - i],
             );
 
             leaf = f0 + alpha * f1;

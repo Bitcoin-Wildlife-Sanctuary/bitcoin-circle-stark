@@ -70,7 +70,7 @@ mod test {
         let mut v0 = a;
         let mut v1 = b;
 
-        ibutterfly(&mut v0, &mut v1, itwid.into());
+        ibutterfly(&mut v0, &mut v1, itwid);
 
         let script = script! {
             { a }
