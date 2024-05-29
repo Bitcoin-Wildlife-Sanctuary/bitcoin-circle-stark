@@ -1,3 +1,9 @@
+<div align="center">
+  
+  [![Test Workflow Status](https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/actions/workflows/test.yml/badge.svg)](https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/actions/workflows/test.yml)
+
+</div>
+
 ## Circle STARK Verifier in Bitcoin Script
 
 This repository includes Bitcoin script implementations of various cryptographic primitives for STARK.
