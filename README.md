@@ -221,6 +221,7 @@ Below we reiterate the contributors to this repository.
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/victorkstarkware"><img src="https://avatars.githubusercontent.com/u/160594433?v=4?s=100" width="100px;" alt="victorkstarkware"/><br /><sub><b>victorkstarkware</b></sub></a><br /><a href="#code-victorkstarkware" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://starknet.io"><img src="https://avatars.githubusercontent.com/u/45264458?v=4?s=100" width="100px;" alt="Abdel @ StarkWare "/><br /><sub><b>Abdel @ StarkWare </b></sub></a><br /><a href="#maintenance-AbdelStark" title="Maintenance">🚧</a></td>
     </tr>
   </tbody>
 </table>
