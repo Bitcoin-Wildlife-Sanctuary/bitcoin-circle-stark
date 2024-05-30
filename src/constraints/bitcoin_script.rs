@@ -1,6 +1,5 @@
 use crate::{circle_secure::CirclePointSecureGadget, treepp::*};
 use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
-use std::ops::{Add, Mul, Neg};
 use stwo_prover::core::{circle::{CirclePoint, Coset}, fields::qm31::QM31};
 
 /// Gadget for constraints over the circle curve

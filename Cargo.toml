@@ -7,12 +7,18 @@ edition = "2021"
 rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
 bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script" }
 bitcoin = "0.32.0"
-bitcoin-scriptexec = { git =  "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec" }
+bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec" }
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "2c8b6e5" }
 num-traits = "0.2.0"
+
+# Add cargo-husky to run pre-commit hooks
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false
+features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy"]
 
 [profile.dev]
 opt-level = 3

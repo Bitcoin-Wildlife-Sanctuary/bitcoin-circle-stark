@@ -161,7 +161,7 @@ mod test {
     use crate::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_m31::{qm31_equalverify, qm31_roll};
+    use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::{Field, FieldExpOps};
