@@ -21,6 +21,9 @@ This repository includes Bitcoin script implementations of various cryptographic
 - **CirclePoint over QM31**
   * implementation of double of a circle point over QM31.
   * implementation of drawing a random point on the circle over QM31, which is useful for OODS.
+  * implementation of addition of a circle point over QM31.
+- **Constraints on the circle curve over QM31**
+  * implementation of `coset_vanishing()` and `pair_vanishing()`.
 - **Fiat-Shamir Transcript**
   * aka "channel", which is the name used in Starkware's [stwo](https://github.com/starkware-libs/stwo) library.
   * absorbing commitments and QM31 elements through `OP_CAT + OP_SHA256`.
@@ -51,6 +54,15 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
 - **CirclePoint over QM31**
   * CirclePointSecure.double_x() = 13505 bytes
   * CirclePointSecure.get_random_point() = 40546 bytes
+  * CirclePointSecure.add() = 40542 bytes
+  * CirclePointSecure.add_x_only() = 26791 bytes
+- **Constraints on the circle curve over QM31**
+  * Constraints.pair_vanishing() = 26932 bytes
+  * Constraints.coset_vanishing(log_size=5) = 80827 bytes
+  * Constraints.coset_vanishing(log_size=6) = 94332 bytes
+  * Constraints.coset_vanishing(log_size=7) = 107837 bytes
+  * Constraints.coset_vanishing(log_size=8) = 121342 bytes
+  * Constraints.coset_vanishing(log_size=9) = 134847 bytes
 - **Fiat-Shamir Transcript**
   * Channel.absorb_commitment = 2 bytes
   * Channel.absorb_qm31() = 9 bytes
