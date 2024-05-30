@@ -1,6 +1,9 @@
 use crate::{circle_secure::CirclePointSecureGadget, treepp::*};
 use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
-use stwo_prover::core::{circle::{CirclePoint, Coset}, fields::qm31::QM31};
+use stwo_prover::core::{
+    circle::{CirclePoint, Coset},
+    fields::qm31::QM31,
+};
 
 /// Gadget for constraints over the circle curve
 pub struct ConstraintsGadget;
@@ -17,7 +20,8 @@ impl ConstraintsGadget {
     /// output:
     ///  P(z)
     pub fn coset_vanishing(coset: Coset) -> Script {
-        let shift = - coset.initial.into_ef::<QM31>() + coset.step_size.half().to_point().into_ef::<QM31>();
+        let shift =
+            -coset.initial.into_ef::<QM31>() + coset.step_size.half().to_point().into_ef::<QM31>();
 
         script! {
             { shift.x }
@@ -37,10 +41,7 @@ impl ConstraintsGadget {
     ///
     /// output:
     ///  P(z)
-    pub fn pair_vanishing(
-        excluded0: CirclePoint<QM31>,
-        excluded1: CirclePoint<QM31>
-    ) -> Script {
+    pub fn pair_vanishing(excluded0: CirclePoint<QM31>, excluded1: CirclePoint<QM31>) -> Script {
         script! {
             { excluded1.x - excluded0.x }
             qm31_mul    //(excluded1.x - excluded0.x) * z.y
@@ -67,7 +68,7 @@ mod test {
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::circle::{CirclePoint, Coset};
-    use stwo_prover::core::constraints::{pair_vanishing,coset_vanishing};
+    use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
 
@@ -78,7 +79,11 @@ mod test {
         for log_size in 5..10 {
             let coset = Coset::subgroup(log_size);
             let coset_vanishing_script = ConstraintsGadget::coset_vanishing(coset);
-            println!("Constraints.coset_vanishing(log_size={}) = {} bytes", log_size, coset_vanishing_script.len());
+            println!(
+                "Constraints.coset_vanishing(log_size={}) = {} bytes",
+                log_size,
+                coset_vanishing_script.len()
+            );
 
             let z = CirclePoint {
                 x: QM31::from_m31(
@@ -92,10 +97,10 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
 
-            let res = coset_vanishing(coset,z);
+            let res = coset_vanishing(coset, z);
 
             let script = script! {
                 { z.x }
@@ -107,10 +112,8 @@ mod test {
             };
             let exec_result = execute_script(script);
             assert!(exec_result.success);
-            
         }
     }
-
 
     #[test]
     fn test_pair_vanishing() {
@@ -129,7 +132,7 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
 
             let excluded0 = CirclePoint {
@@ -144,7 +147,7 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
 
             let excluded1 = CirclePoint {
@@ -159,14 +162,17 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
 
-            let res = pair_vanishing(excluded0,excluded1,z);
+            let res = pair_vanishing(excluded0, excluded1, z);
 
-            let pair_vanishing_script = ConstraintsGadget::pair_vanishing(excluded0,excluded1);
+            let pair_vanishing_script = ConstraintsGadget::pair_vanishing(excluded0, excluded1);
             if seed == 0 {
-                println!("Constraints.pair_vanishing() = {} bytes", pair_vanishing_script.len());
+                println!(
+                    "Constraints.pair_vanishing() = {} bytes",
+                    pair_vanishing_script.len()
+                );
             }
 
             let script = script! {

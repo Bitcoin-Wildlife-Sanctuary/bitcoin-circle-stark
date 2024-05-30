@@ -1,7 +1,9 @@
 use crate::treepp::*;
 use num_traits::One;
 use rust_bitcoin_m31::{
-    m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul, qm31_neg, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack
+    m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_add, qm31_copy,
+    qm31_double, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul,
+    qm31_neg, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
 };
 use std::ops::{Add, Mul, Neg};
 use stwo_prover::core::fields::qm31::QM31;
@@ -13,57 +15,56 @@ use crate::channel::ChannelGadget;
 pub struct CirclePointSecureGadget;
 
 impl CirclePointSecureGadget {
-        /// Only computes the x component of addition between points
-        pub fn add_x_only() -> Script {
-            script! {
-                { qm31_roll(3) }
-                { qm31_roll(2) }
-                qm31_mul
-                { qm31_roll(1) }
-                { qm31_roll(2) }
-                qm31_mul
-                qm31_sub
-            }
+    /// Only computes the x component of addition between points
+    pub fn add_x_only() -> Script {
+        script! {
+            { qm31_roll(3) }
+            { qm31_roll(2) }
+            qm31_mul
+            { qm31_roll(1) }
+            { qm31_roll(2) }
+            qm31_mul
+            qm31_sub
         }
+    }
 
-
-        /// Add two points.
-        pub fn add() -> Script {
-            script! {
-                { qm31_copy(3) }
-                { qm31_copy(2) }
-                qm31_mul
-                { qm31_copy(3) }
-                { qm31_copy(2) }
-                qm31_mul
-                { qm31_roll(5)}
-                { qm31_roll(5)}
-                qm31_add
-                { qm31_roll(4)}
-                { qm31_roll(4)}
-                qm31_add
-                qm31_mul
-                qm31_toaltstack
-                { qm31_copy(1) }
-                { qm31_copy(1) }
-                qm31_add
-                qm31_fromaltstack
-                qm31_swap
-                qm31_sub
-                qm31_toaltstack
-                qm31_sub
-                qm31_fromaltstack
-            }
+    /// Add two points.
+    pub fn add() -> Script {
+        script! {
+            { qm31_copy(3) }
+            { qm31_copy(2) }
+            qm31_mul
+            { qm31_copy(3) }
+            { qm31_copy(2) }
+            qm31_mul
+            { qm31_roll(5)}
+            { qm31_roll(5)}
+            qm31_add
+            { qm31_roll(4)}
+            { qm31_roll(4)}
+            qm31_add
+            qm31_mul
+            qm31_toaltstack
+            { qm31_copy(1) }
+            { qm31_copy(1) }
+            qm31_add
+            qm31_fromaltstack
+            qm31_swap
+            qm31_sub
+            qm31_toaltstack
+            qm31_sub
+            qm31_fromaltstack
         }
+    }
 
-        /// Fail the execution if the two points are not equal.
-        pub fn equalverify() -> Script {
-            script! {
-                { qm31_roll(2) }
-                qm31_equalverify
-                qm31_equalverify
-            }
+    /// Fail the execution if the two points are not equal.
+    pub fn equalverify() -> Script {
+        script! {
+            { qm31_roll(2) }
+            qm31_equalverify
+            qm31_equalverify
         }
+    }
 
     /// Double a point.
     /// Rationale: cos(2*theta) = 2*cos(theta)^2-1
@@ -155,8 +156,8 @@ impl CirclePointSecureGadget {
 #[cfg(test)]
 mod test {
     use num_traits::One;
-    use stwo_prover::core::circle::CirclePoint;
     use std::ops::{Add, Mul, Neg};
+    use stwo_prover::core::circle::CirclePoint;
 
     use crate::treepp::*;
     use rand::{Rng, RngCore, SeedableRng};
@@ -179,7 +180,10 @@ mod test {
         println!("CirclePointSecure.add() = {} bytes", add_script.len());
 
         let add_x_script = CirclePointSecureGadget::add_x_only();
-        println!("CirclePointSecure.add_x_only() = {} bytes", add_x_script.len());
+        println!(
+            "CirclePointSecure.add_x_only() = {} bytes",
+            add_x_script.len()
+        );
 
         for _ in 0..100 {
             let a = CirclePoint {
@@ -194,7 +198,7 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
 
             let b = CirclePoint {
@@ -209,9 +213,9 @@ mod test {
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
                     M31::reduce(prng.next_u64()),
-                )
+                ),
             };
-            let c = a+b;
+            let c = a + b;
 
             let script = script! {
                 { a.x }
