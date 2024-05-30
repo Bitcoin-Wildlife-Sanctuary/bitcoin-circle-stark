@@ -1,6 +1,9 @@
 <div align="center">
   
-<a href="https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/actions/workflows/test.yml"><img alt="GitHub Workflow Status (with event)" src="https://img.shields.io/github/actions/workflow/status/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/test.yml?style=for-the-badge" height=30></a>
+<a href="https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/actions/workflows/test.yml"><img alt="GitHub Workflow Status (with event)" src="https://img.shields.io/github/actions/workflow/status/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/test.yml?style=for-the-badge&logo=bitcoin" height=30></a>
+<a href="https://codecov.io/gh/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark" >
+<img src="https://codecov.io/gh/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/graph/badge.svg?token=US2GIRSC1W&style=for-the-badge" height=30/>
+</a>
 <a href="https://securityscorecards.dev/viewer/?uri=github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark"><img alt="OpenSSF Scorecard Report" src="https://img.shields.io/ossf-scorecard/github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark?label=openssf%20scorecard&style=for-the-badge" height=30></a>
 <a href="https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark.svg?style=for-the-badge" alt="Project license" height="30"></a>
 <a href="https://twitter.com/bitcoinwildlife"><img src="https://img.shields.io/twitter/follow/bitcoinwildlife?style=for-the-badge&logo=twitter" alt="Follow bitcoinwildlife on Twitter" height="30"></a>
