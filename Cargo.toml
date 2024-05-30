@@ -14,9 +14,10 @@ rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "2c8b6e5" }
 num-traits = "0.2.0"
 
+# Add cargo-husky to run pre-commit hooks
 [dev-dependencies.cargo-husky]
 version = "1"
-default-features = false                                            # Disable features which are enabled by default
+default-features = false
 features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy"]
 
 [profile.dev]
