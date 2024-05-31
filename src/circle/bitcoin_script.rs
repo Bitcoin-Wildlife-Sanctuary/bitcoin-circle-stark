@@ -167,10 +167,7 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::{Field, FieldExpOps};
 
-    use crate::{
-        channel::Channel, channel_extract::ExtractorGadget,
-        circle::CirclePointGadget,
-    };
+    use crate::{channel::Channel, channel_extract::ExtractorGadget, circle::CirclePointGadget};
 
     #[test]
     fn test_add() {
