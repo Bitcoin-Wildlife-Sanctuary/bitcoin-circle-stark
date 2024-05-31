@@ -28,10 +28,7 @@ impl FRIGadget {
             let res = channel.draw_felt_and_hints();
             factors_hints.push(res.1);
         }
-        proof
-            .last_layer
-            .iter()
-            .for_each(|v| channel.mix_felts(&[*v]));
+        channel.mix_felts(&proof.last_layer);
 
         let res = channel.draw_5queries(logn);
         let queries_hint = res.1;
@@ -269,10 +266,10 @@ mod test {
     use crate::channel::Sha256Channel;
     use crate::fri;
     use crate::fri::{FFTGadget, FRIGadget, N_QUERIES};
+    use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
-    use crate::tests_utils::report::report_bitcoin_script_size;
     use bitcoin::hashes::Hash;
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};

@@ -84,7 +84,7 @@ mod test {
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
     use crate::{
-        channel::{Sha256Channel, ExtractorGadget},
+        channel::{ExtractorGadget, Sha256Channel},
         tests_utils::report::report_bitcoin_script_size,
     };
     use rand::{Rng, SeedableRng};
