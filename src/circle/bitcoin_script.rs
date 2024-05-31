@@ -1,157 +1,244 @@
 use crate::treepp::*;
-use rust_bitcoin_m31::{m31_add, m31_mul, m31_neg, m31_sub};
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::m31::M31;
+use num_traits::One;
+use rust_bitcoin_m31::{
+    m31_add_n31, m31_sub, push_m31_one, push_n31_one, push_qm31_one, qm31_add, qm31_copy,
+    qm31_double, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul,
+    qm31_neg, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
+};
+use std::ops::{Add, Mul, Neg};
+use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::{Field, FieldExpOps};
 
-/// Gadget for points on the circle curve over the m31 field.
-/// This is not the secure field.
+use crate::channel::ChannelGadget;
+
+/// Gadget for points on the circle curve in the qm31 field.
 pub struct CirclePointGadget;
 
 impl CirclePointGadget {
-    /// Push a zero point.
-    pub fn zero() -> Script {
+    /// Only computes the x component of addition between points
+    pub fn add_x_only() -> Script {
         script! {
-            OP_PUSHNUM_1
-            OP_PUSHBYTES_0
-        }
-    }
-
-    /// Push a constant point.
-    pub fn push(point: &CirclePoint<M31>) -> Script {
-        script! {
-            { point.x.0 }
-            { point.y.0 }
+            { qm31_roll(3) }
+            { qm31_roll(2) }
+            qm31_mul
+            { qm31_roll(1) }
+            { qm31_roll(2) }
+            qm31_mul
+            qm31_sub
         }
     }
 
     /// Add two points.
     pub fn add() -> Script {
         script! {
-            3 OP_PICK
-            2 OP_PICK
-            m31_mul
-            3 OP_PICK
-            2 OP_PICK
-            m31_mul
-            5 OP_ROLL
-            5 OP_ROLL
-            m31_add
-            4 OP_ROLL
-            4 OP_ROLL
-            m31_add
-            m31_mul
-            OP_TOALTSTACK
-            OP_2DUP
-            m31_add
-            OP_FROMALTSTACK
-            OP_SWAP
-            m31_sub
-            OP_TOALTSTACK
-            m31_sub
-            OP_FROMALTSTACK
-        }
-    }
-
-    /// Double the point.
-    pub fn double() -> Script {
-        script! {
-            OP_2DUP
-            { Self::add() }
-        }
-    }
-
-    /// Double the point repeatedly for n times.
-    pub fn repeated_double(n: usize) -> Script {
-        script! {
-            for _ in 0..n {
-                { Self::double() }
-            }
-        }
-    }
-
-    /// Negate a point.
-    pub fn conjugate() -> Script {
-        m31_neg()
-    }
-
-    /// Subtract two points.
-    pub fn sub() -> Script {
-        script! {
-            { Self::conjugate() }
-            { Self::add() }
+            { qm31_copy(3) }
+            { qm31_copy(2) }
+            qm31_mul
+            { qm31_copy(3) }
+            { qm31_copy(2) }
+            qm31_mul
+            { qm31_roll(5)}
+            { qm31_roll(5)}
+            qm31_add
+            { qm31_roll(4)}
+            { qm31_roll(4)}
+            qm31_add
+            qm31_mul
+            qm31_toaltstack
+            { qm31_copy(1) }
+            { qm31_copy(1) }
+            qm31_add
+            qm31_fromaltstack
+            qm31_swap
+            qm31_sub
+            qm31_toaltstack
+            qm31_sub
+            qm31_fromaltstack
         }
     }
 
     /// Fail the execution if the two points are not equal.
     pub fn equalverify() -> Script {
         script! {
-            OP_ROT
-            OP_EQUALVERIFY
-            OP_EQUALVERIFY
+            { qm31_roll(2) }
+            qm31_equalverify
+            qm31_equalverify
+        }
+    }
+
+    /// Double a point.
+    /// Rationale: cos(2*theta) = 2*cos(theta)^2-1
+    ///
+    /// input:
+    ///  x (QM31)
+    ///
+    /// output:
+    ///  2*x^2-1 (QM31)
+    pub fn double_x() -> Script {
+        script! {
+            qm31_square
+            qm31_double
+            push_qm31_one
+            qm31_sub
+        }
+    }
+
+    /// Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
+    ///
+    /// hint:
+    ///  w - qm31 hint (5 elements)
+    ///
+    /// input:
+    ///  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
+    ///  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
+    ///  channel
+    ///
+    /// output:
+    ///  channel'=sha256(channel)
+    ///  x
+    ///  y
+    /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
+    pub fn get_random_point() -> Script {
+        script! {
+            { ChannelGadget::squeeze_qm31_using_hint() }
+            // stack: x, y, channel', t
+
+            // compute t^2 from t
+            qm31_dup
+            qm31_square
+
+            // compute t^2 - 1
+            qm31_dup
+            push_m31_one
+            m31_sub // a trick
+
+            // compute t^2 + 1
+            qm31_swap
+            push_n31_one
+            m31_add_n31
+            qm31_dup
+
+            // stack: x, y, channel', t, t^2 - 1, t^2 + 1, t^2 + 1
+
+            // pull the hint x and verify
+            qm31_from_bottom
+            qm31_dup
+            qm31_rot
+            qm31_mul
+            qm31_neg
+            { qm31_roll(3) }
+            qm31_equalverify
+
+            // stack: y, channel', t, t^2 + 1, x
+
+            // pull the hint y
+            qm31_from_bottom
+            qm31_dup
+            { qm31_roll(3) }
+            qm31_mul
+            { qm31_roll(3) }
+            qm31_double
+            qm31_equalverify
+        }
+    }
+
+    /// Push the hint for sampling a random circle curve point over qm31.
+    pub fn push_random_point_hint(t: QM31) -> Script {
+        let one_plus_tsquared_inv = t.square().add(QM31::one()).inverse();
+
+        script! {
+            { QM31::one().add(t.square().neg()).mul(one_plus_tsquared_inv) } // x = (1 - t^2) / (1 + t^2)
+            { t.double().mul(one_plus_tsquared_inv) } // y = 2t / (1 + t^2)
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::circle::CirclePointGadget;
-    use crate::treepp::*;
-    use rand_chacha::rand_core::{RngCore, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
-    use std::ops::{Add, Sub};
+    use num_traits::One;
+    use std::ops::{Add, Mul, Neg};
     use stwo_prover::core::circle::CirclePoint;
+
+    use crate::treepp::*;
+    use rand::{Rng, RngCore, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+    use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::fields::{Field, FieldExpOps};
 
-    #[test]
-    fn test_double() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        let double_script = CirclePointGadget::double();
-        println!("CirclePoint.double() = {} bytes", double_script.len());
-
-        for _ in 0..100 {
-            let a = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
-            };
-            let b = a.double();
-
-            let script = script! {
-                { CirclePointGadget::push(&a) }
-                { double_script.clone() }
-                { CirclePointGadget::push(&b) }
-                { CirclePointGadget::equalverify() }
-                OP_TRUE
-            };
-            let exec_result = execute_script(script);
-            assert!(exec_result.success);
-        }
-    }
+    use crate::{
+        channel::Channel, channel_extract::ExtractorGadget,
+        circle::CirclePointGadget,
+    };
 
     #[test]
     fn test_add() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let add_script = CirclePointGadget::add();
-        println!("CirclePoint.add() = {} bytes", add_script.len());
+        println!("CirclePointSecure.add() = {} bytes", add_script.len());
+
+        let add_x_script = CirclePointGadget::add_x_only();
+        println!(
+            "CirclePointSecure.add_x_only() = {} bytes",
+            add_x_script.len()
+        );
 
         for _ in 0..100 {
             let a = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
+                x: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
+                y: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
             };
+
             let b = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
+                x: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
+                y: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
             };
-            let c = a.add(b);
+            let c = a + b;
 
             let script = script! {
-                { CirclePointGadget::push(&a) }
-                { CirclePointGadget::push(&b) }
+                { a.x }
+                { a.y }
+                { b.x }
+                { b.y }
                 { add_script.clone() }
-                { CirclePointGadget::push(&c) }
+                { c.x }
+                { c.y }
                 { CirclePointGadget::equalverify() }
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+
+            let script = script! {
+                { a.x }
+                { a.y }
+                { b.x }
+                { b.y }
+                { add_x_script.clone() }
+                { c.x }
+                qm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
@@ -160,33 +247,79 @@ mod test {
     }
 
     #[test]
-    fn test_sub() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
+    fn test_double_x() {
+        let double_x_script = CirclePointGadget::double_x();
+        println!(
+            "CirclePointSecure.double_x() = {} bytes",
+            double_x_script.len()
+        );
 
-        let sub_script = CirclePointGadget::sub();
-        println!("CirclePoint.sub() = {} bytes", sub_script.len());
+        for seed in 0..20 {
+            let mut prng = ChaCha20Rng::seed_from_u64(seed);
 
-        for _ in 0..100 {
-            let a = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
-            };
-            let b = CirclePoint {
-                x: M31::reduce(prng.next_u64()),
-                y: M31::reduce(prng.next_u64()),
-            };
-            let c = a.sub(b);
+            let a = QM31::from_m31(
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+            );
+            let double_a = a.square().double().add(QM31::one().neg());
 
             let script = script! {
-                { CirclePointGadget::push(&a) }
-                { CirclePointGadget::push(&b) }
-                { sub_script.clone() }
-                { CirclePointGadget::push(&c) }
-                { CirclePointGadget::equalverify() }
+                { a }
+                { double_x_script.clone() }
+                { double_a }
+                qm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
+    }
+
+    #[test]
+    fn test_get_random_point() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let get_random_point_script = CirclePointGadget::get_random_point();
+        println!(
+            "CirclePointSecure.get_random_point() = {} bytes",
+            get_random_point_script.len()
+        );
+
+        let mut a = [0u8; 32];
+        a.iter_mut().for_each(|v| *v = prng.gen());
+
+        let mut channel = Channel::new(a);
+        let (t, hint_t) = channel.draw_qm31();
+
+        let c = channel.state;
+
+        let x = t
+            .square()
+            .add(QM31::one())
+            .inverse()
+            .mul(QM31::one().add(t.square().neg())); //(1+t^2)^-1 * (1-t^2)
+        let y = t
+            .square()
+            .add(QM31::one())
+            .inverse()
+            .mul(QM31::one().double().mul(t)); // (1+t^2)^-1 * 2 * t
+
+        let script = script! {
+            { ExtractorGadget::push_hint_qm31(&hint_t) }
+            { CirclePointGadget::push_random_point_hint(t) }
+            { a.to_vec() }
+            { get_random_point_script.clone() }
+            { y } // check y
+            qm31_equalverify
+            { x } // check x
+            qm31_equalverify
+            { c.to_vec() } // check channel'
+            OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
+            OP_TRUE
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }

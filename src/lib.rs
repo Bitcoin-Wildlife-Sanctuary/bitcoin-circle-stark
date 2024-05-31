@@ -14,10 +14,8 @@ pub mod channel;
 pub mod channel_commit;
 /// Module for extracting elements from a channel.
 pub mod channel_extract;
-/// Module for the circle curve over the m31 field.
-pub mod circle;
 /// Module for the circle curve over the qm31 field.
-pub mod circle_secure;
+pub mod circle;
 /// Module for constraints over the circle curve
 pub mod constraints;
 /// Module for Fibonacci end-to-end test.
@@ -34,6 +32,8 @@ pub mod pow;
 pub mod twiddle_merkle_tree;
 /// Module for utility functions.
 pub mod utils;
+/// Module for out-of-domain sampling.
+pub mod oods;
 
 pub(crate) mod treepp {
     pub use bitcoin_script::{define_pushable, script};

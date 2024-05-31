@@ -1,4 +1,4 @@
-use crate::{circle_secure::CirclePointSecureGadget, treepp::*};
+use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
 use stwo_prover::core::{
     circle::{CirclePoint, Coset},
@@ -26,9 +26,9 @@ impl ConstraintsGadget {
         script! {
             { shift.x }
             { shift.y }
-            { CirclePointSecureGadget::add_x_only() }
+            { CirclePointGadget::add_x_only() }
             for _ in 1..coset.log_size {
-                { CirclePointSecureGadget::double_x() }
+                { CirclePointGadget::double_x() }
             }
         }
     }
