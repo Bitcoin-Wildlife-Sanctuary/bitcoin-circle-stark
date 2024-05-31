@@ -24,6 +24,8 @@ pub mod merkle_tree;
 pub mod oods;
 /// Module for PoW.
 pub mod pow;
+/// Module for test utils.
+pub mod tests_utils;
 /// Module for the twiddle Merkle tree.
 pub mod twiddle_merkle_tree;
 /// Module for utility functions.

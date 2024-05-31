@@ -258,12 +258,12 @@ impl FFTGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::Channel;
     use crate::fri;
     use crate::fri::{FFTGadget, FRIGadget, N_QUERIES};
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
+    use crate::{channel::Channel, tests_utils::report::report_bitcoin_script_size};
     use bitcoin::hashes::Hash;
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
@@ -346,7 +346,7 @@ mod test {
             OP_TRUE
         };
 
-        println!("FRI.Fiat-Shamir = {} bytes", script.len());
+        report_bitcoin_script_size("FRI", "Fiat-Shamir", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);
@@ -407,7 +407,7 @@ mod test {
             OP_TRUE
         };
 
-        println!("FRI.Twiddle-Tree = {} bytes", script.len());
+        report_bitcoin_script_size("FRI", "Twiddle-Tree", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);
@@ -467,7 +467,7 @@ mod test {
             OP_TRUE
         };
 
-        println!("FRI.Single-Query-Tree = {} bytes", script.len());
+        report_bitcoin_script_size("FRI", "Single-Query-Tree", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);
@@ -541,7 +541,7 @@ mod test {
             OP_TRUE
         };
 
-        println!("FRI.Single-Query-Butterfly = {} bytes", script.len());
+        report_bitcoin_script_size("FRI", "Single-Query-Butterfly", script.len());
 
         let exec_result = execute_script(script);
         assert!(exec_result.success);
@@ -729,7 +729,7 @@ mod test {
             OP_TRUE
         };
 
-        println!("script length: {}", script.len());
+        report_bitcoin_script_size("FRI", "End-to-End", script.len());
 
         let mut exec = Exec::new(
             ExecCtx::Tapscript,

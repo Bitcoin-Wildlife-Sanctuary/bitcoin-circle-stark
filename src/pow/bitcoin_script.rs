@@ -108,7 +108,7 @@ impl PowGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::treepp::*;
+    use crate::{tests_utils::report::report_bitcoin_script_size, treepp::*};
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
@@ -214,10 +214,10 @@ mod test {
 
                 let verify_pow_script = PowGadget::verify_pow(n_bits);
                 if prng_seed == 0 {
-                    println!(
-                        "POW.verify_pow({} bits) = {} bytes",
-                        n_bits,
-                        verify_pow_script.len()
+                    report_bitcoin_script_size(
+                        "POW",
+                        format!("verify_pow({} bits)", n_bits).as_str(),
+                        verify_pow_script.len(),
                     );
                 }
 
@@ -237,8 +237,9 @@ mod test {
             }
         }
 
-        println!(
-            "POW.verify_pow(78 bits) = {} bytes",
+        report_bitcoin_script_size(
+            "POW",
+            "verify_pow(78 bits)",
             PowGadget::verify_pow(78).len(),
         );
     }

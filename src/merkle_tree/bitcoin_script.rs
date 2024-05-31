@@ -85,8 +85,12 @@ impl MerkleTreeGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::merkle_tree::{MerkleTree, MerkleTreeGadget};
+
     use crate::treepp::*;
+    use crate::{
+        merkle_tree::{MerkleTree, MerkleTreeGadget},
+        tests_utils::report::report_bitcoin_script_size,
+    };
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
@@ -100,7 +104,12 @@ mod test {
 
         for logn in 12..=20 {
             let verify_script = MerkleTreeGadget::query_and_verify(logn);
-            println!("MT.verify(2^{}) = {} bytes", logn, verify_script.len());
+
+            report_bitcoin_script_size(
+                "MerkleTree",
+                format!("verify(2^{})", logn).as_str(),
+                verify_script.len(),
+            );
 
             let mut last_layer = vec![];
             for _ in 0..(1 << logn) {

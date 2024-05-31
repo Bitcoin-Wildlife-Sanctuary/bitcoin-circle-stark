@@ -83,7 +83,7 @@ mod test {
     use std::ops::{Add, Neg};
     use stwo_prover::core::circle::CirclePoint;
 
-    use crate::treepp::*;
+    use crate::{tests_utils::report::report_bitcoin_script_size, treepp::*};
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
@@ -98,10 +98,10 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let add_script = CirclePointGadget::add();
-        println!("CirclePoint.add() = {} bytes", add_script.len());
+        report_bitcoin_script_size("CirclePoint", "add", add_script.len());
 
         let add_x_script = CirclePointGadget::add_x_only();
-        println!("CirclePoint.add_x_only() = {} bytes", add_x_script.len());
+        report_bitcoin_script_size("CirclePoint", "add_x_only", add_x_script.len());
 
         for _ in 0..100 {
             let a = CirclePoint {
@@ -167,7 +167,8 @@ mod test {
     #[test]
     fn test_double_x() {
         let double_x_script = CirclePointGadget::double_x();
-        println!("CirclePoint.double_x() = {} bytes", double_x_script.len());
+
+        report_bitcoin_script_size("CirclePoint", "double_x", double_x_script.len());
 
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
