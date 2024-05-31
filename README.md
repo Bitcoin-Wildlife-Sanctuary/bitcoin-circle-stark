@@ -42,7 +42,7 @@ The next step is to implement the FRI protocol, which reasons about the degree o
 
 These performance numbers are obtained from `cargo test -- --nocapture` over commit [6e5c211](https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/commit/6e5c211fb755428ab3492eac2e0dcd39c99482d6).
 
-- **M31, CM31, QM31, CirclePoint**
+- **M31, CM31, QM31**
   * M31.add() = 18 bytes, QM31.add() = 84 bytes
   * M31.sub() = 12 bytes, QM31.sub() = 63 bytes
   * M31.mul() = 1415 bytes, QM31.mul() = 13321 bytes
@@ -50,12 +50,11 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * QM31.mul_by_m31() = 4702 bytes
   * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
   * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
-  * CirclePoint.add() = 4345 bytes, CirclePoint.double() = 4346 bytes, CirclePoint.sub() = 4352 bytes
 - **CirclePoint over QM31**
-  * CirclePointSecure.double_x() = 13505 bytes
-  * CirclePointSecure.get_random_point() = 40546 bytes
-  * CirclePointSecure.add() = 40542 bytes
-  * CirclePointSecure.add_x_only() = 26791 bytes
+  * CirclePoint.double_x() = 13505 bytes
+  * CirclePoint.get_random_point() = 40546 bytes
+  * CirclePoint.add() = 40542 bytes
+  * CirclePoint.add_x_only() = 26791 bytes
 - **Constraints on the circle curve over QM31**
   * Constraints.pair_vanishing() = 26932 bytes
   * Constraints.coset_vanishing(log_size=5) = 80827 bytes
@@ -69,7 +68,7 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * Channel.squeeze_element_using_hint() = 257 bytes (require 5 hint elements)
   * Channel.squeeze_5queries_using_hint() = 1222 bytes (require 6 hint elements)
 - **Proof-of-Work Check**
-  * POW.verify_pow(1 bits) = 39 bytes
+  * POW.verify_pow(1 bit) = 39 bytes
   * POW.verify_pow(2 bits) = 38 bytes
   * POW.verify_pow(3 bits) = 38 bytes
   * POW.verify_pow(4 bits) = 37 bytes

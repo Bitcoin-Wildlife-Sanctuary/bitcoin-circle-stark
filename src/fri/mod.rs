@@ -1,8 +1,8 @@
 use crate::channel::Channel;
-use crate::channel_commit::Commitment;
-use crate::math::fft::get_twiddles;
+use crate::channel::Commitment;
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
+use crate::utils::get_twiddles;
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;

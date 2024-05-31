@@ -10,24 +10,18 @@ use stwo_prover::core::fields::qm31::QM31;
 
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
-/// Module for committing data.
-pub mod channel_commit;
-/// Module for extracting elements from a channel.
-pub mod channel_extract;
-/// Module for the circle curve over the m31 field.
-pub mod circle;
 /// Module for the circle curve over the qm31 field.
-pub mod circle_secure;
+pub mod circle;
 /// Module for constraints over the circle curve
 pub mod constraints;
 /// Module for Fibonacci end-to-end test.
 pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
-/// Module for the field and group arithmetics.
-pub mod math;
 /// Module for the Merkle tree.
 pub mod merkle_tree;
+/// Module for out-of-domain sampling.
+pub mod oods;
 /// Module for PoW.
 pub mod pow;
 /// Module for the twiddle Merkle tree.
