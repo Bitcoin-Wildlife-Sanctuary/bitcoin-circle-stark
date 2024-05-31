@@ -706,7 +706,7 @@ mod test {
                 verify_cltv: true,
                 verify_csv: true,
                 verify_minimal_if: true,
-                enforce_stack_size_limit: false,
+                enforce_stack_limit: false,
                 experimental: Experimental { op_cat: true },
             },
             TxTemplate {
