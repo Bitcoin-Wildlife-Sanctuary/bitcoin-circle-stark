@@ -18,6 +18,7 @@ use stwo_prover::core::vcs::ops::MerkleOps;
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use tracing::{span, Level};
 
+/// Generate a STARK proof.
 pub fn prove<B: Backend + MerkleOps<Blake2sMerkleHasher>>(
     air: &impl AirProver<B>,
     channel: &mut Blake2sChannel,
@@ -58,6 +59,7 @@ pub fn prove<B: Backend + MerkleOps<Blake2sMerkleHasher>>(
         .collect();
     span.exit();
 
+    // TODO(Bitcoin): copy-paste CommitmentSchemeProver and make it no longer hardcoding Blake2s.
     let mut commitment_scheme = CommitmentSchemeProver::new(LOG_BLOWUP_FACTOR);
     let span = span!(Level::INFO, "Trace commitment").entered();
     commitment_scheme.commit(trace_polys, channel, &twiddles);
@@ -81,6 +83,7 @@ pub fn prove<B: Backend + MerkleOps<Blake2sMerkleHasher>>(
     span.exit();
 
     // Draw OODS point.
+    // TODO(Bitcoin): change how the OODS is sampled.
     let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
 
     // Get mask sample points relative to oods point.
@@ -113,6 +116,7 @@ pub fn prove<B: Backend + MerkleOps<Blake2sMerkleHasher>>(
     })
 }
 
+/// Verify a STARK proof.
 pub fn verify(
     proof: StarkProof,
     air: &impl Air,
@@ -131,6 +135,7 @@ pub fn verify(
     );
 
     // Draw OODS point.
+    // TODO(Bitcoin): change how the OODS is sampled.
     let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
 
     // Get mask sample points relative to oods point.
