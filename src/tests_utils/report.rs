@@ -15,6 +15,18 @@ lazy_static::lazy_static! {
     );
 }
 
+// This function will run before any tests
+#[ctor::ctor]
+fn setup() {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open("target/bitcoin_scripts_performance_report.csv")
+        .unwrap();
+    writeln!(file, "category,name,script_size_bytes").unwrap();
+}
+
 /// Report the size of a bitcoin script to a CSV file.
 /// # Arguments
 /// * `category` - A descriptive category for the script.
