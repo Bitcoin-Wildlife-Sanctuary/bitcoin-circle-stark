@@ -30,8 +30,6 @@ pub mod math;
 pub mod merkle_tree;
 /// Module for PoW.
 pub mod pow;
-/// Module for modified stwo.
-pub mod stwo_fork;
 /// Module for the twiddle Merkle tree.
 pub mod twiddle_merkle_tree;
 /// Module for utility functions.

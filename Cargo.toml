@@ -12,6 +12,7 @@ sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "2c8b6e5" }
+stwo-fork = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo-fork" }
 num-traits = "0.2.0"
 tracing = "0.1.40"
 itertools = "0.12.0"

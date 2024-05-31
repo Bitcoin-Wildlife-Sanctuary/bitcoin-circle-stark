@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::stwo_fork::core::prover::{prove, verify};
+    use stwo_fork::core::prover::{prove, verify};
     use stwo_prover::core::channel::{Blake2sChannel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
