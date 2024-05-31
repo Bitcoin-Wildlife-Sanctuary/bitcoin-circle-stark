@@ -707,7 +707,11 @@ mod test {
                 verify_csv: true,
                 verify_minimal_if: true,
                 enforce_stack_limit: false,
-                experimental: Experimental { op_cat: true },
+                experimental: Experimental {
+                    op_cat: true,
+                    op_mul: false,
+                    op_div: false,
+                },
             },
             TxTemplate {
                 tx: Transaction {
