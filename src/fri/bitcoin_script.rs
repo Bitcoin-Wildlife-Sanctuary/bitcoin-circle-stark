@@ -376,8 +376,6 @@ mod test {
         println!("FRI.Twiddle-Tree = {} bytes", script.len());
 
         let exec_result = execute_script(script);
-        println!("{:8}", exec_result.final_stack);
-        println!("{:?}", exec_result.error);
         assert!(exec_result.success);
     }
 
@@ -707,7 +705,11 @@ mod test {
                 verify_csv: true,
                 verify_minimal_if: true,
                 enforce_stack_limit: false,
-                experimental: Experimental { op_cat: true },
+                experimental: Experimental {
+                    op_cat: true,
+                    op_mul: false,
+                    op_div: false,
+                },
             },
             TxTemplate {
                 tx: Transaction {
