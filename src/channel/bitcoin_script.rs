@@ -207,6 +207,7 @@ impl ExtractorGadget {
 #[cfg(test)]
 mod test {
     use crate::channel::{Channel, ChannelGadget, Commitment, CommitmentGadget, ExtractorGadget};
+    use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use bitcoin_script::script;
     use rand::{Rng, RngCore, SeedableRng};
@@ -221,10 +222,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::absorb_commitment();
-        println!(
-            "Channel.absorb_commitment() = {} bytes",
-            channel_script.len()
-        );
+        report_bitcoin_script_size("Channel", "absorb_commitment", channel_script.len());
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
@@ -253,7 +251,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::absorb_qm31();
-        println!("Channel.absorb_qm31() = {} bytes", channel_script.len());
+        report_bitcoin_script_size("Channel", "absorb_qm31", channel_script.len());
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
@@ -284,10 +282,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::squeeze_qm31_using_hint();
-        println!(
-            "Channel.squeeze_element_using_hint() = {} bytes",
-            channel_script.len()
-        );
+        report_bitcoin_script_size("Channel", "squeeze_qm31_using_hint", channel_script.len());
 
         for _ in 0..100 {
             let mut a = [0u8; 32];
@@ -317,9 +312,11 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let channel_script = ChannelGadget::squeeze_5queries_using_hint(15);
-        println!(
-            "Channel.squeeze_5queries_using_hint() = {} bytes",
-            channel_script.len()
+
+        report_bitcoin_script_size(
+            "Channel",
+            "squeeze_5queries_using_hint",
+            channel_script.len(),
         );
 
         for _ in 0..100 {
@@ -353,7 +350,8 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let commit_script = CommitmentGadget::commit_qm31();
-        println!("QM31.commit() = {} bytes", commit_script.len());
+
+        report_bitcoin_script_size("QM31", "commit", commit_script.len());
 
         for _ in 0..100 {
             let a = QM31(

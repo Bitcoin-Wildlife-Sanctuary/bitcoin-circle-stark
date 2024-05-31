@@ -81,9 +81,12 @@ impl OODSGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::{Channel, ExtractorGadget};
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
+    use crate::{
+        channel::{Channel, ExtractorGadget},
+        tests_utils::report::report_bitcoin_script_size,
+    };
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
@@ -93,10 +96,8 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let get_random_point_script = OODSGadget::get_random_point();
-        println!(
-            "OODS.get_random_point() = {} bytes",
-            get_random_point_script.len()
-        );
+
+        report_bitcoin_script_size("OODS", "get_random_point", get_random_point_script.len());
 
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());

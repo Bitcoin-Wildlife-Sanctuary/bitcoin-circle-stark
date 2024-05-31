@@ -63,7 +63,9 @@ impl ConstraintsGadget {
 #[cfg(test)]
 mod test {
 
-    use crate::{constraints::ConstraintsGadget, treepp::*};
+    use crate::{
+        constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
+    };
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
@@ -83,6 +85,11 @@ mod test {
                 "Constraints.coset_vanishing(log_size={}) = {} bytes",
                 log_size,
                 coset_vanishing_script.len()
+            );
+            report_bitcoin_script_size(
+                "Constraints",
+                format!("coset_vanishing(log_size={})", log_size).as_str(),
+                coset_vanishing_script.len(),
             );
 
             let z = CirclePoint {
@@ -169,9 +176,10 @@ mod test {
 
             let pair_vanishing_script = ConstraintsGadget::pair_vanishing(excluded0, excluded1);
             if seed == 0 {
-                println!(
-                    "Constraints.pair_vanishing() = {} bytes",
-                    pair_vanishing_script.len()
+                report_bitcoin_script_size(
+                    "Constraints",
+                    "pair_vanishing",
+                    pair_vanishing_script.len(),
                 );
             }
 

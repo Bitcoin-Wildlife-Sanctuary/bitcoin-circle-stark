@@ -22,6 +22,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -- --nocapture
+      - name: Upload Bitcoin Scripts Performance Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bitcoin-scripts-performance-report
+          path: target/bitcoin_scripts_performance_report.csv
       - name: Generate coverage report
         run: cargo install cargo-tarpaulin && cargo tarpaulin --out Xml
       - name: Upload coverage reports to Codecov
