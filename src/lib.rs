@@ -20,6 +20,8 @@ pub mod circle;
 pub mod circle_secure;
 /// Module for constraints over the circle curve
 pub mod constraints;
+/// Module for Fibonacci end-to-end test.
+pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
 /// Module for the field and group arithmetics.

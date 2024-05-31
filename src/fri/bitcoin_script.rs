@@ -376,8 +376,6 @@ mod test {
         println!("FRI.Twiddle-Tree = {} bytes", script.len());
 
         let exec_result = execute_script(script);
-        println!("{:8}", exec_result.final_stack);
-        println!("{:?}", exec_result.error);
         assert!(exec_result.success);
     }
 
