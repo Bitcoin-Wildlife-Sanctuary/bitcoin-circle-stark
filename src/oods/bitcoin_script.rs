@@ -81,8 +81,7 @@ impl OODSGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::Channel;
-    use crate::channel_extract::ExtractorGadget;
+    use crate::channel::{Channel, ExtractorGadget};
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
     use rand::{Rng, SeedableRng};

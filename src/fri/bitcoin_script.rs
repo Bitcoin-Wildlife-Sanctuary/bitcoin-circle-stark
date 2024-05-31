@@ -1,5 +1,4 @@
-use crate::channel::{Channel, ChannelGadget};
-use crate::channel_extract::{ExtractionQM31, ExtractorGadget};
+use crate::channel::{Channel, ChannelGadget, ExtractionQM31, ExtractorGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;

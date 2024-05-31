@@ -1,4 +1,4 @@
-use crate::channel_commit::Commitment;
+use crate::channel::Commitment;
 use sha2::{Digest, Sha256};
 use stwo_prover::core::fields::qm31::QM31;
 

@@ -10,10 +10,6 @@ use stwo_prover::core::fields::qm31::QM31;
 
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
-/// Module for committing data.
-pub mod channel_commit;
-/// Module for extracting elements from a channel.
-pub mod channel_extract;
 /// Module for the circle curve over the qm31 field.
 pub mod circle;
 /// Module for constraints over the circle curve

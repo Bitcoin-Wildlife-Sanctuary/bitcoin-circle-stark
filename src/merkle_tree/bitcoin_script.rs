@@ -1,4 +1,4 @@
-use crate::channel_commit::CommitmentGadget;
+use crate::channel::CommitmentGadget;
 use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
 use crate::utils::limb_to_be_bits_toaltstack;

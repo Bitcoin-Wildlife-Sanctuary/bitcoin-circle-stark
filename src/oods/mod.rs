@@ -1,5 +1,5 @@
 use crate::channel::Channel;
-use crate::channel_extract::ExtractionQM31;
+use crate::channel::ExtractionQM31;
 use num_traits::One;
 use std::ops::{Add, Mul, Neg};
 use stwo_prover::core::circle::CirclePoint;
