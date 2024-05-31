@@ -51,30 +51,6 @@ impl Extractor {
         (M31::from(res), hint)
     }
 
-    /// Extract a m31 element from a hash.
-    pub fn extract_m31(hash: &[u8; 32]) -> (M31, ExtractionM31) {
-        let (res, hint) = Self::extract_common(hash);
-
-        let mut hint_bytes = [0u8; 28];
-        hint_bytes.copy_from_slice(&hash[4..]);
-
-        (res, ExtractionM31(hint, hint_bytes))
-    }
-
-    /// Extract a cm31 element from a hash.
-    pub fn extract_cm31(hash: &[u8; 32]) -> (CM31, ExtractionCM31) {
-        let (res_1, hint_1) = Self::extract_common(hash);
-        let (res_2, hint_2) = Self::extract_common(&hash[4..]);
-
-        let mut hint_bytes = [0u8; 24];
-        hint_bytes.copy_from_slice(&hash[8..]);
-
-        (
-            CM31(res_1, res_2),
-            ExtractionCM31((hint_1, hint_2), hint_bytes),
-        )
-    }
-
     /// Extract a qm31 element from a hash.
     pub fn extract_qm31(hash: &[u8; 32]) -> (QM31, ExtractionQM31) {
         let (res_1, hint_1) = Self::extract_common(hash);
@@ -109,10 +85,6 @@ impl Extractor {
     }
 }
 
-/// Extraction hint for a m31 element.
-pub struct ExtractionM31(pub ExtractorHint, pub [u8; 28]);
-/// Extraction hint for a cm31 element.
-pub struct ExtractionCM31(pub (ExtractorHint, ExtractorHint), pub [u8; 24]);
 /// Extraction hint for a qm31 element.
 pub struct ExtractionQM31(
     pub (ExtractorHint, ExtractorHint, ExtractorHint, ExtractorHint),

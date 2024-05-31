@@ -1,26 +1,9 @@
-use crate::channel_extract::{Extraction5M31, ExtractionCM31, ExtractionM31, ExtractionQM31};
+use crate::channel_extract::{Extraction5M31, ExtractionQM31};
 use crate::treepp::*;
 
 /// Gadget for extracting elements.
 pub struct ExtractorGadget;
 impl ExtractorGadget {
-    /// Push the hint for extracting a m31 element from a hash.
-    pub fn push_hint_m31(e: &ExtractionM31) -> Script {
-        script! {
-            { e.0 }
-            { e.1.to_vec() }
-        }
-    }
-
-    /// Push the hint for extracting a cm31 element from a hash.
-    pub fn push_hint_cm31(e: &ExtractionCM31) -> Script {
-        script! {
-            { e.0.0 }
-            { e.0.1 }
-            { e.1.to_vec() }
-        }
-    }
-
     /// Push the hint for extracting a qm31 element from a hash.
     pub fn push_hint_qm31(e: &ExtractionQM31) -> Script {
         script! {
@@ -90,46 +73,6 @@ impl ExtractorGadget {
     fn reduce() -> Script {
         script! {
             OP_DUP OP_NOT OP_NOTIF OP_1SUB OP_ENDIF
-        }
-    }
-
-    /// Unpack the hash into a m31 element.
-    pub fn unpack_m31() -> Script {
-        script! {
-            OP_DEPTH OP_1SUB OP_ROLL
-            OP_DEPTH OP_1SUB OP_ROLL
-
-            OP_SWAP
-            { Self::reconstruct() }
-
-            OP_SWAP OP_CAT
-            OP_EQUALVERIFY
-            OP_FROMALTSTACK
-            { Self::reduce() }
-        }
-    }
-
-    /// Unpack the hash into a cm31 element.
-    pub fn unpack_cm31() -> Script {
-        script! {
-            OP_DEPTH OP_1SUB OP_ROLL
-            OP_DEPTH OP_1SUB OP_ROLL
-            OP_DEPTH OP_1SUB OP_ROLL
-
-            OP_ROT
-            { Self::reconstruct() }
-
-            OP_ROT
-            { Self::reconstruct() }
-
-            OP_CAT
-            OP_SWAP OP_CAT
-
-            OP_EQUALVERIFY
-            OP_FROMALTSTACK
-            { Self::reduce() }
-            OP_FROMALTSTACK
-            { Self::reduce() }
         }
     }
 
@@ -204,6 +147,7 @@ mod test {
     use num_traits::Zero;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::fields::m31::M31;
 
     #[test]
@@ -216,182 +160,19 @@ mod test {
         }
         hash[3] = 0x80;
 
-        let (elem, e) = Extractor::extract_m31(&hash);
-        assert_eq!(elem, M31::zero());
+        let (elem, e) = Extractor::extract_qm31(&hash);
+        assert_eq!(elem.0 .0, M31::zero());
 
         let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
+            { ExtractorGadget::push_hint_qm31(&e) }
             { hash.to_vec() }
-            { ExtractorGadget::unpack_m31() }
+            { ExtractorGadget::unpack_qm31() }
             { elem }
-            OP_EQUAL
+            qm31_equalverify
+            OP_TRUE
         };
         let exec_result = execute_script(script);
         assert!(exec_result.success);
-    }
-
-    #[test]
-    fn test_unpack_m31() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        let unpack_script = ExtractorGadget::unpack_m31();
-        println!("M31.from_hash() = {} bytes", unpack_script.len());
-
-        let mut hash = [0u8; 32];
-        for h in &mut hash {
-            *h = prng.gen();
-        }
-        hash[3] |= 0x80;
-
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        hash[3] = 0;
-        hash[2] &= 0x7f;
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        hash[2] = 0;
-        hash[1] &= 0x7f;
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        hash[1] = 0;
-        hash[0] &= 0x7f;
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        hash[0] = 0;
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        let mut hash = [0u8; 32];
-        for h in &mut hash {
-            *h = prng.gen();
-        }
-        hash[3] |= 0x80;
-        hash[2] = 0;
-
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        let mut hash = [0u8; 32];
-        hash[0] = 0xff;
-        hash[1] = 0xff;
-        hash[2] = 0xff;
-        hash[3] = 0x7f;
-
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-
-        let mut hash = [0u8; 32];
-        hash[0] = 0x02;
-        hash[1] = 0x00;
-        hash[2] = 0x00;
-        hash[3] = 0x80;
-
-        let (elem, e) = Extractor::extract_m31(&hash);
-
-        let script = script! {
-            { ExtractorGadget::push_hint_m31(&e) }
-            { hash.to_vec() }
-            { unpack_script.clone() }
-            { elem }
-            OP_EQUAL
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-    }
-
-    #[test]
-    fn test_unpack_cm31() {
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-
-        let unpack_script = ExtractorGadget::unpack_cm31();
-        println!("CM31.from_hash() = {} bytes", unpack_script.len());
-
-        for _ in 0..300 {
-            let mut hash = [0u8; 32];
-            for h in &mut hash {
-                *h = prng.gen();
-            }
-
-            let (elem, e) = Extractor::extract_cm31(&hash);
-
-            let script = script! {
-                { ExtractorGadget::push_hint_cm31(&e) }
-                { hash.to_vec() }
-                { unpack_script.clone() }
-                { elem }
-                OP_ROT OP_EQUALVERIFY
-                OP_EQUAL
-            };
-            let exec_result = execute_script(script);
-            assert!(exec_result.success);
-        }
     }
 
     #[test]

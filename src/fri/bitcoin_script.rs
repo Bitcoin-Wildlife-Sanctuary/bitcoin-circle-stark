@@ -1,14 +1,14 @@
 use crate::channel::{Channel, ChannelGadget};
 use crate::channel_extract::{ExtractionQM31, ExtractorGadget};
 use crate::fri::{FriProof, N_QUERIES};
-use crate::math::FFTGadget;
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;
 use crate::utils::{limb_to_be_bits, limb_to_be_bits_toaltstack};
 use rust_bitcoin_m31::{
-    qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_roll, qm31_swap, qm31_toaltstack,
+    qm31_add, qm31_equalverify, qm31_fromaltstack, qm31_mul, qm31_mul_m31, qm31_over, qm31_roll,
+    qm31_sub, qm31_swap, qm31_toaltstack,
 };
 
 /// Gadget for FRI.
@@ -224,11 +224,44 @@ impl FRIGadget {
     }
 }
 
+/// Gadget for FFT.
+pub struct FFTGadget;
+
+impl FFTGadget {
+    /// Perform inverse butterfly in Bitcoin script.
+    /// input:
+    ///  v0 (qm31)
+    ///  v1 (qm31)
+    ///  itwid (m31)
+    ///
+    /// output:
+    ///  v0' (qm31)
+    ///  v1' (qm31)
+    pub fn ibutterfly() -> Script {
+        script! {
+            OP_TOALTSTACK
+
+            qm31_over
+            qm31_over
+            qm31_sub
+
+            OP_FROMALTSTACK
+            qm31_mul_m31
+
+            qm31_toaltstack
+
+            qm31_add
+
+            qm31_fromaltstack
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::channel::Channel;
     use crate::fri;
-    use crate::fri::{FRIGadget, N_QUERIES};
+    use crate::fri::{FFTGadget, FRIGadget, N_QUERIES};
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::permute_eval;
@@ -236,11 +269,13 @@ mod test {
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
     use num_traits::One;
-    use rand::{Rng, SeedableRng};
+    use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::circle::CirclePointIndex;
+    use stwo_prover::core::fft::ibutterfly;
     use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
@@ -735,5 +770,46 @@ mod test {
         let res = exec.result().unwrap();
         println!("max stack size: {}", exec.stats().max_nb_stack_items);
         assert!(res.success);
+    }
+
+    #[test]
+    fn test_ibutterfly() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let a = QM31::from_m31(
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+        );
+
+        let b = QM31::from_m31(
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+        );
+
+        let itwid = M31::reduce(prng.next_u64());
+
+        let mut v0 = a;
+        let mut v1 = b;
+
+        ibutterfly(&mut v0, &mut v1, itwid);
+
+        let script = script! {
+            { a }
+            { b }
+            { itwid }
+            { FFTGadget::ibutterfly() }
+            { v1 }
+            qm31_equalverify
+            { v0 }
+            qm31_equalverify
+            OP_TRUE
+        };
+
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }

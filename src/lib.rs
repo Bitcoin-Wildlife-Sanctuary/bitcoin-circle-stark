@@ -22,8 +22,6 @@ pub mod constraints;
 pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
-/// Module for the field and group arithmetics.
-pub mod math;
 /// Module for the Merkle tree.
 pub mod merkle_tree;
 /// Module for out-of-domain sampling.
