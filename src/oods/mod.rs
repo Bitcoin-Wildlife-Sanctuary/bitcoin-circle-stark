@@ -1,5 +1,5 @@
-use crate::channel::Channel;
 use crate::channel::ExtractionQM31;
+use crate::channel::Sha256Channel;
 use num_traits::One;
 use std::ops::{Add, Mul, Neg};
 use stwo_prover::core::circle::CirclePoint;
@@ -14,8 +14,8 @@ pub struct OODS;
 
 impl OODS {
     /// Obtain a random point from the channel and its hint.
-    pub fn get_random_point(channel: &mut Channel) -> (CirclePoint<QM31>, ExtractionQM31) {
-        let (t, hint) = channel.draw_qm31();
+    pub fn get_random_point(channel: &mut Sha256Channel) -> (CirclePoint<QM31>, ExtractionQM31) {
+        let (t, hint) = channel.draw_felt_and_hints();
 
         let one_plus_tsquared_inv = t.square().add(QM31::one()).inverse();
 

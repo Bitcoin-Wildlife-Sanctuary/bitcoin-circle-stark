@@ -62,7 +62,7 @@ impl Pushable for QM31 {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::Channel;
+    use crate::channel::Sha256Channel;
     use crate::fri;
     use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::utils::permute_eval;
@@ -92,9 +92,9 @@ mod test {
         let evaluation = permute_eval(evaluation);
 
         // FRI.
-        let proof = fri::fri_prove(&mut Channel::new(channel_init_state), evaluation);
+        let proof = fri::fri_prove(&mut Sha256Channel::new(channel_init_state), evaluation);
         fri::fri_verify(
-            &mut Channel::new(channel_init_state),
+            &mut Sha256Channel::new(channel_init_state),
             logn,
             proof,
             TWIDDLE_MERKLE_TREE_ROOT_4,

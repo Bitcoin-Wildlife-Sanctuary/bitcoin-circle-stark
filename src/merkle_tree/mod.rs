@@ -1,8 +1,8 @@
-use crate::channel::Commitment;
 use sha2::{Digest, Sha256};
 use stwo_prover::core::fields::qm31::QM31;
 
 mod bitcoin_script;
+use crate::utils::hash_qm31;
 pub use bitcoin_script::*;
 
 /// A Merkle tree.
@@ -24,14 +24,14 @@ impl MerkleTree {
         let mut cur = leaf_layer
             .chunks_exact(2)
             .map(|v| {
-                let commit_1 = Commitment::commit_qm31(v[0]);
-                let commit_2 = Commitment::commit_qm31(v[1]);
+                let commit_1 = hash_qm31(&v[0]);
+                let commit_2 = hash_qm31(&v[1]);
 
                 let mut hash_result = [0u8; 32];
 
                 let mut hasher = Sha256::new();
-                Digest::update(&mut hasher, commit_1.0);
-                Digest::update(&mut hasher, commit_2.0);
+                Digest::update(&mut hasher, commit_1);
+                Digest::update(&mut hasher, commit_2);
                 hash_result.copy_from_slice(hasher.finalize().as_slice());
                 hash_result
             })
@@ -71,7 +71,7 @@ impl MerkleTree {
         merkle_tree_proof.leaf = self.leaf_layer[pos];
         merkle_tree_proof
             .siblings
-            .push(Commitment::commit_qm31(self.leaf_layer[pos ^ 1]).0);
+            .push(hash_qm31(&self.leaf_layer[pos ^ 1]));
 
         for i in 0..(logn - 1) {
             pos >>= 1;
@@ -92,7 +92,7 @@ impl MerkleTree {
     ) -> bool {
         assert_eq!(proof.siblings.len(), logn);
 
-        let mut leaf_hash = Commitment::commit_qm31(proof.leaf).0;
+        let mut leaf_hash = hash_qm31(&proof.leaf);
 
         for i in 0..logn {
             let (f0, f1) = if query & 1 == 0 {

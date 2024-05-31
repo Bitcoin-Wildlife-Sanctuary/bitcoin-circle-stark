@@ -1,45 +1,112 @@
-use crate::utils::{num_to_bytes, trim_m31};
+use crate::utils::{hash_qm31, trim_m31};
 use bitcoin::script::PushBytesBuf;
 use sha2::{Digest, Sha256};
 use std::ops::Neg;
+use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::qm31::{SecureField, QM31};
 
 mod bitcoin_script;
 use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 
 /// A channel.
-pub struct Channel {
+pub struct Sha256Channel {
     /// Current state of the channel.
     pub state: [u8; 32],
 }
 
-impl Channel {
+impl Channel for Sha256Channel {
+    type Digest = [u8; 32];
+    const BYTES_PER_HASH: usize = 32;
+
+    fn new(digest: Self::Digest) -> Self {
+        Self { state: digest }
+    }
+
+    fn get_digest(&self) -> Self::Digest {
+        self.state
+    }
+
+    fn mix_digest(&mut self, digest: Self::Digest) {
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, digest);
+        Digest::update(&mut hasher, self.state);
+        self.state.copy_from_slice(hasher.finalize().as_slice());
+    }
+
+    fn mix_felts(&mut self, felts: &[SecureField]) {
+        for felt in felts.iter() {
+            let mut hasher = Sha256::new();
+            Digest::update(&mut hasher, hash_qm31(felt));
+            Digest::update(&mut hasher, self.state);
+            self.state.copy_from_slice(hasher.finalize().as_slice());
+        }
+    }
+
+    fn mix_nonce(&mut self, nonce: u64) {
+        // mix_nonce is called during PoW. However, later we plan to replace it by a Bitcoin block
+        // inclusion proof, then this function would never be called.
+
+        let mut hash = [0u8; 32];
+        hash[..8].copy_from_slice(&nonce.to_le_bytes());
+
+        self.mix_digest(hash);
+    }
+
+    fn draw_felt(&mut self) -> SecureField {
+        let mut extract = [0u8; 32];
+
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, [0u8]);
+        extract.copy_from_slice(hasher.finalize().as_slice());
+
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, self.state);
+        self.state.copy_from_slice(hasher.finalize().as_slice());
+
+        let (res_1, _) = Self::extract_common(&extract);
+        let (res_2, _) = Self::extract_common(&extract[4..]);
+        let (res_3, _) = Self::extract_common(&extract[8..]);
+        let (res_4, _) = Self::extract_common(&extract[12..]);
+
+        QM31(CM31(res_1, res_2), CM31(res_3, res_4))
+    }
+
+    fn draw_felts(&mut self, n_felts: usize) -> Vec<SecureField> {
+        let mut res = vec![];
+        for _ in 0..n_felts {
+            res.push(self.draw_felt());
+        }
+        res
+    }
+
+    fn draw_random_bytes(&mut self) -> Vec<u8> {
+        let mut extract = [0u8; 32];
+
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, [0u8]);
+        extract.copy_from_slice(hasher.finalize().as_slice());
+
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, self.state);
+        self.state.copy_from_slice(hasher.finalize().as_slice());
+
+        extract.to_vec()
+    }
+}
+
+impl Sha256Channel {
     /// Initialize a new channel.
     pub fn new(hash: [u8; 32]) -> Self {
         Self { state: hash }
     }
 
-    /// Absorb a commitment.
-    pub fn absorb_commitment(&mut self, commitment: &Commitment) {
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, commitment.0);
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
-    }
-
-    /// Absorb a qm31 element.
-    pub fn absorb_qm31(&mut self, el: &QM31) {
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, Commitment::commit_qm31(*el).0);
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
-    }
-
     /// Draw one qm31 and compute the hints.
-    pub fn draw_qm31(&mut self) -> (QM31, ExtractionQM31) {
+    pub fn draw_felt_and_hints(&mut self) -> (QM31, ExtractionQM31) {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
@@ -164,43 +231,3 @@ pub struct Extraction5M31(
     ),
     pub [u8; 12],
 );
-
-/// A commitment, which is a 32-byte SHA256 hash
-#[derive(Clone, Default, Debug)]
-pub struct Commitment(pub [u8; 32]);
-
-impl Pushable for Commitment {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let mut buf = PushBytesBuf::new();
-        buf.extend_from_slice(&self.0).unwrap();
-        builder.push_slice(buf)
-    }
-}
-
-impl Commitment {
-    /// Commit a qm31 element.
-    pub fn commit_qm31(v: QM31) -> Self {
-        let mut res = Self::default();
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.0 .0));
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.0 .1));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.1 .0));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.1 .1));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        res
-    }
-}

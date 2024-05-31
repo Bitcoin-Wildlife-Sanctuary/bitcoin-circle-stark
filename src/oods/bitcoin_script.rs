@@ -1,4 +1,4 @@
-use crate::channel::ChannelGadget;
+use crate::channel::Sha256ChannelGadget;
 use crate::treepp::*;
 use rust_bitcoin_m31::{
     m31_add_n31, m31_sub, push_m31_one, push_n31_one, qm31_double, qm31_dup, qm31_equalverify,
@@ -28,7 +28,7 @@ impl OODSGadget {
     /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     pub fn get_random_point() -> Script {
         script! {
-            { ChannelGadget::squeeze_qm31_using_hint() }
+            { Sha256ChannelGadget::squeeze_qm31_using_hint() }
             // stack: x, y, channel', t
 
             // compute t^2 from t
@@ -84,7 +84,7 @@ mod test {
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
     use crate::{
-        channel::{Channel, ExtractorGadget},
+        channel::{Sha256Channel, ExtractorGadget},
         tests_utils::report::report_bitcoin_script_size,
     };
     use rand::{Rng, SeedableRng};
@@ -102,7 +102,7 @@ mod test {
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());
 
-        let mut channel = Channel::new(a);
+        let mut channel = Sha256Channel::new(a);
 
         let (p, hint_t) = OODS::get_random_point(&mut channel);
 
