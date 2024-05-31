@@ -98,13 +98,10 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let add_script = CirclePointGadget::add();
-        println!("CirclePointSecure.add() = {} bytes", add_script.len());
+        println!("CirclePoint.add() = {} bytes", add_script.len());
 
         let add_x_script = CirclePointGadget::add_x_only();
-        println!(
-            "CirclePointSecure.add_x_only() = {} bytes",
-            add_x_script.len()
-        );
+        println!("CirclePoint.add_x_only() = {} bytes", add_x_script.len());
 
         for _ in 0..100 {
             let a = CirclePoint {
@@ -170,10 +167,7 @@ mod test {
     #[test]
     fn test_double_x() {
         let double_x_script = CirclePointGadget::double_x();
-        println!(
-            "CirclePointSecure.double_x() = {} bytes",
-            double_x_script.len()
-        );
+        println!("CirclePoint.double_x() = {} bytes", double_x_script.len());
 
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);

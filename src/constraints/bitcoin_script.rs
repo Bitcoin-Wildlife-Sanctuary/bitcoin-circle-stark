@@ -33,7 +33,7 @@ impl ConstraintsGadget {
         }
     }
 
-    /// Evaluates a polynomial P : CirclePointSecure -> QM31 that vanishes at excluded0 and excluded1
+    /// Evaluates a polynomial P : CirclePoint -> QM31 that vanishes at excluded0 and excluded1
     ///
     /// input:
     ///  z.x (QM31)

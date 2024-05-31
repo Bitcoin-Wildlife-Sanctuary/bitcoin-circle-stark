@@ -95,7 +95,7 @@ mod test {
 
         let get_random_point_script = OODSGadget::get_random_point();
         println!(
-            "CirclePointSecure.get_random_point() = {} bytes",
+            "OODS.get_random_point() = {} bytes",
             get_random_point_script.len()
         );
 
