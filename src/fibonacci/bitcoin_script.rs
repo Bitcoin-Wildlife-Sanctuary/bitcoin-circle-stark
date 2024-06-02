@@ -253,7 +253,11 @@ mod test {
             FibonacciCompositionGadget::eval_composition_polynomial_at_point(log_size, claim);
         report_bitcoin_script_size(
             "Fibonacci",
-            "eval_composition_polynomial_at_point",
+            format!(
+                "eval_composition_polynomial_at_point(log_size={})",
+                log_size
+            )
+            .as_str(),
             composition_polynomial_script.len(),
         );
 
@@ -326,7 +330,11 @@ mod test {
             FibonacciCompositionGadget::boundary_constraint_eval_quotient_by_mask(log_size, claim);
         report_bitcoin_script_size(
             "Fibonacci",
-            "boundary_constraint_eval_quotient_by_mask",
+            format!(
+                "boundary_constraint_eval_quotient_by_mask(log_size={})",
+                log_size
+            )
+            .as_str(),
             boundary_constraint_script.len(),
         );
 
@@ -385,7 +393,11 @@ mod test {
             FibonacciCompositionGadget::step_constraint_eval_quotient_by_mask(log_size);
         report_bitcoin_script_size(
             "Fibonacci",
-            "step_constraint_eval_quotient_by_mask",
+            format!(
+                "step_constraint_eval_quotient_by_mask(log_size={})",
+                log_size
+            )
+            .as_str(),
             step_constraint_script.len(),
         );
 
