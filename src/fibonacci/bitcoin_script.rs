@@ -375,7 +375,6 @@ mod test {
         }
     }
 
-    //TODO: efficiency report
     #[test]
     fn test_step_constraint_eval_quotient_by_mask() {
         let log_size = 5;
