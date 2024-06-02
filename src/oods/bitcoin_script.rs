@@ -28,7 +28,7 @@ impl OODSGadget {
     /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     pub fn get_random_point() -> Script {
         script! {
-            { Sha256ChannelGadget::squeeze_qm31_using_hint() }
+            { Sha256ChannelGadget::draw_felt_with_hint() }
             // stack: x, y, channel', t
 
             // compute t^2 from t
@@ -81,16 +81,15 @@ impl OODSGadget {
 
 #[cfg(test)]
 mod test {
+    use crate::channel::Sha256ChannelGadget;
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
-    use crate::{
-        channel::{ExtractorGadget, Sha256Channel},
-        tests_utils::report::report_bitcoin_script_size,
-    };
+    use crate::{channel::Sha256Channel, tests_utils::report::report_bitcoin_script_size};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::channel::Channel;
+    use stwo_prover::core::circle::CirclePoint;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
@@ -108,12 +107,12 @@ mod test {
 
         let mut channel = Sha256Channel::new(a);
 
-        let (p, hint_t) = OODS::get_random_point(&mut channel);
+        let (p, hint_t) = CirclePoint::get_random_point_with_hint(&mut channel);
 
         let c = channel.digest;
 
         let script = script! {
-            { ExtractorGadget::push_hint_qm31(&hint_t) }
+            { Sha256ChannelGadget::push_draw_hint(&hint_t) }
             { OODSGadget::push_random_point_hint(&p) }
             { a }
             { get_random_point_script.clone() }

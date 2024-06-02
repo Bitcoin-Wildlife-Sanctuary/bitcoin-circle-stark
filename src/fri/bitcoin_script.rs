@@ -1,6 +1,4 @@
-use crate::channel::{
-    ChannelWithHint, ExtractionQM31, ExtractorGadget, Sha256Channel, Sha256ChannelGadget,
-};
+use crate::channel::{ChannelWithHint, DrawQM31Hints, Sha256Channel, Sha256ChannelGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;
@@ -23,7 +21,7 @@ impl FRIGadget {
         logn: usize,
         proof: &FriProof,
     ) -> Script {
-        let mut factors_hints = Vec::<ExtractionQM31>::new();
+        let mut factors_hints = Vec::<DrawQM31Hints>::new();
 
         for c in proof.commitments.iter() {
             channel.mix_digest(*c);
@@ -37,9 +35,9 @@ impl FRIGadget {
 
         script! {
             for hint in factors_hints.iter() {
-                { ExtractorGadget::push_hint_qm31(hint) }
+                { Sha256ChannelGadget::push_draw_hint(hint) }
             }
-            { ExtractorGadget::push_hint_5m31(&queries_hint) }
+            { Sha256ChannelGadget::push_draw_hint(&queries_hint) }
         }
     }
 
@@ -52,7 +50,7 @@ impl FRIGadget {
 
             for _ in 0..n_layers {
                 { Sha256ChannelGadget::mix_digest() }
-                { Sha256ChannelGadget::squeeze_qm31_using_hint() }
+                { Sha256ChannelGadget::draw_felt_with_hint() }
                 qm31_toaltstack
             }
 
@@ -60,7 +58,7 @@ impl FRIGadget {
                 { Sha256ChannelGadget::mix_felt() }
             }
 
-            { Sha256ChannelGadget::squeeze_5queries_using_hint(logn) }
+            { Sha256ChannelGadget::draw_5numbers_with_hint(logn) }
 
             // remove the channel
             5 OP_ROLL OP_DROP
