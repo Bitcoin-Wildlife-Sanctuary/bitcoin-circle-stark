@@ -29,8 +29,8 @@ pub trait ChannelWithHint: Channel {
         let res = self.draw_m31_and_hints::<5>();
 
         let mut trimmed_results = [0usize; 5];
-        for i in 0..5 {
-            trimmed_results[i] = trim_m31(res.0[i].0, logn) as usize;
+        for (trimmed_result, result) in trimmed_results.iter_mut().zip(res.0.iter()) {
+            *trimmed_result = trim_m31(result.0, logn) as usize;
         }
 
         (trimmed_results, res.1)
