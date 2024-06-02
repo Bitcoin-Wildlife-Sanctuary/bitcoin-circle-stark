@@ -1,11 +1,11 @@
 use crate::channel::{Extraction5M31, ExtractionQM31};
 use crate::treepp::*;
-use crate::utils::trim_m31_gadget;
+use crate::utils::{hash_felt_gadget, trim_m31_gadget};
 
 /// Gadget for a channel.
-pub struct ChannelGadget;
+pub struct Sha256ChannelGadget;
 
-impl ChannelGadget {
+impl Sha256ChannelGadget {
     /// Initialize a channel.
     pub fn create_channel(hash: [u8; 32]) -> Script {
         script! {
@@ -14,17 +14,17 @@ impl ChannelGadget {
     }
 
     /// Absorb a commitment.
-    pub fn absorb_commitment() -> Script {
+    pub fn mix_digest() -> Script {
         script! {
             OP_CAT OP_SHA256
         }
     }
 
     /// Absorb a qm31 element.
-    pub fn absorb_qm31() -> Script {
+    pub fn mix_felt() -> Script {
         script! {
             OP_TOALTSTACK
-            { CommitmentGadget::commit_qm31() }
+            hash_felt_gadget
             OP_FROMALTSTACK OP_CAT OP_SHA256
         }
     }
@@ -50,18 +50,6 @@ impl ChannelGadget {
             { trim_m31_gadget(logn) } OP_TOALTSTACK
             { trim_m31_gadget(logn) }
             OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
-        }
-    }
-}
-
-/// Gadget for committing field elements.
-pub struct CommitmentGadget;
-
-impl CommitmentGadget {
-    /// Commit a qm31 element.
-    pub fn commit_qm31() -> Script {
-        script! {
-            OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
         }
     }
 }
@@ -206,40 +194,45 @@ impl ExtractorGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::{Channel, ChannelGadget, Commitment, CommitmentGadget, ExtractorGadget};
+    use crate::channel::{ChannelWithHint, ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
+    use crate::utils::{hash_felt_gadget, hash_qm31};
     use bitcoin_script::script;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::channel::Channel;
     use stwo_prover::core::fields::cm31::CM31;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
-    fn test_absorb_commitment() {
+    fn test_mix_digest() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::absorb_commitment();
-        report_bitcoin_script_size("Channel", "absorb_commitment", channel_script.len());
+        let channel_script = Sha256ChannelGadget::mix_digest();
+        report_bitcoin_script_size("Channel", "mix_digest", channel_script.len());
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = BWSSha256Hash::from(init_state.to_vec());
 
         let mut elem = [0u8; 32];
         elem.iter_mut().for_each(|v| *v = prng.gen());
+        let elem = BWSSha256Hash::from(elem.to_vec());
 
-        let mut channel = Channel::new(init_state);
-        channel.absorb_commitment(&Commitment(elem));
+        let mut channel = Sha256Channel::new(init_state);
+        channel.mix_digest(elem);
 
-        let final_state = channel.state;
+        let final_state = channel.digest;
 
         let script = script! {
-            { elem.to_vec() }
-            { init_state.to_vec() }
+            { elem }
+            { init_state }
             { channel_script.clone() }
-            { final_state.to_vec() }
+            { final_state }
             OP_EQUAL
         };
         let exec_result = execute_script(script);
@@ -247,30 +240,31 @@ mod test {
     }
 
     #[test]
-    fn test_absorb_qm31() {
+    fn test_mix_felt() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::absorb_qm31();
-        report_bitcoin_script_size("Channel", "absorb_qm31", channel_script.len());
+        let channel_script = Sha256ChannelGadget::mix_felt();
+        report_bitcoin_script_size("Channel", "mix_felt", channel_script.len());
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = BWSSha256Hash::from(init_state.to_vec());
 
         let elem = QM31(
             CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
             CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
         );
 
-        let mut channel = Channel::new(init_state);
-        channel.absorb_qm31(&elem);
+        let mut channel = Sha256Channel::new(init_state);
+        channel.mix_felts(&[elem]);
 
-        let final_state = channel.state;
+        let final_state = channel.digest;
 
         let script = script! {
             { elem }
-            { init_state.to_vec() }
+            { init_state }
             { channel_script.clone() }
-            { final_state.to_vec() }
+            { final_state }
             OP_EQUAL
         };
         let exec_result = execute_script(script);
@@ -281,25 +275,26 @@ mod test {
     fn test_squeeze_qm31_using_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::squeeze_qm31_using_hint();
+        let channel_script = Sha256ChannelGadget::squeeze_qm31_using_hint();
         report_bitcoin_script_size("Channel", "squeeze_qm31_using_hint", channel_script.len());
 
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = BWSSha256Hash::from(a.to_vec());
 
-            let mut channel = Channel::new(a);
-            let (b, hint) = channel.draw_qm31();
+            let mut channel = Sha256Channel::new(a);
+            let (b, hint) = channel.draw_felt_and_hints();
 
-            let c = channel.state;
+            let c = channel.digest;
 
             let script = script! {
                 { ExtractorGadget::push_hint_qm31(&hint) }
-                { a.to_vec() }
+                { a }
                 { channel_script.clone() }
                 { b }
                 qm31_equalverify
-                { c.to_vec() }
+                { c }
                 OP_EQUAL
             };
             let exec_result = execute_script(script);
@@ -311,7 +306,7 @@ mod test {
     fn test_squeeze_5queries_using_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = ChannelGadget::squeeze_5queries_using_hint(15);
+        let channel_script = Sha256ChannelGadget::squeeze_5queries_using_hint(15);
 
         report_bitcoin_script_size(
             "Channel",
@@ -322,22 +317,23 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = BWSSha256Hash::from(a.to_vec());
 
-            let mut channel = Channel::new(a);
+            let mut channel = Sha256Channel::new(a);
             let (b, hint) = channel.draw_5queries(15);
 
-            let c = channel.state;
+            let c = channel.digest;
 
             let script = script! {
                 { ExtractorGadget::push_hint_5m31(&hint) }
-                { a.to_vec() }
+                { a }
                 { channel_script.clone() }
                 { b[4] } OP_EQUALVERIFY
                 { b[3] } OP_EQUALVERIFY
                 { b[2] } OP_EQUALVERIFY
                 { b[1] } OP_EQUALVERIFY
                 { b[0] } OP_EQUALVERIFY
-                { c.to_vec() }
+                { c }
                 OP_EQUAL
             };
             let exec_result = execute_script(script);
@@ -346,24 +342,23 @@ mod test {
     }
 
     #[test]
-    fn test_commit_qm31() {
+    fn test_hash_felt() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let commit_script = CommitmentGadget::commit_qm31();
-
-        report_bitcoin_script_size("QM31", "commit", commit_script.len());
+        let commit_script = hash_felt_gadget();
+        report_bitcoin_script_size("QM31", "hash", commit_script.len());
 
         for _ in 0..100 {
             let a = QM31(
                 CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
                 CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
             );
-            let b = Commitment::commit_qm31(a);
+            let b = hash_qm31(&a);
 
             let script = script! {
                 { a }
                 { commit_script.clone() }
-                { b.clone() }
+                { b.to_vec() }
                 OP_EQUAL
             };
             let exec_result = execute_script(script);

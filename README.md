@@ -42,31 +42,31 @@ The next step is to implement the FRI protocol, which reasons about the degree o
 
 These performance numbers are obtained from `cargo test -- --nocapture` over commit [6e5c211](https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-circle-stark/commit/6e5c211fb755428ab3492eac2e0dcd39c99482d6).
 
-- **M31, CM31, QM31**
-  * M31.add() = 18 bytes, QM31.add() = 84 bytes
-  * M31.sub() = 12 bytes, QM31.sub() = 63 bytes
-  * M31.mul() = 1415 bytes, QM31.mul() = 13321 bytes
-  * M31.mul_by_constant() = ~744 bytes, QM31.mul_by_m31_constant() = ~2981 bytes
-  * QM31.mul_by_m31() = 4702 bytes
-  * M31.commit() = 1 bytes, CM31.commit() = 3 bytes, QM31.commit() = 7 bytes
-  * M31.from_hash() = 64 bytes, CM31.from_hash() = 124 bytes, QM31.from_hash() = 250 bytes, 5M31.from_hash() = 312 bytes
+- **M31, QM31**
+  * M31.add = 18 bytes, QM31.add = 84 bytes
+  * M31.sub = 12 bytes, QM31.sub = 63 bytes
+  * M31.mul = 1415 bytes, QM31.mul = 13321 bytes
+  * M31.mul_by_constant = ~744 bytes, QM31.mul_by_m31_constant = ~2981 bytes
+  * QM31.mul_by_m31 = 4702 bytes
+  * QM31.commit = 7 bytes, QM31.from_hash = 250 bytes
+  * 5M31.from_hash = 312 bytes
 - **CirclePoint over QM31**
-  * CirclePoint.double_x() = 13505 bytes
-  * CirclePoint.get_random_point() = 40546 bytes
-  * CirclePoint.add() = 40542 bytes
-  * CirclePoint.add_x_only() = 26791 bytes
+  * CirclePoint.double_x = 13505 bytes
+  * CirclePoint.get_random_point = 40546 bytes
+  * CirclePoint.add = 40542 bytes
+  * CirclePoint.add_x_only = 26791 bytes
 - **Constraints on the circle curve over QM31**
-  * Constraints.pair_vanishing() = 26932 bytes
+  * Constraints.pair_vanishing = 26932 bytes
   * Constraints.coset_vanishing(log_size=5) = 80827 bytes
   * Constraints.coset_vanishing(log_size=6) = 94332 bytes
   * Constraints.coset_vanishing(log_size=7) = 107837 bytes
   * Constraints.coset_vanishing(log_size=8) = 121342 bytes
   * Constraints.coset_vanishing(log_size=9) = 134847 bytes
 - **Fiat-Shamir Transcript**
-  * Channel.absorb_commitment = 2 bytes
-  * Channel.absorb_qm31() = 9 bytes
-  * Channel.squeeze_element_using_hint() = 257 bytes (require 5 hint elements)
-  * Channel.squeeze_5queries_using_hint() = 1222 bytes (require 6 hint elements)
+  * Channel.mix_digest = 2 bytes
+  * Channel.mix_felts = 9 bytes per felt
+  * Channel.squeeze_element_using_hint = 257 bytes (require 5 hint elements)
+  * Channel.squeeze_5queries_using_hint = 1222 bytes (require 6 hint elements)
 - **Proof-of-Work Check**
   * POW.verify_pow(1 bit) = 39 bytes
   * POW.verify_pow(2 bits) = 38 bytes
@@ -102,12 +102,12 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
 The channel is used for Fiat-Shamir transform. It absorbs elements that are either prior knowledge of the verifier or provers' 
 messages, and it can be squeezed to produce pseudorandom elements. There are five operations.
 
-- `new(IV) -> channel`: initialize a new channel using an initialization vector (IV)
-  * `channel := IV`
-- `absorb(channel, commitment) -> channel'`: update the channel with a commitment
+- `new(digest) -> channel`: initialize a new channel using an initial digest
+  * `channel := digest`
+- `mix_digest(channel, digest) -> channel'`: update the channel with a digest
   * `channel' := SHA256(channel || commitment)`
-- `absorb(channel, qm31) -> channel'`: update the channel with a QM31 element
-  * `channel' := SHA256(channel || commit(qm31))`
+- `mix_felts(channel, [qm31]) -> channel'`: update the channel with QM31 elements
+  * `channel' := SHA256(channel || commit(qm31))` for each qm31
 - `squeeze(channel) -> (qm31, channel')`: squeeze a QM31 element out of the channel
   * `hash := SHA256(channel || 0x00)`
   * `channel' := SHA256(channel)`
@@ -117,36 +117,16 @@ messages, and it can be squeezed to produce pseudorandom elements. There are fiv
   * `channel' := SHA256(channel)`
   * `q1, q2, q3, q4, q5 := extract(hash, logn)`
 
-The constructions of commit and extract are discussed later.
+The constructions of commit and extract are as follows.
 
----
-
-### Commit
-
-With `OP_CAT + OP_SHA256`, we can commit M31, CM31, and QM31 elements with a few bytes.
-
-M31 requires only 1 byte: `commit(m31) := SHA256(m31)`.
-```
-OP_SHA256
-```
-
-CM31 requires 3 bytes: `commit(cm31) := SHA256(cm31.0 || SHA256(cm31.1)) `
-```
-OP_SHA256 OP_CAT OP_SHA256
-```
+**Commit.** With `OP_CAT + OP_SHA256`, we can commit QM31 elements with a few bytes.
 
 QM31 requires 7 bytes: `commit(qm31) := SHA256(qm31.0.0 || SHA256(qm31.0.1 || SHA256(qm31.1.0 || SHA256(qm31.1.1))))`
 ```
 OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
 ```
 
-We feel that this is the optimal.
-
----
-
-### Extract
-
-Since we do not have `OP_SUBSTR`, to extract a QM31 element or five positions from the hash, we need to use hints. The 
+**Extract.** Since we do not have `OP_SUBSTR`, to extract a QM31 element or five positions from the hash, we need to use hints. The 
 idea is to peel off the first few bytes of the hash and recreate a normalized QM31 element out of it. If we want to extract 
 positions, the numbers are further adjusted to have only `logn` bits.
 

@@ -3,6 +3,7 @@ mod bitcoin_script;
 use crate::treepp::*;
 pub use bitcoin_script::*;
 use num_traits::Zero;
+use sha2::{Digest, Sha256};
 use std::cmp::min;
 use stwo_prover::core::circle::CirclePointIndex;
 use stwo_prover::core::fields::m31::M31;
@@ -43,6 +44,32 @@ pub fn permute_eval(evaluation: Vec<QM31>) -> Vec<QM31> {
             evaluation[evaluation.len() - 1 - i * 2];
     }
     layer
+}
+
+/// Compute the Bitcoin-friendly hash of a single QM31 element.
+pub fn hash_qm31(v: &QM31) -> [u8; 32] {
+    let mut res = [0u8; 32];
+
+    let mut hasher = Sha256::new();
+    Digest::update(&mut hasher, &num_to_bytes(v.0 .0));
+    res.copy_from_slice(hasher.finalize().as_slice());
+
+    let mut hasher = Sha256::new();
+    Digest::update(&mut hasher, num_to_bytes(v.0 .1));
+    Digest::update(&mut hasher, res);
+    res.copy_from_slice(hasher.finalize().as_slice());
+
+    let mut hasher = Sha256::new();
+    Digest::update(&mut hasher, num_to_bytes(v.1 .0));
+    Digest::update(&mut hasher, res);
+    res.copy_from_slice(hasher.finalize().as_slice());
+
+    let mut hasher = Sha256::new();
+    Digest::update(&mut hasher, num_to_bytes(v.1 .1));
+    Digest::update(&mut hasher, res);
+    res.copy_from_slice(hasher.finalize().as_slice());
+
+    res
 }
 
 /// Trim a m31 element to have only logn bits.

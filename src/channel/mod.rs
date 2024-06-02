@@ -1,7 +1,8 @@
-use crate::utils::{num_to_bytes, trim_m31};
+use crate::utils::trim_m31;
 use bitcoin::script::PushBytesBuf;
 use sha2::{Digest, Sha256};
 use std::ops::Neg;
+use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
@@ -10,51 +11,34 @@ mod bitcoin_script;
 use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 
-/// A channel.
-pub struct Channel {
-    /// Current state of the channel.
-    pub state: [u8; 32],
+pub use stwo_prover::core::channel::BWSSha256Channel as Sha256Channel;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+
+/// A wrapper trait to implement hint-related method for channels.
+pub trait ChannelWithHint: Channel {
+    /// Draw one qm31 and compute the hints.
+    fn draw_felt_and_hints(&mut self) -> (QM31, ExtractionQM31);
+    /// Draw five queries and compute the hints.
+    fn draw_5queries(&mut self, logn: usize) -> ([usize; 5], Extraction5M31);
 }
 
-impl Channel {
-    /// Initialize a new channel.
-    pub fn new(hash: [u8; 32]) -> Self {
-        Self { state: hash }
-    }
-
-    /// Absorb a commitment.
-    pub fn absorb_commitment(&mut self, commitment: &Commitment) {
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, commitment.0);
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
-    }
-
-    /// Absorb a qm31 element.
-    pub fn absorb_qm31(&mut self, el: &QM31) {
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, Commitment::commit_qm31(*el).0);
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
-    }
-
-    /// Draw one qm31 and compute the hints.
-    pub fn draw_qm31(&mut self) -> (QM31, ExtractionQM31) {
+impl ChannelWithHint for Sha256Channel {
+    fn draw_felt_and_hints(&mut self) -> (QM31, ExtractionQM31) {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, self.digest);
         Digest::update(&mut hasher, [0u8]);
         extract.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
+        Digest::update(&mut hasher, self.digest);
+        self.digest = BWSSha256Hash::from(hasher.finalize().to_vec());
 
-        let (res_1, hint_1) = Self::extract_common(&extract);
-        let (res_2, hint_2) = Self::extract_common(&extract[4..]);
-        let (res_3, hint_3) = Self::extract_common(&extract[8..]);
-        let (res_4, hint_4) = Self::extract_common(&extract[12..]);
+        let (res_1, hint_1) = extract_common(&extract);
+        let (res_2, hint_2) = extract_common(&extract[4..]);
+        let (res_3, hint_3) = extract_common(&extract[8..]);
+        let (res_4, hint_4) = extract_common(&extract[12..]);
 
         let mut hint_bytes = [0u8; 16];
         hint_bytes.copy_from_slice(&extract[16..]);
@@ -65,24 +49,23 @@ impl Channel {
         )
     }
 
-    /// Draw five queries and compute the hints.
-    pub fn draw_5queries(&mut self, logn: usize) -> ([usize; 5], Extraction5M31) {
+    fn draw_5queries(&mut self, logn: usize) -> ([usize; 5], Extraction5M31) {
         let mut extract = [0u8; 32];
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, self.state);
+        Digest::update(&mut hasher, self.digest);
         Digest::update(&mut hasher, [0u8]);
         extract.copy_from_slice(hasher.finalize().as_slice());
 
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, self.state);
-        self.state.copy_from_slice(hasher.finalize().as_slice());
+        Digest::update(&mut hasher, self.digest);
+        self.digest = BWSSha256Hash::from(hasher.finalize().to_vec());
 
-        let (res_1, hint_1) = Self::extract_common(&extract);
-        let (res_2, hint_2) = Self::extract_common(&extract[4..]);
-        let (res_3, hint_3) = Self::extract_common(&extract[8..]);
-        let (res_4, hint_4) = Self::extract_common(&extract[12..]);
-        let (res_5, hint_5) = Self::extract_common(&extract[16..]);
+        let (res_1, hint_1) = extract_common(&extract);
+        let (res_2, hint_2) = extract_common(&extract[4..]);
+        let (res_3, hint_3) = extract_common(&extract[8..]);
+        let (res_4, hint_4) = extract_common(&extract[12..]);
+        let (res_5, hint_5) = extract_common(&extract[16..]);
 
         let mut hint_bytes = [0u8; 12];
         hint_bytes.copy_from_slice(&extract[20..]);
@@ -105,28 +88,28 @@ impl Channel {
             hint,
         )
     }
+}
 
-    fn extract_common(hash: &[u8]) -> (M31, ExtractorHint) {
-        let mut bytes = [0u8; 4];
-        bytes.copy_from_slice(&hash[0..4]);
+fn extract_common(hash: &[u8]) -> (M31, ExtractorHint) {
+    let mut bytes = [0u8; 4];
+    bytes.copy_from_slice(&hash[0..4]);
 
-        let mut res = u32::from_le_bytes(bytes);
-        res &= 0x7fffffff;
+    let mut res = u32::from_le_bytes(bytes);
+    res &= 0x7fffffff;
 
-        let hint = if bytes[3] & 0x80 != 0 {
-            if res == 0 {
-                ExtractorHint::NegativeZero
-            } else {
-                ExtractorHint::Other((res as i64).neg())
-            }
+    let hint = if bytes[3] & 0x80 != 0 {
+        if res == 0 {
+            ExtractorHint::NegativeZero
         } else {
-            ExtractorHint::Other(res as i64)
-        };
+            ExtractorHint::Other((res as i64).neg())
+        }
+    } else {
+        ExtractorHint::Other(res as i64)
+    };
 
-        res = res.saturating_sub(1);
+    res = res.saturating_sub(1);
 
-        (M31::from(res), hint)
-    }
+    (M31::from(res), hint)
 }
 
 /// Basic hint structure for extracting a single qm31 element.
@@ -164,43 +147,3 @@ pub struct Extraction5M31(
     ),
     pub [u8; 12],
 );
-
-/// A commitment, which is a 32-byte SHA256 hash
-#[derive(Clone, Default, Debug)]
-pub struct Commitment(pub [u8; 32]);
-
-impl Pushable for Commitment {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let mut buf = PushBytesBuf::new();
-        buf.extend_from_slice(&self.0).unwrap();
-        builder.push_slice(buf)
-    }
-}
-
-impl Commitment {
-    /// Commit a qm31 element.
-    pub fn commit_qm31(v: QM31) -> Self {
-        let mut res = Self::default();
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v.0 .0));
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.0 .1));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.1 .0));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, num_to_bytes(v.1 .1));
-        Digest::update(&mut hasher, res.0);
-        res.0.copy_from_slice(hasher.finalize().as_slice());
-
-        res
-    }
-}

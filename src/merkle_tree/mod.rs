@@ -1,8 +1,9 @@
-use crate::channel::Commitment;
 use sha2::{Digest, Sha256};
 use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
+use crate::utils::hash_qm31;
 pub use bitcoin_script::*;
 
 /// A Merkle tree.
@@ -12,7 +13,7 @@ pub struct MerkleTree {
     /// Intermediate layers.
     pub intermediate_layers: Vec<Vec<[u8; 32]>>,
     /// Root hash.
-    pub root_hash: [u8; 32],
+    pub root_hash: BWSSha256Hash,
 }
 
 impl MerkleTree {
@@ -24,14 +25,14 @@ impl MerkleTree {
         let mut cur = leaf_layer
             .chunks_exact(2)
             .map(|v| {
-                let commit_1 = Commitment::commit_qm31(v[0]);
-                let commit_2 = Commitment::commit_qm31(v[1]);
+                let commit_1 = hash_qm31(&v[0]);
+                let commit_2 = hash_qm31(&v[1]);
 
                 let mut hash_result = [0u8; 32];
 
                 let mut hasher = Sha256::new();
-                Digest::update(&mut hasher, commit_1.0);
-                Digest::update(&mut hasher, commit_2.0);
+                Digest::update(&mut hasher, commit_1);
+                Digest::update(&mut hasher, commit_2);
                 hash_result.copy_from_slice(hasher.finalize().as_slice());
                 hash_result
             })
@@ -56,7 +57,7 @@ impl MerkleTree {
         Self {
             leaf_layer,
             intermediate_layers,
-            root_hash: cur[0],
+            root_hash: BWSSha256Hash::from(cur[0].to_vec()),
         }
     }
 
@@ -71,7 +72,7 @@ impl MerkleTree {
         merkle_tree_proof.leaf = self.leaf_layer[pos];
         merkle_tree_proof
             .siblings
-            .push(Commitment::commit_qm31(self.leaf_layer[pos ^ 1]).0);
+            .push(hash_qm31(&self.leaf_layer[pos ^ 1]));
 
         for i in 0..(logn - 1) {
             pos >>= 1;
@@ -85,14 +86,14 @@ impl MerkleTree {
 
     /// Verify a Merkle tree proof.
     pub fn verify(
-        root_hash: [u8; 32],
+        root_hash: &BWSSha256Hash,
         logn: usize,
         proof: &MerkleTreeProof,
         mut query: usize,
     ) -> bool {
         assert_eq!(proof.siblings.len(), logn);
 
-        let mut leaf_hash = Commitment::commit_qm31(proof.leaf).0;
+        let mut leaf_hash = hash_qm31(&proof.leaf);
 
         for i in 0..logn {
             let (f0, f1) = if query & 1 == 0 {
@@ -109,7 +110,7 @@ impl MerkleTree {
             query >>= 1;
         }
 
-        leaf_hash == root_hash
+        leaf_hash == root_hash.as_ref()
     }
 }
 
@@ -149,7 +150,12 @@ mod test {
             let query = (prng.gen::<u32>() % (1 << 12)) as usize;
 
             let proof = merkle_tree.query(query);
-            assert!(MerkleTree::verify(merkle_tree.root_hash, 12, &proof, query));
+            assert!(MerkleTree::verify(
+                &merkle_tree.root_hash,
+                12,
+                &proof,
+                query
+            ));
         }
     }
 }

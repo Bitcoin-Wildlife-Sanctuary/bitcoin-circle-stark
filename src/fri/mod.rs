@@ -1,11 +1,12 @@
-use crate::channel::Channel;
-use crate::channel::Commitment;
+use crate::channel::{ChannelWithHint, Sha256Channel};
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 use crate::utils::get_twiddles;
+use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -13,7 +14,7 @@ pub use bitcoin_script::*;
 /// A FRI proof.
 #[derive(Clone, Debug)]
 pub struct FriProof {
-    commitments: Vec<Commitment>,
+    commitments: Vec<BWSSha256Hash>,
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
     merkle_proofs: Vec<Vec<MerkleTreeProof>>,
@@ -23,7 +24,7 @@ pub struct FriProof {
 const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
 
 /// Generate a FRI proof.
-pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
+pub fn fri_prove(channel: &mut Sha256Channel, evaluation: Vec<QM31>) -> FriProof {
     let logn = evaluation.len().ilog2() as usize;
     let n_layers = logn - 1;
     let twiddles = get_twiddles(logn);
@@ -39,13 +40,12 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
         let tree = MerkleTree::new(layer.clone());
 
-        let commitment = Commitment(tree.root_hash);
-        channel.absorb_commitment(&commitment);
-        commitments.push(commitment);
+        channel.mix_digest(tree.root_hash);
+        commitments.push(tree.root_hash);
 
         trees.push(tree);
 
-        let (alpha, _) = channel.draw_qm31();
+        let (alpha, _) = channel.draw_felt_and_hints();
 
         layer = layer
             .chunks_exact(2)
@@ -60,7 +60,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
     // Last layer.
     let last_layer = layer;
-    last_layer.iter().for_each(|v| channel.absorb_qm31(v));
+    channel.mix_felts(&last_layer);
 
     // Queries.
     let queries = channel.draw_5queries(logn).0.to_vec();
@@ -93,7 +93,7 @@ pub fn fri_prove(channel: &mut Channel, evaluation: Vec<QM31>) -> FriProof {
 
 /// Verify the FRI proof.
 pub fn fri_verify(
-    channel: &mut Channel,
+    channel: &mut Sha256Channel,
     logn: usize,
     proof: FriProof,
     twiddle_merkle_tree_root: [u8; 32],
@@ -103,11 +103,11 @@ pub fn fri_verify(
     // Draw factors.
     let mut factors = Vec::with_capacity(n_layers);
     for c in proof.commitments.iter() {
-        channel.absorb_commitment(c);
-        factors.push(channel.draw_qm31().0);
+        channel.mix_digest(*c);
+        factors.push(channel.draw_felt_and_hints().0);
     }
     // Last layer.
-    proof.last_layer.iter().for_each(|v| channel.absorb_qm31(v));
+    channel.mix_felts(&proof.last_layer);
     // Check it's of half degree.
     assert_eq!(proof.last_layer[0], proof.last_layer[1]);
     // Queries.
@@ -131,7 +131,7 @@ pub fn fri_verify(
         ));
         for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {
             assert!(MerkleTree::verify(
-                proof.commitments[i].0,
+                &proof.commitments[i],
                 logn - i,
                 &merkle_proof[i],
                 query ^ 1

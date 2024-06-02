@@ -1,7 +1,6 @@
-use crate::channel::CommitmentGadget;
 use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
-use crate::utils::limb_to_be_bits_toaltstack;
+use crate::utils::{hash_felt_gadget, limb_to_be_bits_toaltstack};
 
 /// Gadget for verifying a regular binary Merkle tree.
 pub struct MerkleTreeGadget;
@@ -35,7 +34,7 @@ impl MerkleTreeGadget {
             OP_2ROT
             OP_2SWAP
 
-            { CommitmentGadget::commit_qm31() }
+            hash_felt_gadget
 
             if is_sibling {
                 OP_DEPTH OP_1SUB OP_ROLL
@@ -128,7 +127,7 @@ mod test {
 
             let script = script! {
                 { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
-                { merkle_tree.root_hash.to_vec() }
+                { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
                 { last_layer[pos as usize] }
@@ -165,7 +164,7 @@ mod test {
 
             let script = script! {
                 { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
-                { merkle_tree.root_hash.to_vec() }
+                { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
                 { last_layer[(pos ^ 1) as usize] }

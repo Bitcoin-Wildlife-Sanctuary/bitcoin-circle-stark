@@ -1,4 +1,4 @@
-use crate::channel::ChannelGadget;
+use crate::channel::Sha256ChannelGadget;
 use crate::treepp::*;
 use rust_bitcoin_m31::{
     m31_add_n31, m31_sub, push_m31_one, push_n31_one, qm31_double, qm31_dup, qm31_equalverify,
@@ -28,7 +28,7 @@ impl OODSGadget {
     /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     pub fn get_random_point() -> Script {
         script! {
-            { ChannelGadget::squeeze_qm31_using_hint() }
+            { Sha256ChannelGadget::squeeze_qm31_using_hint() }
             // stack: x, y, channel', t
 
             // compute t^2 from t
@@ -84,12 +84,14 @@ mod test {
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
     use crate::{
-        channel::{Channel, ExtractorGadget},
+        channel::{ExtractorGadget, Sha256Channel},
         tests_utils::report::report_bitcoin_script_size,
     };
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::channel::Channel;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
     fn test_get_random_point() {
@@ -102,22 +104,24 @@ mod test {
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());
 
-        let mut channel = Channel::new(a);
+        let a = BWSSha256Hash::from(a.to_vec());
+
+        let mut channel = Sha256Channel::new(a);
 
         let (p, hint_t) = OODS::get_random_point(&mut channel);
 
-        let c = channel.state;
+        let c = channel.digest;
 
         let script = script! {
             { ExtractorGadget::push_hint_qm31(&hint_t) }
             { OODSGadget::push_random_point_hint(&p) }
-            { a.to_vec() }
+            { a }
             { get_random_point_script.clone() }
             { p.y } // check y
             qm31_equalverify
             { p.x } // check x
             qm31_equalverify
-            { c.to_vec() } // check channel'
+            { c } // check channel'
             OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
             OP_TRUE
         };

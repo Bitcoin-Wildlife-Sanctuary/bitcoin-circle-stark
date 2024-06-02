@@ -45,6 +45,13 @@ pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
     }
 }
 
+/// Gadget for hashing a qm31 element in the script.
+pub fn hash_felt_gadget() -> Script {
+    script! {
+        OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::treepp::*;
