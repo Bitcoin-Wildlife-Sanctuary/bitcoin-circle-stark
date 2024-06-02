@@ -15,10 +15,10 @@ impl OODSGadget {
     ///
     /// hint:
     ///  w - qm31 hint (5 elements)
-    ///
-    /// input:
     ///  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
     ///  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
+    ///
+    /// input:
     ///  channel
     ///
     /// output:
