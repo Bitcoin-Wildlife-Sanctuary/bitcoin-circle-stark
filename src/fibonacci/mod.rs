@@ -1,3 +1,40 @@
+mod bitcoin_script;
+pub use bitcoin_script::*;
+use num_traits::One;
+use stwo_prover::core::{
+    circle::{CirclePoint, Coset},
+    constraints::pair_vanishing,
+    fields::{
+        m31::{BaseField, M31},
+        ExtensionOf, FieldExpOps,
+    },
+};
+
+///fibonacci composition polynomial-related methods are private, so we need to copy-paste them from stwo
+pub struct FibonacciComposition;
+
+impl FibonacciComposition {
+    ///boundary
+    pub fn boundary_constraint_eval_quotient_by_mask<F: ExtensionOf<BaseField>>(
+        log_size: u32,
+        claim: M31,
+        point: CirclePoint<F>,
+        mask: &[F; 1],
+    ) -> F {
+        let constraint_zero_domain = Coset::subgroup(log_size);
+        let p = constraint_zero_domain.at(constraint_zero_domain.size() - 1);
+        // On (1,0), we should get 1.
+        // On p, we should get self.claim.
+        // 1 + y * (self.claim - 1) * p.y^-1
+        // TODO(spapini): Cache the constant.
+        let linear = F::one() + point.y * (claim - BaseField::one()) * p.y.inverse();
+
+        let num = mask[0] - linear;
+        let denom = pair_vanishing(p.into_ef(), CirclePoint::zero(), point);
+        num / denom
+    }
+}
+
 #[cfg(test)]
 mod test {
     use stwo_fork::core::prover::{prove, verify};
