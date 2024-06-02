@@ -227,10 +227,12 @@ mod test {
         examples::fibonacci::Fibonacci,
     };
 
-    use crate::fibonacci::{FibonacciComposition, FibonacciCompositionGadget};
     use crate::treepp::*;
+    use crate::{
+        fibonacci::{FibonacciComposition, FibonacciCompositionGadget},
+        tests_utils::report::report_bitcoin_script_size,
+    };
 
-    //TODO: efficiency report
     #[test]
     fn test_eval_composition_polynomial_at_point() {
         let log_size = 5;
@@ -246,6 +248,14 @@ mod test {
         let component_traces = vec![trace];
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let composition_polynomial_script =
+            FibonacciCompositionGadget::eval_composition_polynomial_at_point(log_size, claim);
+        report_bitcoin_script_size(
+            "Fibonacci",
+            "eval_composition_polynomial_at_point",
+            composition_polynomial_script.len(),
+        );
 
         for _ in 0..20 {
             let random_coeff = QM31::from_m31(
@@ -295,7 +305,7 @@ mod test {
                 { comp[0][0] }
                 { z.x }
                 { z.y }
-                { FibonacciCompositionGadget::eval_composition_polynomial_at_point(log_size, claim) }
+                { composition_polynomial_script.clone() }
                 { res }
                 qm31_equalverify
                 OP_TRUE
@@ -305,13 +315,20 @@ mod test {
         }
     }
 
-    //TODO: efficiency report
     #[test]
     fn test_boundary_constraint_eval_quotient_by_mask() {
         let log_size = 5;
         let claim = m31::M31::from_u32_unchecked(443693538);
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let boundary_constraint_script =
+            FibonacciCompositionGadget::boundary_constraint_eval_quotient_by_mask(log_size, claim);
+        report_bitcoin_script_size(
+            "Fibonacci",
+            "boundary_constraint_eval_quotient_by_mask",
+            boundary_constraint_script.len(),
+        );
 
         for _ in 0..20 {
             let z = CirclePoint {
@@ -348,7 +365,7 @@ mod test {
                 { fz }
                 { z.x }
                 { z.y }
-                { FibonacciCompositionGadget::boundary_constraint_eval_quotient_by_mask(log_size,claim) }
+                { boundary_constraint_script.clone() }
                 { res }
                 qm31_equalverify
                 OP_TRUE
@@ -364,6 +381,14 @@ mod test {
         let log_size = 5;
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let step_constraint_script =
+            FibonacciCompositionGadget::step_constraint_eval_quotient_by_mask(log_size);
+        report_bitcoin_script_size(
+            "Fibonacci",
+            "step_constraint_eval_quotient_by_mask",
+            step_constraint_script.len(),
+        );
 
         for _ in 0..20 {
             let z = CirclePoint {
@@ -415,7 +440,7 @@ mod test {
                 { fz }
                 { z.x }
                 { z.y }
-                { FibonacciCompositionGadget::step_constraint_eval_quotient_by_mask(log_size) }
+                { step_constraint_script.clone() }
                 { res }
                 qm31_equalverify
                 OP_TRUE
