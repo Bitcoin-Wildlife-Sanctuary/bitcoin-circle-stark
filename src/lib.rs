@@ -4,7 +4,6 @@
 #![deny(missing_docs)]
 
 use crate::treepp::pushable::{Builder, Pushable};
-use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
@@ -47,17 +46,12 @@ impl Pushable for M31 {
     }
 }
 
-impl Pushable for CM31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let builder = self.1.bitcoin_script_push(builder);
-        self.0.bitcoin_script_push(builder)
-    }
-}
-
 impl Pushable for QM31 {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        let builder = self.1.bitcoin_script_push(builder);
-        self.0.bitcoin_script_push(builder)
+        let mut builder = self.1 .1.bitcoin_script_push(builder);
+        builder = self.1 .0.bitcoin_script_push(builder);
+        builder = self.0 .1.bitcoin_script_push(builder);
+        self.0 .0.bitcoin_script_push(builder)
     }
 }
 
@@ -71,10 +65,14 @@ impl Pushable for BWSSha256Hash {
 mod test {
     use crate::channel::Sha256Channel;
     use crate::fri;
+    use crate::treepp::{
+        pushable::{Builder, Pushable},
+        *,
+    };
     use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::utils::permute_eval;
     use num_traits::One;
-    use rand::{Rng, SeedableRng};
+    use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use stwo_prover::core::channel::Channel;
     use stwo_prover::core::circle::CirclePointIndex;
@@ -82,6 +80,28 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+
+    #[test]
+    fn test_pushable() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        // m31
+        let m31 = M31::reduce(prng.next_u64());
+        let qm31 = QM31::from_m31(
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+            M31::reduce(prng.next_u64()),
+        );
+
+        let mut builder = Builder::new();
+        builder = m31.bitcoin_script_push(builder);
+        assert_eq!(script! { {m31} }.as_bytes(), builder.as_bytes());
+
+        let mut builder = Builder::new();
+        builder = qm31.bitcoin_script_push(builder);
+        assert_eq!(script! { {qm31} }.as_bytes(), builder.as_bytes());
+    }
 
     #[test]
     fn test_cfri_main() {
