@@ -1,3 +1,6 @@
+mod bitcoin_script;
+pub use bitcoin_script::*;
+
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::channel::BWSSha256Channel;

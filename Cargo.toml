@@ -15,6 +15,7 @@ stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo" }
 num-traits = "0.2.0"
 lazy_static = "1.4.0"
 ctor = "0.2.8"
+itertools = "0.12.0"
 
 # Add cargo-husky to run pre-commit hooks
 [dev-dependencies.cargo-husky]
