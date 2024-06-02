@@ -21,7 +21,7 @@ use stwo_prover::core::{
 pub struct FibonacciCompositionGadget;
 
 impl FibonacciCompositionGadget {
-    ///hint
+    ///Hint
     #[allow(dead_code)]
     fn step_constraint_eval_quotient_by_mask_hint(
         log_size: u32,
@@ -35,13 +35,13 @@ impl FibonacciCompositionGadget {
         }
     }
 
-    //give result as hint, compute num,denom yourself and verify
+    ///Computes the step constraint f(z)^2 + f(G z)^2 - f(G^2 z)
     ///hint:
     /// num/denom
     ///input:
     /// f(G^2 z)
     /// f(Gz)
-    /// f(z) (QM31)
+    /// f(z)
     /// z.x
     /// z.y
     ///output:
@@ -64,7 +64,7 @@ impl FibonacciCompositionGadget {
             qm31_add
 
             qm31_swap
-            qm31_sub //mask[0]^2 + mask[1]^2 - mask[2]
+            qm31_sub //f(z)^2 + f(G z)^2 - f(G^2 z)
 
             qm31_fromaltstack
             qm31_fromaltstack
@@ -96,7 +96,7 @@ impl FibonacciCompositionGadget {
         }
     }
 
-    ///hint
+    ///Hint
     #[allow(dead_code)]
     fn boundary_constraint_eval_quotient_by_mask_hint(
         log_size: u32,
@@ -116,7 +116,7 @@ impl FibonacciCompositionGadget {
         }
     }
 
-    //give result as hint, compute num,denom yourself and verify
+    ///Computes the bonudary constraint f(0)=1, f(end)=claim
     ///hint:
     /// num/denom
     ///input:
@@ -142,7 +142,6 @@ impl FibonacciCompositionGadget {
             qm31_add //linear = QM31::one() + z.y * (self.claim - M31::one()) * p.y.inverse();
 
             qm31_sub //num = f(z) - linear
-            //OP_RETURN
 
             qm31_fromaltstack //bring back z.x from altstack
             qm31_fromaltstack //bring back z.y from altstack
@@ -161,12 +160,23 @@ impl FibonacciCompositionGadget {
         }
     }
 
-    //step_constraint_eval_quotient_by_mask(f(z'),f(G z'),f(G^2 z'),z)*alpha + boundary_constraint_eval_quotient_by_mask(f(z'),z)
-    //eval_composition_polynomial_at_point()->evaluate_constraint_quotients_at_point()->
-    //no accumulator
-    //alpha should be taken from channel
+    ///Hint
+    #[allow(dead_code)]
+    fn eval_composition_polynomial_at_point_hint(
+        log_size: u32,
+        claim: M31,
+        z: CirclePoint<QM31>,
+        fz: QM31,
+        fgz: QM31,
+        fggz: QM31,
+    ) -> Script {
+        script! {
+            { Self::boundary_constraint_eval_quotient_by_mask_hint(log_size, claim, z, fz) }
+            { Self::step_constraint_eval_quotient_by_mask_hint(log_size, z, fz, fgz, fggz) }
+        }
+    }
 
-    /*
+    ///Computes the composition polynomial of Fibonacci
     ///input:
     /// alpha
     /// f(G^2 z)
@@ -174,28 +184,126 @@ impl FibonacciCompositionGadget {
     /// f(z) (QM31)
     /// z.x
     /// z.y
+    ///output:
+    /// alpha*step_constraint(f(z),f(Gz),f(G^2 z),z) + boundary_constraint(f(z),z,claim)
+    #[allow(dead_code)]
     fn eval_composition_polynomial_at_point(log_size: u32, claim: M31) -> Script {
         script! {
+            { qm31_copy(2) }
+            { qm31_copy(2) }
+            { qm31_copy(2) }
+            { Self::boundary_constraint_eval_quotient_by_mask(log_size,claim) }
+            qm31_toaltstack
 
+            { Self::step_constraint_eval_quotient_by_mask(log_size) }
+            qm31_mul
+
+            qm31_fromaltstack
+            qm31_add
         }
-    }*/
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::iter::zip;
+
+    use itertools::Itertools;
+
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-    use stwo_prover::core::{
-        circle::CirclePoint,
-        fields::{
-            m31::{self, M31},
-            qm31::QM31,
+    use stwo_prover::{
+        core::{
+            air::{AirExt, ComponentTrace},
+            circle::CirclePoint,
+            fields::{
+                m31::{self, M31},
+                qm31::QM31,
+            },
+            poly::circle::CanonicCoset,
+            ComponentVec,
         },
+        examples::fibonacci::Fibonacci,
     };
 
     use crate::fibonacci::{FibonacciComposition, FibonacciCompositionGadget};
     use crate::treepp::*;
+
+    //TODO: efficiency report
+    #[test]
+    fn test_eval_composition_polynomial_at_point() {
+        let log_size = 5;
+        let claim = m31::M31::from_u32_unchecked(443693538);
+
+        let fib = Fibonacci::new(log_size, claim);
+        let trace = fib.get_trace();
+        let trace_poly = trace.interpolate();
+        let trace_eval =
+            trace_poly.evaluate(CanonicCoset::new(trace_poly.log_size() + 1).circle_domain());
+        let trace = ComponentTrace::new(vec![&trace_poly], vec![&trace_eval]);
+
+        let component_traces = vec![trace];
+
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..20 {
+            let random_coeff = QM31::from_m31(
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+                M31::reduce(prng.next_u64()),
+            );
+
+            let z = CirclePoint {
+                x: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
+                y: QM31::from_m31(
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                    M31::reduce(prng.next_u64()),
+                ),
+            };
+
+            let points = fib.air.mask_points(z);
+            let comp = zip(&component_traces[0].polys, &points[0])
+                .map(|(poly, points)| {
+                    points
+                        .iter()
+                        .map(|point| poly.eval_at_point(*point))
+                        .collect_vec()
+                })
+                .collect_vec();
+
+            let mut mask_values = ComponentVec(Vec::new());
+            mask_values.push(comp.clone());
+
+            let res = fib
+                .air
+                .eval_composition_polynomial_at_point(z, &mask_values, random_coeff);
+
+            let script = script! {
+                { FibonacciCompositionGadget::eval_composition_polynomial_at_point_hint(log_size, claim, z, comp[0][0], comp[0][1], comp[0][2]) } //hint
+                { random_coeff }
+                { comp[0][2] }
+                { comp[0][1] }
+                { comp[0][0] }
+                { z.x }
+                { z.y }
+                { FibonacciCompositionGadget::eval_composition_polynomial_at_point(log_size, claim) }
+                { res }
+                qm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
 
     //TODO: efficiency report
     #[test]

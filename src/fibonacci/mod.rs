@@ -10,13 +10,12 @@ use stwo_prover::core::{
     },
 };
 
-///fibonacci composition polynomial-related methods are private, so we need to copy-paste them from stwo
+///Fibonacci composition polynomial-related methods are PRIVATE, so we need to copy-paste them from stwo!
+/// TODO: solve this problem
 pub struct FibonacciComposition;
 
 impl FibonacciComposition {
-    /// Evaluates the step constraint quotient polynomial on a single point.
-    /// The step constraint is defined as:
-    ///   mask[0]^2 + mask[1]^2 - mask[2]
+    ///step
     fn step_constraint_eval_quotient_by_mask<F: ExtensionOf<BaseField>>(
         log_size: u32,
         point: CirclePoint<F>,
@@ -47,10 +46,6 @@ impl FibonacciComposition {
     ) -> F {
         let constraint_zero_domain = Coset::subgroup(log_size);
         let p = constraint_zero_domain.at(constraint_zero_domain.size() - 1);
-        // On (1,0), we should get 1.
-        // On p, we should get self.claim.
-        // 1 + y * (self.claim - 1) * p.y^-1
-        // TODO(spapini): Cache the constant.
         let linear = F::one() + point.y * (claim - BaseField::one()) * p.y.inverse();
 
         let num = mask[0] - linear;
