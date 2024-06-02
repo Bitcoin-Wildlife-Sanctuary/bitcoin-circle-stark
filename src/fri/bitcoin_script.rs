@@ -1,4 +1,6 @@
-use crate::channel::{ChannelWithHint, ExtractionQM31, ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
+use crate::channel::{
+    ChannelWithHint, ExtractionQM31, ExtractorGadget, Sha256Channel, Sha256ChannelGadget,
+};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;
@@ -42,11 +44,7 @@ impl FRIGadget {
     }
 
     /// Check the Fiat-Shamir computation.
-    pub fn check_fiat_shamir(
-        channel_init_state: &[u8],
-        logn: usize,
-        n_layers: usize,
-    ) -> Script {
+    pub fn check_fiat_shamir(channel_init_state: &[u8], logn: usize, n_layers: usize) -> Script {
         assert_eq!(channel_init_state.len(), 32);
         let n_last_layer = 1 << (logn - n_layers);
         script! {

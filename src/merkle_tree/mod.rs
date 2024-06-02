@@ -150,7 +150,12 @@ mod test {
             let query = (prng.gen::<u32>() % (1 << 12)) as usize;
 
             let proof = merkle_tree.query(query);
-            assert!(MerkleTree::verify(&merkle_tree.root_hash, 12, &proof, query));
+            assert!(MerkleTree::verify(
+                &merkle_tree.root_hash,
+                12,
+                &proof,
+                query
+            ));
         }
     }
 }

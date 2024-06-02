@@ -94,7 +94,7 @@ mod test {
         let mut channel_init_state = [0u8; 32];
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
 
-        let channel_init_state= BWSSha256Hash::from(channel_init_state.to_vec());
+        let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
         // Note: Add another .square() to make the proof fail.
         let evaluation = (0..(1 << logn))
