@@ -1,4 +1,4 @@
-use crate::channel::{ExtractionQM31, ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
+use crate::channel::{ChannelWithHint, ExtractionQM31, ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;
@@ -43,10 +43,11 @@ impl FRIGadget {
 
     /// Check the Fiat-Shamir computation.
     pub fn check_fiat_shamir(
-        channel_init_state: &[u8; 32],
+        channel_init_state: &[u8],
         logn: usize,
         n_layers: usize,
     ) -> Script {
+        assert_eq!(channel_init_state.len(), 32);
         let n_last_layer = 1 << (logn - n_layers);
         script! {
             { channel_init_state.to_vec() }
@@ -263,7 +264,7 @@ impl FFTGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::Sha256Channel;
+    use crate::channel::{ChannelWithHint, Sha256Channel};
     use crate::fri;
     use crate::fri::{FFTGadget, FRIGadget, N_QUERIES};
     use crate::tests_utils::report::report_bitcoin_script_size;
@@ -283,6 +284,7 @@ mod test {
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
     fn test_fiat_shamir() {
@@ -291,7 +293,7 @@ mod test {
 
             let mut channel_init_state = [0u8; 32];
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
-            channel_init_state
+            BWSSha256Hash::from(channel_init_state.to_vec())
         };
 
         let mut channel = Sha256Channel::new(channel_init_state);
@@ -304,6 +306,7 @@ mod test {
 
             let mut channel_init_state = [0u8; 32];
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+            let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
             let evaluation = (0..(1 << logn))
                 .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
@@ -338,10 +341,10 @@ mod test {
                 { *elem }
             }
             for c in proof.commitments.iter().rev() {
-                { c.to_vec() }
+                { *c }
             }
 
-            { FRIGadget::check_fiat_shamir(&channel_init_state, logn, logn - 1) }
+            { FRIGadget::check_fiat_shamir(channel_init_state.as_ref(), logn, logn - 1) }
             for elem in expected.0.iter() {
                 { *elem }
                 qm31_equalverify
@@ -366,6 +369,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let mut channel_init_state = [0u8; 32];
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
         let proof = {
             let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
@@ -427,6 +431,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let mut channel_init_state = [0u8; 32];
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
         let proof = {
             let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
@@ -462,7 +467,7 @@ mod test {
         let script = script! {
             { FRIGadget::push_single_query_merkle_tree_proof(0, &proof) }
             for c in proof.commitments.iter().rev() {
-                { c.to_vec() }
+                { *c }
             }
             { queries[0] }
             { FRIGadget::check_single_query_merkle_tree_proof(logn) }
@@ -486,6 +491,7 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let mut channel_init_state = [0u8; 32];
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
         let proof = {
             let p = CirclePointIndex::subgroup_gen(logn as u32 + 1).to_point();
@@ -559,7 +565,7 @@ mod test {
 
             let mut channel_init_state = [0u8; 32];
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
-            channel_init_state
+            BWSSha256Hash::from(channel_init_state.to_vec())
         };
 
         let mut channel = Sha256Channel::new(channel_init_state);
@@ -572,6 +578,8 @@ mod test {
 
             let mut channel_init_state = [0u8; 32];
             channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+
+            let channel_init_state = BWSSha256Hash::from(channel_init_state.to_vec());
 
             let evaluation = (0..(1 << logn))
                 .map(|i| (p.mul(i * 2 + 1).x.square().square() + M31::one()).into())
@@ -630,7 +638,7 @@ mod test {
             }
             // commitments
             for c in proof.commitments.iter().rev() {
-                { c.to_vec() }
+                { *c }
             }
         };
 
@@ -641,7 +649,7 @@ mod test {
             }
 
             // do the check_fiat_shamir
-            { FRIGadget::check_fiat_shamir(&channel_init_state, logn, logn - 1) }
+            { FRIGadget::check_fiat_shamir(channel_init_state.as_ref(), logn, logn - 1) }
 
             // stack:
             //    proof body -- leaves (n_queries qm31), last layer (some qm31), commitments (logn - 1)

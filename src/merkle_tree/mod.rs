@@ -1,5 +1,6 @@
 use sha2::{Digest, Sha256};
 use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
 use crate::utils::hash_qm31;
@@ -12,7 +13,7 @@ pub struct MerkleTree {
     /// Intermediate layers.
     pub intermediate_layers: Vec<Vec<[u8; 32]>>,
     /// Root hash.
-    pub root_hash: [u8; 32],
+    pub root_hash: BWSSha256Hash,
 }
 
 impl MerkleTree {
@@ -56,7 +57,7 @@ impl MerkleTree {
         Self {
             leaf_layer,
             intermediate_layers,
-            root_hash: cur[0],
+            root_hash: BWSSha256Hash::from(cur[0].to_vec()),
         }
     }
 
@@ -85,7 +86,7 @@ impl MerkleTree {
 
     /// Verify a Merkle tree proof.
     pub fn verify(
-        root_hash: [u8; 32],
+        root_hash: &BWSSha256Hash,
         logn: usize,
         proof: &MerkleTreeProof,
         mut query: usize,
@@ -109,7 +110,7 @@ impl MerkleTree {
             query >>= 1;
         }
 
-        leaf_hash == root_hash
+        leaf_hash == root_hash.as_ref()
     }
 }
 
@@ -149,7 +150,7 @@ mod test {
             let query = (prng.gen::<u32>() % (1 << 12)) as usize;
 
             let proof = merkle_tree.query(query);
-            assert!(MerkleTree::verify(merkle_tree.root_hash, 12, &proof, query));
+            assert!(MerkleTree::verify(&merkle_tree.root_hash, 12, &proof, query));
         }
     }
 }

@@ -194,7 +194,7 @@ impl ExtractorGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::{ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
+    use crate::channel::{ChannelWithHint, ExtractorGadget, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use crate::utils::{hash_felt_gadget, hash_qm31};
@@ -206,6 +206,7 @@ mod test {
     use stwo_prover::core::fields::cm31::CM31;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
     fn test_mix_digest() {
@@ -216,20 +217,22 @@ mod test {
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = BWSSha256Hash::from(init_state.to_vec());
 
         let mut elem = [0u8; 32];
         elem.iter_mut().for_each(|v| *v = prng.gen());
+        let elem = BWSSha256Hash::from(elem.to_vec());
 
         let mut channel = Sha256Channel::new(init_state);
         channel.mix_digest(elem);
 
-        let final_state = channel.state;
+        let final_state = channel.digest;
 
         let script = script! {
-            { elem.to_vec() }
-            { init_state.to_vec() }
+            { elem }
+            { init_state }
             { channel_script.clone() }
-            { final_state.to_vec() }
+            { final_state }
             OP_EQUAL
         };
         let exec_result = execute_script(script);
@@ -245,6 +248,7 @@ mod test {
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = BWSSha256Hash::from(init_state.to_vec());
 
         let elem = QM31(
             CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
@@ -254,13 +258,13 @@ mod test {
         let mut channel = Sha256Channel::new(init_state);
         channel.mix_felts(&[elem]);
 
-        let final_state = channel.state;
+        let final_state = channel.digest;
 
         let script = script! {
             { elem }
-            { init_state.to_vec() }
+            { init_state }
             { channel_script.clone() }
-            { final_state.to_vec() }
+            { final_state }
             OP_EQUAL
         };
         let exec_result = execute_script(script);
@@ -277,19 +281,20 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = BWSSha256Hash::from(a.to_vec());
 
             let mut channel = Sha256Channel::new(a);
             let (b, hint) = channel.draw_felt_and_hints();
 
-            let c = channel.state;
+            let c = channel.digest;
 
             let script = script! {
                 { ExtractorGadget::push_hint_qm31(&hint) }
-                { a.to_vec() }
+                { a }
                 { channel_script.clone() }
                 { b }
                 qm31_equalverify
-                { c.to_vec() }
+                { c }
                 OP_EQUAL
             };
             let exec_result = execute_script(script);
@@ -312,22 +317,23 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = BWSSha256Hash::from(a.to_vec());
 
             let mut channel = Sha256Channel::new(a);
             let (b, hint) = channel.draw_5queries(15);
 
-            let c = channel.state;
+            let c = channel.digest;
 
             let script = script! {
                 { ExtractorGadget::push_hint_5m31(&hint) }
-                { a.to_vec() }
+                { a }
                 { channel_script.clone() }
                 { b[4] } OP_EQUALVERIFY
                 { b[3] } OP_EQUALVERIFY
                 { b[2] } OP_EQUALVERIFY
                 { b[1] } OP_EQUALVERIFY
                 { b[0] } OP_EQUALVERIFY
-                { c.to_vec() }
+                { c }
                 OP_EQUAL
             };
             let exec_result = execute_script(script);

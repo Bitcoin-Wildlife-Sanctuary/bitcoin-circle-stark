@@ -1,4 +1,4 @@
-use crate::channel::Sha256Channel;
+use crate::channel::{ChannelWithHint, Sha256Channel};
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 use crate::utils::get_twiddles;
@@ -6,6 +6,7 @@ use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -13,7 +14,7 @@ pub use bitcoin_script::*;
 /// A FRI proof.
 #[derive(Clone, Debug)]
 pub struct FriProof {
-    commitments: Vec<[u8; 32]>,
+    commitments: Vec<BWSSha256Hash>,
     last_layer: Vec<QM31>,
     leaves: Vec<QM31>,
     merkle_proofs: Vec<Vec<MerkleTreeProof>>,
@@ -130,7 +131,7 @@ pub fn fri_verify(
         ));
         for (i, (eval_proof, &alpha)) in merkle_proof.iter().zip(factors.iter()).enumerate() {
             assert!(MerkleTree::verify(
-                proof.commitments[i],
+                &proof.commitments[i],
                 logn - i,
                 &merkle_proof[i],
                 query ^ 1

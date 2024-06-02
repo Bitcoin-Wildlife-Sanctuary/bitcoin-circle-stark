@@ -7,6 +7,7 @@ use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
@@ -60,6 +61,12 @@ impl Pushable for QM31 {
     }
 }
 
+impl Pushable for BWSSha256Hash {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        self.as_ref().to_vec().bitcoin_script_push(builder)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::channel::Sha256Channel;
@@ -69,10 +76,12 @@ mod test {
     use num_traits::One;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::channel::Channel;
     use stwo_prover::core::circle::CirclePointIndex;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
     fn test_cfri_main() {
@@ -84,6 +93,8 @@ mod test {
 
         let mut channel_init_state = [0u8; 32];
         channel_init_state.iter_mut().for_each(|v| *v = prng.gen());
+
+        let channel_init_state= BWSSha256Hash::from(channel_init_state.to_vec());
 
         // Note: Add another .square() to make the proof fail.
         let evaluation = (0..(1 << logn))

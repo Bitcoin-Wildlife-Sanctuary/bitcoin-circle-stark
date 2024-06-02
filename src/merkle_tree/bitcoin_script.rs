@@ -127,7 +127,7 @@ mod test {
 
             let script = script! {
                 { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
-                { merkle_tree.root_hash.to_vec() }
+                { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
                 { last_layer[pos as usize] }
@@ -164,7 +164,7 @@ mod test {
 
             let script = script! {
                 { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
-                { merkle_tree.root_hash.to_vec() }
+                { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
                 { last_layer[(pos ^ 1) as usize] }

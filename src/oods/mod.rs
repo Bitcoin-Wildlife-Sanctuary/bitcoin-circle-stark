@@ -1,4 +1,4 @@
-use crate::channel::ExtractionQM31;
+use crate::channel::{ChannelWithHint, ExtractionQM31};
 use crate::channel::Sha256Channel;
 use num_traits::One;
 use std::ops::{Add, Mul, Neg};

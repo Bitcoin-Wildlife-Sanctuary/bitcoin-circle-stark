@@ -90,6 +90,8 @@ mod test {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use stwo_prover::core::channel::Channel;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
     fn test_get_random_point() {
@@ -102,22 +104,24 @@ mod test {
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());
 
+        let a = BWSSha256Hash::from(a.to_vec());
+
         let mut channel = Sha256Channel::new(a);
 
         let (p, hint_t) = OODS::get_random_point(&mut channel);
 
-        let c = channel.state;
+        let c = channel.digest;
 
         let script = script! {
             { ExtractorGadget::push_hint_qm31(&hint_t) }
             { OODSGadget::push_random_point_hint(&p) }
-            { a.to_vec() }
+            { a }
             { get_random_point_script.clone() }
             { p.y } // check y
             qm31_equalverify
             { p.x } // check x
             qm31_equalverify
-            { c.to_vec() } // check channel'
+            { c } // check channel'
             OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)
             OP_TRUE
         };
