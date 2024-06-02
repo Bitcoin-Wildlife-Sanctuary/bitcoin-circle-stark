@@ -1,6 +1,4 @@
-use core::slice;
-
-use crate::{constraints::ConstraintsGadget, fibonacci::FibonacciComposition, treepp::*};
+use crate::{constraints::ConstraintsGadget, treepp::*};
 use num_traits::One;
 use rust_bitcoin_m31::qm31_add;
 use rust_bitcoin_m31::qm31_copy;
@@ -16,6 +14,7 @@ use stwo_prover::core::{
     circle::{CirclePoint, Coset},
     fields::{m31::M31, qm31::QM31, FieldExpOps},
 };
+use stwo_prover::examples::fibonacci::Fibonacci;
 
 /// Gadget for Fibonacci composition polynomial-related operations.
 pub struct FibonacciCompositionGadget;
@@ -25,13 +24,16 @@ impl FibonacciCompositionGadget {
     #[allow(dead_code)]
     fn step_constraint_eval_quotient_by_mask_hint(
         log_size: u32,
+        claim: M31,
         z: CirclePoint<QM31>,
         fz: QM31,
         fgz: QM31,
         fggz: QM31,
     ) -> Script {
+        let fib = Fibonacci::new(log_size, claim);
+
         script! {
-            { FibonacciComposition::step_constraint_eval_quotient_by_mask(log_size, z, &[fz,fgz,fggz]) }
+            { fib.air.component.step_constraint_eval_quotient_by_mask(z, &[fz,fgz,fggz]) }
         }
     }
 
@@ -104,12 +106,12 @@ impl FibonacciCompositionGadget {
         z: CirclePoint<QM31>,
         fz: QM31,
     ) -> Script {
-        let res = FibonacciComposition::boundary_constraint_eval_quotient_by_mask(
-            log_size,
-            claim,
-            z,
-            slice::from_ref(&fz).try_into().unwrap(),
-        );
+        let fib = Fibonacci::new(log_size, claim);
+
+        let res = fib
+            .air
+            .component
+            .boundary_constraint_eval_quotient_by_mask(z, &[fz]);
 
         script! {
             { res }
@@ -172,7 +174,7 @@ impl FibonacciCompositionGadget {
     ) -> Script {
         script! {
             { Self::boundary_constraint_eval_quotient_by_mask_hint(log_size, claim, z, fz) }
-            { Self::step_constraint_eval_quotient_by_mask_hint(log_size, z, fz, fgz, fggz) }
+            { Self::step_constraint_eval_quotient_by_mask_hint(log_size, claim, z, fz, fgz, fggz) }
         }
     }
 
@@ -229,8 +231,7 @@ mod test {
 
     use crate::treepp::*;
     use crate::{
-        fibonacci::{FibonacciComposition, FibonacciCompositionGadget},
-        tests_utils::report::report_bitcoin_script_size,
+        fibonacci::FibonacciCompositionGadget, tests_utils::report::report_bitcoin_script_size,
     };
 
     #[test]
@@ -323,6 +324,7 @@ mod test {
     fn test_boundary_constraint_eval_quotient_by_mask() {
         let log_size = 5;
         let claim = m31::M31::from_u32_unchecked(443693538);
+        let fib = Fibonacci::new(log_size, claim);
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -361,12 +363,10 @@ mod test {
                 M31::reduce(prng.next_u64()),
             );
 
-            let res = FibonacciComposition::boundary_constraint_eval_quotient_by_mask(
-                log_size,
-                claim,
-                z,
-                &[fz],
-            );
+            let res = fib
+                .air
+                .component
+                .boundary_constraint_eval_quotient_by_mask(z, &[fz]);
 
             let script = script! {
                 { FibonacciCompositionGadget::boundary_constraint_eval_quotient_by_mask_hint(log_size, claim, z, fz) } //hint
@@ -386,6 +386,8 @@ mod test {
     #[test]
     fn test_step_constraint_eval_quotient_by_mask() {
         let log_size = 5;
+        let claim = m31::M31::from_u32_unchecked(443693538);
+        let fib = Fibonacci::new(log_size, claim);
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -438,14 +440,13 @@ mod test {
                 M31::reduce(prng.next_u64()),
             );
 
-            let res = FibonacciComposition::step_constraint_eval_quotient_by_mask(
-                log_size,
-                z,
-                &[fz, fgz, fggz],
-            );
+            let res = fib
+                .air
+                .component
+                .step_constraint_eval_quotient_by_mask(z, &[fz, fgz, fggz]);
 
             let script = script! {
-                { FibonacciCompositionGadget::step_constraint_eval_quotient_by_mask_hint(log_size, z, fz, fgz, fggz) } //hint
+                { FibonacciCompositionGadget::step_constraint_eval_quotient_by_mask_hint(log_size, claim, z, fz, fgz, fggz) } //hint
                 { fggz }
                 { fgz }
                 { fz }
