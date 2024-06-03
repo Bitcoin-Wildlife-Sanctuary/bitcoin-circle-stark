@@ -36,15 +36,6 @@ pub fn copy_to_altstack_top_item_first_in(n: usize) -> Script {
     }
 }
 
-/// Copy some stack elements to the altstack, where the altstack head is the stack top.
-pub fn copy_to_altstack_top_item_last_in(n: usize) -> Script {
-    script! {
-        for i in 0..n {
-            { n - 1 - i } OP_PICK OP_TOALTSTACK
-        }
-    }
-}
-
 /// Gadget for hashing a qm31 element in the script.
 pub fn hash_felt_gadget() -> Script {
     script! {
