@@ -6,13 +6,6 @@ use crate::utils::{hash_felt_gadget, trim_m31_gadget};
 pub struct Sha256ChannelGadget;
 
 impl Sha256ChannelGadget {
-    /// Initialize a channel.
-    pub fn create_channel(hash: [u8; 32]) -> Script {
-        script! {
-            { hash.to_vec() }
-        }
-    }
-
     /// Absorb a commitment.
     pub fn mix_digest() -> Script {
         script! {
@@ -112,21 +105,25 @@ impl Sha256ChannelGadget {
     /// Unpack multiple m31 and put them on the stack.
     pub fn unpack_multi_m31<const N: usize>() -> Script {
         script! {
-            for _ in 0..N+1 {
+            for _ in 0..N {
                 OP_DEPTH OP_1SUB OP_ROLL
             }
 
             for _ in 0..N {
-                { N } OP_ROLL
+                { N - 1 } OP_ROLL
                 { Self::reconstruct() }
             }
 
             for _ in 0..N-1 {
                 OP_CAT
             }
-            OP_SWAP OP_CAT
+
+            if N % 8 != 0 {
+                OP_DEPTH OP_1SUB OP_ROLL OP_CAT
+            }
 
             OP_EQUALVERIFY
+
             for _ in 0..N {
                 OP_FROMALTSTACK
 
@@ -141,7 +138,7 @@ impl Sha256ChannelGadget {
 
 #[cfg(test)]
 mod test {
-    use crate::channel::{ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
+    use crate::channel::{generate_hints, ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use crate::utils::{hash_felt_gadget, hash_qm31};
@@ -216,6 +213,38 @@ mod test {
         };
         let exec_result = execute_script(script);
         assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_draw_8_elements() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..100 {
+            let mut a = [0u8; 32];
+            a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = BWSSha256Hash::from(a.to_vec());
+
+            let mut channel = Sha256Channel::new(a);
+            let (b, hint) = channel.draw_m31_and_hints::<8>();
+
+            let c = channel.digest;
+
+            let script = script! {
+                { Sha256ChannelGadget::push_draw_hint(&hint) }
+                { a }
+                OP_DUP OP_SHA256 OP_SWAP
+                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
+                { Sha256ChannelGadget::unpack_multi_m31::<8>() }
+                for i in 0..8 {
+                    { b[i] }
+                    OP_EQUALVERIFY
+                }
+                { c }
+                OP_EQUAL
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
     }
 
     #[test]
@@ -312,6 +341,27 @@ mod test {
         let script = script! {
             OP_CAT
             OP_RETURN
+        };
+        let exec_result = execute_script(script);
+        assert!(!exec_result.success);
+    }
+
+    #[test]
+    fn test_corner_case() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let mut h = [0u8; 32];
+        h[3] = 0x80;
+        for i in 4..32 {
+            h[i] = prng.gen();
+        }
+
+        let (m31, hint) = generate_hints::<1>(&h);
+
+        let script = script! {
+            { Sha256ChannelGadget::push_draw_hint(&hint) }
+            { Sha256ChannelGadget::unpack_multi_m31::<1>() }
+            OP_NOT
         };
         let exec_result = execute_script(script);
         assert!(!exec_result.success);

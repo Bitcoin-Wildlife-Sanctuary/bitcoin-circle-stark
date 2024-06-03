@@ -128,8 +128,9 @@ fn limb_to_le_bits_common(num_bits: u32) -> Script {
         for i in 0..min_i - 1  {
             { 2 << i } OP_TOALTSTACK
         }
+        { 2 << (min_i - 1) }
         if num_bits - 1 > min_i {
-            { 2 << (min_i - 1) } OP_DUP OP_TOALTSTACK
+            OP_DUP OP_TOALTSTACK
 
             // Then, we double powers of 2 to generate the 4-byte numbers
             for _ in min_i..num_bits - 2 {
@@ -141,7 +142,7 @@ fn limb_to_le_bits_common(num_bits: u32) -> Script {
             OP_DUP
             OP_ADD OP_TOALTSTACK
         } else {
-            { 2 << (min_i - 1) } OP_TOALTSTACK
+            OP_TOALTSTACK
         }
 
         for _ in 0..num_bits - 2 {
@@ -171,44 +172,20 @@ fn limb_to_le_bits_common(num_bits: u32) -> Script {
 /// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
 /// due to inability to reconcile the dependency issues between BitVM and stwo.
 pub fn limb_to_le_bits(num_bits: u32) -> Script {
-    if num_bits >= 2 {
-        script! {
-            { limb_to_le_bits_common(num_bits) }
-        }
-    } else {
-        script! {}
-    }
-}
-
-/// Convert a limb to low-endian bits but store them in the altstack for now
-/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
-/// due to inability to reconcile the dependency issues between BitVM and stwo.
-pub fn limb_to_le_bits_toaltstack(num_bits: u32) -> Script {
-    if num_bits >= 2 {
-        script! {
-            { limb_to_le_bits_common(num_bits) }
-            for _ in 0..num_bits {
-                OP_TOALTSTACK
-            }
-        }
-    } else {
-        script! {}
-    }
+    assert!(num_bits >= 2);
+    limb_to_le_bits_common(num_bits)
 }
 
 /// Convert a limb to big-endian bits
 /// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
 /// due to inability to reconcile the dependency issues between BitVM and stwo.
 pub fn limb_to_be_bits(num_bits: u32) -> Script {
-    if num_bits >= 2 {
-        script! {
-            { limb_to_be_bits_common(num_bits) }
-            for _ in 0..num_bits - 2 {
-                OP_FROMALTSTACK
-            }
+    assert!(num_bits >= 2);
+    script! {
+        { limb_to_be_bits_common(num_bits) }
+        for _ in 0..num_bits - 2 {
+            OP_FROMALTSTACK
         }
-    } else {
-        script! {}
     }
 }
 
@@ -216,16 +193,11 @@ pub fn limb_to_be_bits(num_bits: u32) -> Script {
 /// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
 /// due to inability to reconcile the dependency issues between BitVM and stwo.
 pub fn limb_to_be_bits_toaltstack(num_bits: u32) -> Script {
-    if num_bits >= 2 {
-        script! {
-            { limb_to_be_bits_common(num_bits) }
-            OP_TOALTSTACK
-            OP_TOALTSTACK
-        }
-    } else {
-        script! {
-            OP_TOALTSTACK
-        }
+    assert!(num_bits >= 2);
+    script! {
+        { limb_to_be_bits_common(num_bits) }
+        OP_TOALTSTACK
+        OP_TOALTSTACK
     }
 }
 

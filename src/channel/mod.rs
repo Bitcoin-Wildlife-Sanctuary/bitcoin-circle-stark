@@ -55,38 +55,36 @@ impl ChannelWithHint for Sha256Channel {
             count += 8;
         }
 
-        let mut res_m31 = [M31::default(); N];
-        let mut res_hints = DrawHints::<N>::default();
-
-        for i in 0..N {
-            let mut bytes = [0u8; 4];
-            bytes.copy_from_slice(&extract[i * 4..(i + 1) * 4]);
-
-            let mut res = u32::from_le_bytes(bytes);
-            res &= 0x7fffffff;
-
-            let hint = if bytes[3] & 0x80 != 0 {
-                if res == 0 {
-                    BitcoinIntegerEncodedData::NegativeZero
-                } else {
-                    BitcoinIntegerEncodedData::Other((res as i64).neg())
-                }
-            } else {
-                BitcoinIntegerEncodedData::Other(res as i64)
-            };
-
-            res = res.saturating_sub(1);
-
-            res_m31[i] = M31::from(res);
-            res_hints.0[i] = hint;
-        }
-
-        if N % 8 != 0 {
-            res_hints.1 = extract[N * 4..].to_vec();
-        }
-
-        (res_m31, res_hints)
+        generate_hints(&extract)
     }
+}
+
+fn generate_hints<const N: usize>(extract: &[u8]) -> ([M31; N], DrawHints<N>) {
+    let mut res_m31 = [M31::default(); N];
+    let mut res_hints = DrawHints::<N>::default();
+
+    for i in 0..N {
+        let res = u32::from_le_bytes(<[u8; 4]>::try_from(&extract[i * 4..(i + 1) * 4]).unwrap())
+            & 0x7fffffff;
+
+        res_hints.0[i] = if extract[(i + 1) * 4 - 1] & 0x80 != 0 {
+            if res == 0 {
+                BitcoinIntegerEncodedData::NegativeZero
+            } else {
+                BitcoinIntegerEncodedData::Other((res as i64).neg())
+            }
+        } else {
+            BitcoinIntegerEncodedData::Other(res as i64)
+        };
+
+        res_m31[i] = M31::from(res.saturating_sub(1));
+    }
+
+    if N % 8 != 0 {
+        res_hints.1 = extract[N * 4..].to_vec();
+    }
+
+    (res_m31, res_hints)
 }
 
 /// Basic hint structure for extracting a single qm31 element.
