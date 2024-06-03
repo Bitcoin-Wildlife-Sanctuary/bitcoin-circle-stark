@@ -356,7 +356,7 @@ mod test {
             h[i] = prng.gen();
         }
 
-        let (m31, hint) = generate_hints::<1>(&h);
+        let (_, hint) = generate_hints::<1>(&h);
 
         let script = script! {
             { Sha256ChannelGadget::push_draw_hint(&hint) }
