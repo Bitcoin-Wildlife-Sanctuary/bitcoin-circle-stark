@@ -352,8 +352,8 @@ mod test {
 
         let mut h = [0u8; 32];
         h[3] = 0x80;
-        for i in 4..32 {
-            h[i] = prng.gen();
+        for elem in h.iter_mut().skip(4) {
+            *elem = prng.gen();
         }
 
         let (_, hint) = generate_hints::<1>(&h);
