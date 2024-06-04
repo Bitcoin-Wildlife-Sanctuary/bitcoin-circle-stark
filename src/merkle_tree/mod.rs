@@ -143,11 +143,9 @@ impl Pushable for &MerkleTreeProof {
 #[cfg(test)]
 mod test {
     use crate::merkle_tree::MerkleTree;
-    use rand::{Rng, RngCore, SeedableRng};
+    use crate::utils::get_rand_qm31;
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use stwo_prover::core::fields::cm31::CM31;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_merkle_tree() {
@@ -155,10 +153,7 @@ mod test {
 
         let mut last_layer = vec![];
         for _ in 0..1 << 12 {
-            last_layer.push(QM31(
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-            ));
+            last_layer.push(get_rand_qm31(&mut prng));
         }
 
         let merkle_tree = MerkleTree::new(last_layer.clone());

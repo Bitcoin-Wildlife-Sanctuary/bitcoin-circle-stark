@@ -1,4 +1,5 @@
 use crate::channel::Sha256ChannelGadget;
+use crate::oods::OODSGadget;
 use crate::{treepp::*, OP_HINT};
 use stwo_prover::core::channel::BWSSha256Channel;
 
@@ -29,12 +30,18 @@ impl FibonacciVerifierGadget {
             OP_DUP OP_ROT
             { Sha256ChannelGadget::mix_digest() }
 
-            // stack: c1, random_coeff (4), c2, channel_digest
+            // draw the OODS point
+            { OODSGadget::get_random_point() }
+
+            // stack: c1, random_coeff (4), c2, channel_digest, oods point (8)
+
+            8 OP_ROLL
 
             // test-only: final channel digest
             OP_HINT OP_EQUALVERIFY
 
             // test-only: clean up the stack
+            OP_2DROP OP_2DROP OP_2DROP OP_2DROP
             OP_DROP OP_2DROP OP_2DROP OP_DROP
         }
     }

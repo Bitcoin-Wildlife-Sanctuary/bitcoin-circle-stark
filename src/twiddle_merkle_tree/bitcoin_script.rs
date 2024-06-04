@@ -103,7 +103,7 @@ mod test {
             let twiddle_proof = twiddle_merkle_tree.query(pos as usize);
 
             let script = script! {
-                { &twiddle_proof }
+                { twiddle_proof.clone() }
                 { twiddle_merkle_tree.root_hash.to_vec() }
                 { pos }
                 { verify_script.clone() }

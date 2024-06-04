@@ -204,18 +204,15 @@ impl FibonacciCompositionGadget {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
-    use rand::{RngCore, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use std::iter::zip;
+    use stwo_prover::core::fields::m31::M31;
     use stwo_prover::{
         core::{
             air::{AirExt, ComponentTrace},
             circle::CirclePoint,
-            fields::{
-                m31::{self, M31},
-                qm31::QM31,
-            },
             poly::circle::CanonicCoset,
             ComponentVec,
         },
@@ -225,11 +222,12 @@ mod test {
     use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
+    use crate::utils::get_rand_qm31;
 
     #[test]
     fn test_eval_composition_polynomial_at_point() {
         let log_size = 5;
-        let claim = m31::M31::from_u32_unchecked(443693538);
+        let claim = M31::from_u32_unchecked(443693538);
 
         let fib = Fibonacci::new(log_size, claim);
         let trace = fib.get_trace();
@@ -255,26 +253,11 @@ mod test {
         );
 
         for _ in 0..20 {
-            let random_coeff = QM31::from_m31(
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-            );
+            let random_coeff = get_rand_qm31(&mut prng);
 
             let z = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
             let points = fib.air.mask_points(z);
@@ -315,7 +298,7 @@ mod test {
     #[test]
     fn test_boundary_constraint_eval_quotient_by_mask() {
         let log_size = 5;
-        let claim = m31::M31::from_u32_unchecked(443693538);
+        let claim = M31::from_u32_unchecked(443693538);
         let fib = Fibonacci::new(log_size, claim);
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
@@ -334,26 +317,11 @@ mod test {
 
         for _ in 0..20 {
             let z = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
-            let fz = QM31::from_m31(
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-            );
+            let fz = get_rand_qm31(&mut prng);
 
             let res = fib
                 .air
@@ -378,7 +346,7 @@ mod test {
     #[test]
     fn test_step_constraint_eval_quotient_by_mask() {
         let log_size = 5;
-        let claim = m31::M31::from_u32_unchecked(443693538);
+        let claim = M31::from_u32_unchecked(443693538);
         let fib = Fibonacci::new(log_size, claim);
 
         let mut prng = ChaCha20Rng::seed_from_u64(0);
@@ -397,40 +365,15 @@ mod test {
 
         for _ in 0..20 {
             let z = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
-            let fz = QM31::from_m31(
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-            );
+            let fz = get_rand_qm31(&mut prng);
 
-            let fgz = QM31::from_m31(
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-            );
+            let fgz = get_rand_qm31(&mut prng);
 
-            let fggz = QM31::from_m31(
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-                M31::reduce(prng.next_u64()),
-            );
+            let fggz = get_rand_qm31(&mut prng);
 
             let res = fib
                 .air

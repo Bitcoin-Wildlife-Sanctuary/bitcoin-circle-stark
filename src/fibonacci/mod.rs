@@ -2,9 +2,12 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
+use crate::oods::{OODSHint, OODS};
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::channel::BWSSha256Channel;
+use stwo_prover::core::circle::CirclePoint;
+use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::CommitmentSchemeVerifier;
 use stwo_prover::core::prover::{StarkProof, VerificationError};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
@@ -17,7 +20,10 @@ pub struct VerifierHints {
     /// random_coeff comes from adding `proof.commitments[0]` to the channel.
     pub random_coeff_hint: DrawQM31Hints,
 
-    /// Testing purpose: the ending channel digest
+    /// OODS hint.
+    pub oods_hint: OODSHint,
+
+    /// Testing purpose: the ending channel digest.
     pub test_only: BWSSha256Hash,
 }
 
@@ -26,6 +32,7 @@ impl Pushable for VerifierHints {
         builder = self.commitments[0].bitcoin_script_push(builder);
         builder = self.random_coeff_hint.bitcoin_script_push(builder);
         builder = self.commitments[1].bitcoin_script_push(builder);
+        builder = self.oods_hint.bitcoin_script_push(builder);
         builder = self.test_only.bitcoin_script_push(builder);
         builder
     }
@@ -49,11 +56,16 @@ pub fn verify_with_hints(
         channel,
     );
 
+    // Draw OODS point.
+    let (oods_point, oods_hint) = CirclePoint::<SecureField>::get_random_point_with_hint(channel);
+
     let _ = random_coeff;
+    let _ = oods_point;
 
     Ok(VerifierHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
+        oods_hint,
         test_only: channel.digest,
     })
 }

@@ -63,16 +63,15 @@ impl ConstraintsGadget {
 #[cfg(test)]
 mod test {
 
+    use crate::utils::get_rand_qm31;
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
-    use rand::{RngCore, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::circle::{CirclePoint, Coset};
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_coset_vanishing() {
@@ -93,18 +92,8 @@ mod test {
             );
 
             let z = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
             let res = coset_vanishing(coset, z);
@@ -128,48 +117,18 @@ mod test {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
 
             let z = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
             let excluded0 = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
             let excluded1 = CirclePoint {
-                x: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
-                y: QM31::from_m31(
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                    M31::reduce(prng.next_u64()),
-                ),
+                x: get_rand_qm31(&mut prng),
+                y: get_rand_qm31(&mut prng),
             };
 
             let res = pair_vanishing(excluded0, excluded1, z);

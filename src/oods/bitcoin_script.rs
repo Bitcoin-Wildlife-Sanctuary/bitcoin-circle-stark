@@ -11,18 +11,16 @@ pub struct OODSGadget;
 impl OODSGadget {
     /// Samples a random point over the projective line, see Lemma 1 in https://eprint.iacr.org/2024/278.pdf
     ///
-    /// hint:
-    ///  w - qm31 hint (5 elements)
-    ///  x - (1-t^2)/(1+t^2), where t is extracted from channel (4 elements)
-    ///  y - 2t/(1+t^2), where t is extracted from channel (4 elements)
+    /// Hint:
+    /// - OODSHint
     ///
-    /// input:
-    ///  channel
+    /// Input:
+    /// - channel
     ///
-    /// output:
-    ///  channel'=sha256(channel)
-    ///  x
-    ///  y
+    /// Output:
+    /// - channel'=sha256(channel)
+    /// - x
+    /// - y
     /// where (x,y) - random point on C(QM31) satisfying x^2+y^2=1 (8 elements)
     pub fn get_random_point() -> Script {
         script! {

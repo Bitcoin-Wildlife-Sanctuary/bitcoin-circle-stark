@@ -75,16 +75,14 @@ impl MerkleTreeGadget {
 mod test {
 
     use crate::treepp::*;
+    use crate::utils::get_rand_qm31;
     use crate::{
         merkle_tree::{MerkleTree, MerkleTreeGadget},
         tests_utils::report::report_bitcoin_script_size,
     };
-    use rand::{Rng, RngCore, SeedableRng};
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-    use stwo_prover::core::fields::cm31::CM31;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_merkle_tree_verify() {
@@ -101,10 +99,7 @@ mod test {
 
             let mut last_layer = vec![];
             for _ in 0..(1 << logn) {
-                last_layer.push(QM31(
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                ));
+                last_layer.push(get_rand_qm31(&mut prng));
             }
 
             let merkle_tree = MerkleTree::new(last_layer.clone());
@@ -138,10 +133,7 @@ mod test {
 
             let mut last_layer = vec![];
             for _ in 0..(1 << logn) {
-                last_layer.push(QM31(
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                ));
+                last_layer.push(get_rand_qm31(&mut prng));
             }
 
             let merkle_tree = MerkleTree::new(last_layer.clone());

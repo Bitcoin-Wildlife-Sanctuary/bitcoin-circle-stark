@@ -144,15 +144,12 @@ mod test {
     use crate::channel::{generate_hints, ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::utils::{hash_felt_gadget, hash_qm31};
+    use crate::utils::{get_rand_qm31, hash_felt_gadget, hash_qm31};
     use bitcoin_script::script;
-    use rand::{Rng, RngCore, SeedableRng};
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::channel::Channel;
-    use stwo_prover::core::fields::cm31::CM31;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
@@ -197,10 +194,7 @@ mod test {
         init_state.iter_mut().for_each(|v| *v = prng.gen());
         let init_state = BWSSha256Hash::from(init_state.to_vec());
 
-        let elem = QM31(
-            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-        );
+        let elem = get_rand_qm31(&mut prng);
 
         let mut channel = Sha256Channel::new(init_state);
         channel.mix_felts(&[elem]);
@@ -324,10 +318,7 @@ mod test {
         report_bitcoin_script_size("QM31", "hash", commit_script.len());
 
         for _ in 0..100 {
-            let a = QM31(
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-            );
+            let a = get_rand_qm31(&mut prng);
             let b = hash_qm31(&a);
 
             let script = script! {

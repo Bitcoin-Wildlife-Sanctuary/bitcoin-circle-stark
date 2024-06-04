@@ -3,6 +3,7 @@ mod bitcoin_script;
 use crate::treepp::*;
 pub use bitcoin_script::*;
 use num_traits::Zero;
+use rand::RngCore;
 use sha2::{Digest, Sha256};
 use std::cmp::min;
 use stwo_prover::core::circle::CirclePointIndex;
@@ -225,4 +226,14 @@ pub fn get_twiddles(mut logn: usize) -> Vec<Vec<M31>> {
     }
 
     twiddles
+}
+
+/// Get a random qm31 element.
+pub fn get_rand_qm31<R: RngCore>(prng: &mut R) -> QM31 {
+    QM31::from_m31(
+        M31::reduce(prng.next_u64()),
+        M31::reduce(prng.next_u64()),
+        M31::reduce(prng.next_u64()),
+        M31::reduce(prng.next_u64()),
+    )
 }

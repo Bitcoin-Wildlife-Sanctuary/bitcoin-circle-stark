@@ -4,10 +4,13 @@
 #![deny(missing_docs)]
 
 use crate::treepp::pushable::{Builder, Pushable};
+use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
+/// Module for AIR-related features.
+pub mod air;
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
 /// Module for the circle curve over the qm31 field.
@@ -61,6 +64,14 @@ impl Pushable for BWSSha256Hash {
     }
 }
 
+impl Pushable for CirclePoint<QM31> {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.x.bitcoin_script_push(builder);
+        builder = self.y.bitcoin_script_push(builder);
+        builder
+    }
+}
+
 #[allow(non_snake_case)]
 pub(crate) fn OP_HINT() -> treepp::Script {
     use treepp::*;
@@ -78,7 +89,7 @@ mod test {
         *,
     };
     use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
-    use crate::utils::permute_eval;
+    use crate::utils::{get_rand_qm31, permute_eval};
     use num_traits::One;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -95,12 +106,7 @@ mod test {
 
         // m31
         let m31 = M31::reduce(prng.next_u64());
-        let qm31 = QM31::from_m31(
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-        );
+        let qm31 = get_rand_qm31(&mut prng);
 
         let mut builder = Builder::new();
         builder = m31.bitcoin_script_push(builder);
