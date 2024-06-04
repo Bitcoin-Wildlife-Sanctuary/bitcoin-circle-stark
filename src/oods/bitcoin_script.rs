@@ -4,8 +4,6 @@ use rust_bitcoin_m31::{
     m31_add_n31, m31_sub, push_m31_one, push_n31_one, qm31_double, qm31_dup, qm31_equalverify,
     qm31_from_bottom, qm31_mul, qm31_neg, qm31_roll, qm31_rot, qm31_square, qm31_swap,
 };
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::QM31;
 
 /// Gadget for out-of-domain sampling.
 pub struct OODSGadget;
@@ -69,19 +67,10 @@ impl OODSGadget {
             qm31_equalverify
         }
     }
-
-    /// Push the hint for sampling a random circle curve point over qm31.
-    pub fn push_random_point_hint(p: &CirclePoint<QM31>) -> Script {
-        script! {
-            { p.x }
-            { p.y }
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::channel::Sha256ChannelGadget;
     use crate::oods::{OODSGadget, OODS};
     use crate::treepp::*;
     use crate::{channel::Sha256Channel, tests_utils::report::report_bitcoin_script_size};
@@ -107,18 +96,17 @@ mod test {
 
         let mut channel = Sha256Channel::new(a);
 
-        let (p, hint_t) = CirclePoint::get_random_point_with_hint(&mut channel);
+        let (oods_res, hint) = CirclePoint::get_random_point_with_hint(&mut channel);
 
         let c = channel.digest;
 
         let script = script! {
-            { Sha256ChannelGadget::push_draw_hint(&hint_t) }
-            { OODSGadget::push_random_point_hint(&p) }
+            { hint }
             { a }
             { get_random_point_script.clone() }
-            { p.y } // check y
+            { oods_res.y } // check y
             qm31_equalverify
-            { p.x } // check x
+            { oods_res.x } // check x
             qm31_equalverify
             { c } // check channel'
             OP_EQUALVERIFY // checking that indeed channel' = sha256(channel)

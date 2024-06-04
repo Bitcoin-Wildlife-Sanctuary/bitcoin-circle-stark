@@ -1,4 +1,3 @@
-use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
 use crate::utils::{hash_felt_gadget, limb_to_be_bits_toaltstack};
 
@@ -6,16 +5,6 @@ use crate::utils::{hash_felt_gadget, limb_to_be_bits_toaltstack};
 pub struct MerkleTreeGadget;
 
 impl MerkleTreeGadget {
-    /// Push the Merkle tree proof into the stack (and used as a hint).
-    pub fn push_merkle_tree_proof(merkle_proof: &MerkleTreeProof) -> Script {
-        script! {
-            { merkle_proof.leaf }
-            for elem in merkle_proof.siblings.iter() {
-                { elem.to_vec() }
-            }
-        }
-    }
-
     pub(crate) fn query_and_verify_internal(logn: usize, is_sibling: bool) -> Script {
         script! {
             OP_DEPTH OP_1SUB OP_ROLL
@@ -126,7 +115,7 @@ mod test {
             let proof = merkle_tree.query(pos as usize);
 
             let script = script! {
-                { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
+                { proof }
                 { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
@@ -163,7 +152,7 @@ mod test {
             let proof = merkle_tree.query((pos ^ 1) as usize);
 
             let script = script! {
-                { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
+                { proof }
                 { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }

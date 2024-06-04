@@ -35,9 +35,9 @@ impl FRIGadget {
 
         script! {
             for hint in factors_hints.iter() {
-                { Sha256ChannelGadget::push_draw_hint(hint) }
+                { hint }
             }
-            { Sha256ChannelGadget::push_draw_hint(&queries_hint) }
+            { queries_hint }
         }
     }
 
@@ -73,7 +73,7 @@ impl FRIGadget {
     pub fn push_twiddle_merkle_tree_proof(fri_proof: &FriProof) -> Script {
         script! {
             for proof in fri_proof.twiddle_merkle_proofs.iter() {
-                { TwiddleMerkleTreeGadget::push_twiddle_merkle_tree_proof(proof) }
+                { proof }
             }
         }
     }

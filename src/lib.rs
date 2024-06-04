@@ -61,6 +61,14 @@ impl Pushable for BWSSha256Hash {
     }
 }
 
+#[allow(non_snake_case)]
+pub(crate) fn OP_HINT() -> treepp::Script {
+    use treepp::*;
+    script! {
+        OP_DEPTH OP_1SUB OP_ROLL
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::channel::Sha256Channel;

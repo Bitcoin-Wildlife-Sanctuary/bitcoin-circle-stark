@@ -3,6 +3,7 @@ use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
+use crate::treepp::pushable::{Builder, Pushable};
 use crate::utils::hash_qm31;
 pub use bitcoin_script::*;
 
@@ -121,6 +122,22 @@ pub struct MerkleTreeProof {
     pub leaf: QM31,
     /// All the intermediate sibling nodes.
     pub siblings: Vec<[u8; 32]>,
+}
+
+impl Pushable for MerkleTreeProof {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
+
+impl Pushable for &MerkleTreeProof {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.leaf.bitcoin_script_push(builder);
+        for elem in self.siblings.iter() {
+            builder = elem.to_vec().bitcoin_script_push(builder);
+        }
+        builder
+    }
 }
 
 #[cfg(test)]

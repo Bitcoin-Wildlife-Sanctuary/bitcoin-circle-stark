@@ -1,19 +1,14 @@
-use crate::{constraints::ConstraintsGadget, treepp::*};
+use crate::constraints::ConstraintsGadget;
+use crate::treepp::*;
 use num_traits::One;
-use rust_bitcoin_m31::qm31_add;
-use rust_bitcoin_m31::qm31_copy;
-use rust_bitcoin_m31::qm31_dup;
-use rust_bitcoin_m31::qm31_equalverify;
-use rust_bitcoin_m31::qm31_from_bottom;
-use rust_bitcoin_m31::qm31_square;
-use rust_bitcoin_m31::qm31_swap;
 use rust_bitcoin_m31::{
-    qm31_fromaltstack, qm31_mul, qm31_mul_m31, qm31_roll, qm31_sub, qm31_toaltstack,
+    qm31_add, qm31_copy, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul,
+    qm31_mul_m31, qm31_roll, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
 };
-use stwo_prover::core::{
-    circle::{CirclePoint, Coset},
-    fields::{m31::M31, qm31::QM31, FieldExpOps},
-};
+use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::examples::fibonacci::Fibonacci;
 
 /// Gadget for Fibonacci composition polynomial-related operations.
@@ -66,7 +61,7 @@ impl FibonacciCompositionGadget {
             qm31_add
 
             qm31_swap
-            qm31_sub //f(z)^2 + f(G z)^2 - f(G^2 z)
+            qm31_sub // f(z)^2 + f(G z)^2 - f(G^2 z)
 
             qm31_fromaltstack
             qm31_fromaltstack
@@ -80,20 +75,20 @@ impl FibonacciCompositionGadget {
                         .into_ef()
                 )
             }
-            qm31_mul //num
+            qm31_mul // num
 
             qm31_fromaltstack
             qm31_fromaltstack
-            { ConstraintsGadget::coset_vanishing(constraint_zero_domain) } //denom
+            { ConstraintsGadget::coset_vanishing(constraint_zero_domain) } // denom
 
-            qm31_from_bottom //num/denom
+            qm31_from_bottom // num/denom
             qm31_dup
             qm31_toaltstack
 
             qm31_mul // denom*(num/denom)
 
             qm31_equalverify
-            qm31_fromaltstack //num/denom
+            qm31_fromaltstack // num/denom
 
         }
     }
@@ -118,15 +113,15 @@ impl FibonacciCompositionGadget {
         }
     }
 
-    ///Computes the bonudary constraint f(0)=1, f(end)=claim
-    ///hint:
-    /// num/denom
-    ///input:
-    /// f(z)
-    /// z.x
-    /// z.y
-    ///output:
-    /// num/denom
+    /// Computes the bonudary constraint f(0)=1, f(end)=claim
+    /// hint:
+    ///  num/denom
+    /// input:
+    ///  f(z)
+    ///  z.x
+    ///  z.y
+    /// output:
+    ///  num/denom
     #[allow(dead_code)]
     fn boundary_constraint_eval_quotient_by_mask(log_size: u32, claim: M31) -> Script {
         let constraint_zero_domain = Coset::subgroup(log_size);
@@ -208,13 +203,11 @@ impl FibonacciCompositionGadget {
 
 #[cfg(test)]
 mod test {
-    use std::iter::zip;
-
     use itertools::Itertools;
-
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
+    use std::iter::zip;
     use stwo_prover::{
         core::{
             air::{AirExt, ComponentTrace},
@@ -229,10 +222,9 @@ mod test {
         examples::fibonacci::Fibonacci,
     };
 
+    use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
+    use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::{
-        fibonacci::FibonacciCompositionGadget, tests_utils::report::report_bitcoin_script_size,
-    };
 
     #[test]
     fn test_eval_composition_polynomial_at_point() {

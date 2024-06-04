@@ -2,6 +2,7 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
+use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::pcs::CommitmentSchemeVerifier;
@@ -15,6 +16,19 @@ pub struct VerifierHints {
 
     /// random_coeff comes from adding `proof.commitments[0]` to the channel.
     pub random_coeff_hint: DrawQM31Hints,
+
+    /// Testing purpose: the ending channel digest
+    pub test_only: BWSSha256Hash,
+}
+
+impl Pushable for VerifierHints {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.commitments[0].bitcoin_script_push(builder);
+        builder = self.random_coeff_hint.bitcoin_script_push(builder);
+        builder = self.commitments[1].bitcoin_script_push(builder);
+        builder = self.test_only.bitcoin_script_push(builder);
+        builder
+    }
 }
 
 /// A verifier program that generates hints.
@@ -40,6 +54,7 @@ pub fn verify_with_hints(
     Ok(VerifierHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
+        test_only: channel.digest,
     })
 }
 
