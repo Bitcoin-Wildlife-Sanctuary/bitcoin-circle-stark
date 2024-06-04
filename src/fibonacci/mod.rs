@@ -1,16 +1,21 @@
 mod bitcoin_script;
+
 pub use bitcoin_script::*;
+use itertools::Itertools;
 
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
 use crate::oods::{OODSHint, OODS};
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
+use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::SecureField;
-use stwo_prover::core::pcs::CommitmentSchemeVerifier;
-use stwo_prover::core::prover::{StarkProof, VerificationError};
+use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
+use stwo_prover::core::poly::circle::SecureCirclePoly;
+use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+use stwo_prover::core::{ColumnVec, ComponentVec};
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
@@ -24,7 +29,7 @@ pub struct VerifierHints {
     pub oods_hint: OODSHint,
 
     /// Testing purpose: the ending channel digest.
-    pub test_only: BWSSha256Hash,
+    pub test_only: Vec<ColumnVec<Vec<CirclePoint<QM31>>>>,
 }
 
 impl Pushable for VerifierHints {
@@ -33,7 +38,9 @@ impl Pushable for VerifierHints {
         builder = self.random_coeff_hint.bitcoin_script_push(builder);
         builder = self.commitments[1].bitcoin_script_push(builder);
         builder = self.oods_hint.bitcoin_script_push(builder);
-        builder = self.test_only.bitcoin_script_push(builder);
+        for p in self.test_only[0][0].iter().rev() {
+            builder = p.bitcoin_script_push(builder);
+        }
         builder
     }
 }
@@ -59,15 +66,81 @@ pub fn verify_with_hints(
     // Draw OODS point.
     let (oods_point, oods_hint) = CirclePoint::<SecureField>::get_random_point_with_hint(channel);
 
+    // Get mask sample points relative to oods point.
+    let trace_sample_points = air.mask_points(oods_point);
+    let masked_points = trace_sample_points.clone();
+
+    // TODO(spapini): Change when we support multiple interactions.
+    // First tree - trace.
+    let mut sample_points = TreeVec::new(vec![trace_sample_points.flatten()]);
+    // Second tree - composition polynomial.
+    sample_points.push(vec![vec![oods_point]; 4]);
+
+    // this step is just a reorganization of the data
+    assert_eq!(sample_points.0[0][0][0], masked_points[0][0][0]);
+    assert_eq!(sample_points.0[0][0][1], masked_points[0][0][1]);
+    assert_eq!(sample_points.0[0][0][2], masked_points[0][0][2]);
+
+    assert_eq!(sample_points.0[1][0][0], oods_point);
+    assert_eq!(sample_points.0[1][1][0], oods_point);
+    assert_eq!(sample_points.0[1][2][0], oods_point);
+    assert_eq!(sample_points.0[1][3][0], oods_point);
+
+    // TODO(spapini): Save clone.
+    let (trace_oods_values, composition_oods_value) = sampled_values_to_mask(
+        air,
+        proof.commitment_scheme_proof.sampled_values.clone(),
+    )
+    .map_err(|_| {
+        VerificationError::InvalidStructure("Unexpected sampled_values structure".to_string())
+    })?;
+
     let _ = random_coeff;
     let _ = oods_point;
+    let _ = composition_oods_value;
+    let _ = trace_oods_values;
 
     Ok(VerifierHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
         oods_hint,
-        test_only: channel.digest,
+        test_only: masked_points,
     })
+}
+
+fn sampled_values_to_mask(
+    air: &impl Air,
+    mut sampled_values: TreeVec<ColumnVec<Vec<SecureField>>>,
+) -> Result<(ComponentVec<Vec<SecureField>>, SecureField), InvalidOodsSampleStructure> {
+    let composition_partial_sampled_values =
+        sampled_values.pop().ok_or(InvalidOodsSampleStructure)?;
+    let composition_oods_value = SecureCirclePoly::<CpuBackend>::eval_from_partial_evals(
+        composition_partial_sampled_values
+            .iter()
+            .flatten()
+            .cloned()
+            .collect_vec()
+            .try_into()
+            .map_err(|_| InvalidOodsSampleStructure)?,
+    );
+
+    // Retrieve sampled mask values for each component.
+    let flat_trace_values = &mut sampled_values
+        .pop()
+        .ok_or(InvalidOodsSampleStructure)?
+        .into_iter();
+    let trace_oods_values = ComponentVec(
+        air.components()
+            .iter()
+            .map(|c| {
+                flat_trace_values
+                    .take(c.mask_points(CirclePoint::zero()).len())
+                    .collect_vec()
+            })
+            .collect(),
+    );
+
+    Ok((trace_oods_values, composition_oods_value))
 }
 
 #[cfg(test)]

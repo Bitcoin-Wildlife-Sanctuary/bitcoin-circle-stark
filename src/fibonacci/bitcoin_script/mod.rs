@@ -1,9 +1,14 @@
+use crate::air::AirGadget;
 use crate::channel::Sha256ChannelGadget;
+use crate::circle::CirclePointGadget;
 use crate::oods::OODSGadget;
 use crate::{treepp::*, OP_HINT};
 use stwo_prover::core::channel::BWSSha256Channel;
+use stwo_prover::core::poly::circle::CanonicCoset;
 
 mod composition;
+
+const FIB_LOG_SIZE: u32 = 5;
 
 /// A verifier for the Fibonacci proof.
 pub struct FibonacciVerifierGadget;
@@ -35,20 +40,32 @@ impl FibonacciVerifierGadget {
 
             // stack: c1, random_coeff (4), c2, channel_digest, oods point (8)
 
-            8 OP_ROLL
+            // mask the points
+            { AirGadget::shifted_mask_points(&vec![vec![0, 1, 2]], &[CanonicCoset::new(FIB_LOG_SIZE)]) }
 
-            // test-only: final channel digest
-            OP_HINT OP_EQUALVERIFY
+            // test-only: masked points
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            { CirclePointGadget::equalverify() }
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            { CirclePointGadget::equalverify() }
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            OP_HINT OP_HINT OP_HINT OP_HINT
+            { CirclePointGadget::equalverify() }
 
             // test-only: clean up the stack
-            OP_2DROP OP_2DROP OP_2DROP OP_2DROP
-            OP_DROP OP_2DROP OP_2DROP OP_DROP
+            OP_DROP // drop channel_digest
+            OP_DROP // drop c2
+            OP_2DROP OP_2DROP // drop random_coeff
+            OP_DROP // drop c1
         }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::fibonacci::bitcoin_script::FIB_LOG_SIZE;
     use crate::fibonacci::{verify_with_hints, FibonacciVerifierGadget};
     use crate::treepp::*;
     use bitcoin_scriptexec::execute_script;
@@ -62,7 +79,6 @@ mod test {
 
     #[test]
     fn test_verifier() {
-        const FIB_LOG_SIZE: u32 = 5;
         let fib = Fibonacci::new(FIB_LOG_SIZE, M31::reduce(443693538));
 
         let trace = fib.get_trace();
