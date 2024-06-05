@@ -1,4 +1,3 @@
-use crate::channel::DrawHints;
 use crate::treepp::*;
 use crate::utils::{hash_felt_gadget, trim_m31_gadget};
 
@@ -7,6 +6,13 @@ pub struct Sha256ChannelGadget;
 
 impl Sha256ChannelGadget {
     /// Absorb a commitment.
+    ///
+    /// Input:
+    /// - digest
+    /// - old channel digest
+    ///
+    /// Output:
+    /// - new channel digest
     pub fn mix_digest() -> Script {
         script! {
             OP_CAT OP_SHA256
@@ -14,6 +20,13 @@ impl Sha256ChannelGadget {
     }
 
     /// Absorb a qm31 element.
+    ///
+    /// Input:
+    /// - qm31
+    /// - old channel digest
+    ///
+    /// Output:
+    /// - new channel digest
     pub fn mix_felt() -> Script {
         script! {
             OP_TOALTSTACK
@@ -22,7 +35,14 @@ impl Sha256ChannelGadget {
         }
     }
 
-    /// Squeeze a qm31 element using hints.
+    /// Draw a qm31 element using hints.
+    ///
+    /// Input:
+    /// - old channel digest
+    ///
+    /// Output:
+    /// - new channel digest
+    /// - qm31
     pub fn draw_felt_with_hint() -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
@@ -31,7 +51,7 @@ impl Sha256ChannelGadget {
         }
     }
 
-    /// Squeeze queries from the channel, each of logn bits, using hints.
+    /// Draw queries from the channel, each of logn bits, using hints.
     pub fn draw_5numbers_with_hint(logn: usize) -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
@@ -42,23 +62,6 @@ impl Sha256ChannelGadget {
             OP_2SWAP { trim_m31_gadget(logn) }
             OP_SWAP { trim_m31_gadget(logn) }
             4 OP_ROLL { trim_m31_gadget(logn) }
-        }
-    }
-
-    /// Push the hint for drawing m31 elements from a hash.
-    pub fn push_draw_hint<const N: usize>(e: &DrawHints<N>) -> Script {
-        if N % 8 == 0 {
-            assert!(e.1.is_empty());
-        } else {
-            assert_eq!(e.1.len(), 32 - (N % 8) * 4);
-        }
-        script! {
-            for i in 0..N {
-                { e.0[i] }
-            }
-            if N % 8 != 0 {
-                { e.1.clone() }
-            }
         }
     }
 
@@ -141,15 +144,12 @@ mod test {
     use crate::channel::{generate_hints, ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::utils::{hash_felt_gadget, hash_qm31};
+    use crate::utils::{get_rand_qm31, hash_felt_gadget, hash_qm31};
     use bitcoin_script::script;
-    use rand::{Rng, RngCore, SeedableRng};
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::channel::Channel;
-    use stwo_prover::core::fields::cm31::CM31;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
     #[test]
@@ -194,10 +194,7 @@ mod test {
         init_state.iter_mut().for_each(|v| *v = prng.gen());
         let init_state = BWSSha256Hash::from(init_state.to_vec());
 
-        let elem = QM31(
-            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-            CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-        );
+        let elem = get_rand_qm31(&mut prng);
 
         let mut channel = Sha256Channel::new(init_state);
         channel.mix_felts(&[elem]);
@@ -230,7 +227,7 @@ mod test {
             let c = channel.digest;
 
             let script = script! {
-                { Sha256ChannelGadget::push_draw_hint(&hint) }
+                { hint }
                 { a }
                 OP_DUP OP_SHA256 OP_SWAP
                 OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
@@ -265,7 +262,7 @@ mod test {
             let c = channel.digest;
 
             let script = script! {
-                { Sha256ChannelGadget::push_draw_hint(&hint) }
+                { hint }
                 { a }
                 { channel_script.clone() }
                 { b }
@@ -297,7 +294,7 @@ mod test {
             let c = channel.digest;
 
             let script = script! {
-                { Sha256ChannelGadget::push_draw_hint(&hint) }
+                { hint }
                 { a }
                 { channel_script.clone() }
                 { b[4] } OP_EQUALVERIFY
@@ -321,10 +318,7 @@ mod test {
         report_bitcoin_script_size("QM31", "hash", commit_script.len());
 
         for _ in 0..100 {
-            let a = QM31(
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-            );
+            let a = get_rand_qm31(&mut prng);
             let b = hash_qm31(&a);
 
             let script = script! {
@@ -359,7 +353,7 @@ mod test {
         let (_, hint) = generate_hints::<1>(&h);
 
         let script = script! {
-            { Sha256ChannelGadget::push_draw_hint(&hint) }
+            { hint }
             { Sha256ChannelGadget::unpack_multi_m31::<1>() }
             OP_NOT
         };

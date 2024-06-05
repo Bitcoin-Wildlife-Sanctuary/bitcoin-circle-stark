@@ -125,3 +125,29 @@ impl<const N: usize> Default for DrawHints<N> {
 
 /// Hints for drawing a QM31 element (most common).
 pub type DrawQM31Hints = DrawHints<4>;
+
+impl<const N: usize> Pushable for DrawHints<N> {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
+
+impl<const N: usize> Pushable for &DrawHints<N> {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        if N % 8 == 0 {
+            assert!(self.1.is_empty());
+        } else {
+            assert_eq!(self.1.len(), 32 - (N % 8) * 4);
+        }
+
+        for i in 0..N {
+            builder = self.0[i].bitcoin_script_push(builder);
+        }
+
+        if N % 8 != 0 {
+            builder = self.1.clone().bitcoin_script_push(builder);
+        }
+
+        builder
+    }
+}

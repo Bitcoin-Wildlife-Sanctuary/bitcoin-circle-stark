@@ -1,4 +1,3 @@
-use crate::merkle_tree::MerkleTreeProof;
 use crate::treepp::*;
 use crate::utils::{hash_felt_gadget, limb_to_be_bits_toaltstack};
 
@@ -6,16 +5,6 @@ use crate::utils::{hash_felt_gadget, limb_to_be_bits_toaltstack};
 pub struct MerkleTreeGadget;
 
 impl MerkleTreeGadget {
-    /// Push the Merkle tree proof into the stack (and used as a hint).
-    pub fn push_merkle_tree_proof(merkle_proof: &MerkleTreeProof) -> Script {
-        script! {
-            { merkle_proof.leaf }
-            for elem in merkle_proof.siblings.iter() {
-                { elem.to_vec() }
-            }
-        }
-    }
-
     pub(crate) fn query_and_verify_internal(logn: usize, is_sibling: bool) -> Script {
         script! {
             OP_DEPTH OP_1SUB OP_ROLL
@@ -86,16 +75,14 @@ impl MerkleTreeGadget {
 mod test {
 
     use crate::treepp::*;
+    use crate::utils::get_rand_qm31;
     use crate::{
         merkle_tree::{MerkleTree, MerkleTreeGadget},
         tests_utils::report::report_bitcoin_script_size,
     };
-    use rand::{Rng, RngCore, SeedableRng};
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-    use stwo_prover::core::fields::cm31::CM31;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
 
     #[test]
     fn test_merkle_tree_verify() {
@@ -112,10 +99,7 @@ mod test {
 
             let mut last_layer = vec![];
             for _ in 0..(1 << logn) {
-                last_layer.push(QM31(
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                ));
+                last_layer.push(get_rand_qm31(&mut prng));
             }
 
             let merkle_tree = MerkleTree::new(last_layer.clone());
@@ -126,7 +110,7 @@ mod test {
             let proof = merkle_tree.query(pos as usize);
 
             let script = script! {
-                { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
+                { proof }
                 { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }
@@ -149,10 +133,7 @@ mod test {
 
             let mut last_layer = vec![];
             for _ in 0..(1 << logn) {
-                last_layer.push(QM31(
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                    CM31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
-                ));
+                last_layer.push(get_rand_qm31(&mut prng));
             }
 
             let merkle_tree = MerkleTree::new(last_layer.clone());
@@ -163,7 +144,7 @@ mod test {
             let proof = merkle_tree.query((pos ^ 1) as usize);
 
             let script = script! {
-                { MerkleTreeGadget::push_merkle_tree_proof(&proof) }
+                { proof }
                 { merkle_tree.root_hash }
                 { pos }
                 { verify_script.clone() }

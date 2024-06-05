@@ -35,9 +35,9 @@ impl FRIGadget {
 
         script! {
             for hint in factors_hints.iter() {
-                { Sha256ChannelGadget::push_draw_hint(hint) }
+                { hint }
             }
-            { Sha256ChannelGadget::push_draw_hint(&queries_hint) }
+            { queries_hint }
         }
     }
 
@@ -73,7 +73,7 @@ impl FRIGadget {
     pub fn push_twiddle_merkle_tree_proof(fri_proof: &FriProof) -> Script {
         script! {
             for proof in fri_proof.twiddle_merkle_proofs.iter() {
-                { TwiddleMerkleTreeGadget::push_twiddle_merkle_tree_proof(proof) }
+                { proof }
             }
         }
     }
@@ -266,7 +266,7 @@ mod test {
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
-    use crate::utils::permute_eval;
+    use crate::utils::{get_rand_qm31, permute_eval};
     use bitcoin::hashes::Hash;
     use bitcoin::{TapLeafHash, Transaction};
     use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
@@ -278,7 +278,6 @@ mod test {
     use stwo_prover::core::circle::CirclePointIndex;
     use stwo_prover::core::fft::ibutterfly;
     use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
@@ -784,19 +783,9 @@ mod test {
     fn test_ibutterfly() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a = QM31::from_m31(
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-        );
+        let a = get_rand_qm31(&mut prng);
 
-        let b = QM31::from_m31(
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-            M31::reduce(prng.next_u64()),
-        );
+        let b = get_rand_qm31(&mut prng);
 
         let itwid = M31::reduce(prng.next_u64());
 

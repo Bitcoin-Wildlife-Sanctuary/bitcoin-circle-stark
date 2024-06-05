@@ -1,25 +1,10 @@
 use crate::treepp::*;
-use crate::twiddle_merkle_tree::TwiddleMerkleTreeProof;
 use crate::utils::limb_to_le_bits;
 
 /// Gadget for verifying a Merkle tree path in a twiddle tree.
 pub struct TwiddleMerkleTreeGadget;
 
 impl TwiddleMerkleTreeGadget {
-    /// Push a Merkle tree proof for the twiddle tree into the stack.
-    pub fn push_twiddle_merkle_tree_proof(
-        twiddle_merkle_tree_proof: &TwiddleMerkleTreeProof,
-    ) -> Script {
-        script! {
-            { *twiddle_merkle_tree_proof.elements.last().unwrap() }
-            for (element, sibling) in twiddle_merkle_tree_proof.elements.iter().rev().skip(1).zip(twiddle_merkle_tree_proof.siblings.iter()) {
-                { *element }
-                { sibling.to_vec() }
-            }
-            { twiddle_merkle_tree_proof.siblings.last().unwrap().to_vec() }
-        }
-    }
-
     /// Query the twiddle tree on a point and verify the Merkle tree proof (as a hint).
     ///
     /// hint:
@@ -115,15 +100,15 @@ mod test {
             let mut pos: u32 = prng.gen();
             pos &= (1 << logn) - 1;
 
-            let proof = twiddle_merkle_tree.query(pos as usize);
+            let twiddle_proof = twiddle_merkle_tree.query(pos as usize);
 
             let script = script! {
-                { TwiddleMerkleTreeGadget::push_twiddle_merkle_tree_proof(&proof) }
+                { twiddle_proof.clone() }
                 { twiddle_merkle_tree.root_hash.to_vec() }
                 { pos }
                 { verify_script.clone() }
                 for i in 0..n_layers {
-                    { proof.elements[n_layers - 1 - i] }
+                    { twiddle_proof.elements[n_layers - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE

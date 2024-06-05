@@ -1,5 +1,7 @@
 set -e
 
+echo '+cargo clean'
+cargo clean
 echo '+cargo test -- --nocapture'
 cargo test -- --nocapture
 echo '+cargo clippy --all --all-features --all-targets -- -D warnings'

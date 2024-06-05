@@ -8,6 +8,7 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 mod constants;
+use crate::treepp::pushable::{Builder, Pushable};
 pub use constants::*;
 
 /// A twiddle Merkle tree.
@@ -162,6 +163,27 @@ pub struct TwiddleMerkleTreeProof {
     pub elements: Vec<M31>,
     /// Sibling elements (in hashes).
     pub siblings: Vec<[u8; 32]>,
+}
+
+impl Pushable for TwiddleMerkleTreeProof {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
+
+impl Pushable for &TwiddleMerkleTreeProof {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.elements.last().unwrap().bitcoin_script_push(builder);
+        for (element, sibling) in self.elements.iter().rev().skip(1).zip(self.siblings.iter()) {
+            builder = element.bitcoin_script_push(builder);
+            builder = sibling.to_vec().bitcoin_script_push(builder);
+        }
+        self.siblings
+            .last()
+            .unwrap()
+            .to_vec()
+            .bitcoin_script_push(builder)
+    }
 }
 
 #[cfg(test)]

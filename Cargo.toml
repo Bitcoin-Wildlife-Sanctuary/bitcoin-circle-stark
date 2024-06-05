@@ -7,7 +7,7 @@ edition = "2021"
 rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
 bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script" }
 bitcoin = "0.32.0"
-bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec" }
+bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", features = ["debug"] }
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
