@@ -10,14 +10,20 @@ use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::SecureField;
+use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::fri::{
+    CirclePolyDegreeBound, FriConfig, FriLayerVerifier, FriVerificationError, FOLD_STEP,
+};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
-use stwo_prover::core::prover::{InvalidOodsSampleStructure, LOG_BLOWUP_FACTOR, LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, StarkProof, VerificationError};
+use stwo_prover::core::poly::line::LineDomain;
+use stwo_prover::core::prover::{
+    InvalidOodsSampleStructure, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
+    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES,
+};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
-use stwo_prover::core::fri::{CirclePolyDegreeBound, FriConfig};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
@@ -46,7 +52,13 @@ pub struct VerifierHints {
     /// circle_poly_alpha hint
     pub circle_poly_alpha_hint: DrawQM31Hints,
 
-    // Testing purpose: final channel values.
+    /// fri commit and hints for deriving the folding parameter
+    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawQM31Hints)>,
+
+    /// last layer poly (assuming only one element)
+    pub last_layer: QM31,
+
+    /// Testing purpose: final channel values.
     pub test_only: BWSSha256Hash,
 }
 
@@ -65,6 +77,11 @@ impl Pushable for VerifierHints {
         builder = self.composition_hint.bitcoin_script_push(builder);
         builder = self.random_coeff_hint2.bitcoin_script_push(builder);
         builder = self.circle_poly_alpha_hint.bitcoin_script_push(builder);
+        for (c, h) in self.fri_commitment_and_folding_hints.iter() {
+            builder = c.bitcoin_script_push(builder);
+            builder = h.bitcoin_script_push(builder);
+        }
+        builder = self.last_layer.bitcoin_script_push(builder);
         builder = self.test_only.bitcoin_script_push(builder);
 
         builder
@@ -142,7 +159,13 @@ pub fn verify_with_hints(
 
     let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
 
-    channel.mix_felts(&proof.commitment_scheme_proof.sampled_values.clone().flatten_cols());
+    channel.mix_felts(
+        &proof
+            .commitment_scheme_proof
+            .sampled_values
+            .clone()
+            .flatten_cols(),
+    );
     let (random_coeff, random_coeff_hint2) = channel.draw_felt_and_hints();
 
     let bounds = commitment_scheme
@@ -163,12 +186,64 @@ pub fn verify_with_hints(
 
     // from fri-verifier
     let max_column_bound = bounds[0];
-    let _ =
-        max_column_bound.log_degree_bound + fri_config.log_blowup_factor;
+    let _ = max_column_bound.log_degree_bound + fri_config.log_blowup_factor;
 
     // Circle polynomials can all be folded with the same alpha.
     let (circle_poly_alpha, circle_poly_alpha_hint) = channel.draw_felt_and_hints();
 
+    let mut inner_layers = Vec::new();
+    let mut layer_bound = max_column_bound.fold_to_line();
+    let mut layer_domain = LineDomain::new(Coset::half_odds(
+        layer_bound.log_degree_bound + fri_config.log_blowup_factor,
+    ));
+
+    let mut fri_commitment_and_folding_hints = vec![];
+
+    for (layer_index, proof) in proof
+        .commitment_scheme_proof
+        .fri_proof
+        .inner_layers
+        .into_iter()
+        .enumerate()
+    {
+        channel.mix_digest(proof.commitment);
+
+        let (folding_alpha, folding_alpha_hint) = channel.draw_felt_and_hints();
+
+        fri_commitment_and_folding_hints.push((proof.commitment, folding_alpha_hint));
+
+        inner_layers.push(FriLayerVerifier {
+            degree_bound: layer_bound,
+            domain: layer_domain,
+            folding_alpha,
+            layer_index,
+            proof,
+        });
+
+        layer_bound = layer_bound
+            .fold(FOLD_STEP)
+            .ok_or(FriVerificationError::InvalidNumFriLayers)?;
+        layer_domain = layer_domain.double();
+    }
+
+    if layer_bound.log_degree_bound != fri_config.log_last_layer_degree_bound {
+        return Err(VerificationError::Fri(
+            FriVerificationError::InvalidNumFriLayers,
+        ));
+    }
+
+    let last_layer_domain = layer_domain;
+    let last_layer_poly = proof.commitment_scheme_proof.fri_proof.last_layer_poly;
+
+    if last_layer_poly.len() > (1 << fri_config.log_last_layer_degree_bound) {
+        return Err(VerificationError::Fri(
+            FriVerificationError::LastLayerDegreeInvalid,
+        ));
+    }
+
+    channel.mix_felts(&last_layer_poly);
+
+    let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
     let _ = oods_point;
@@ -193,6 +268,8 @@ pub fn verify_with_hints(
         composition_hint,
         random_coeff_hint2,
         circle_poly_alpha_hint,
+        fri_commitment_and_folding_hints,
+        last_layer: last_layer_poly.to_vec()[0],
         test_only: channel.digest,
     })
 }
