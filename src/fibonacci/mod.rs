@@ -9,14 +9,15 @@ use crate::oods::{OODSHint, OODS};
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
-use stwo_prover::core::channel::BWSSha256Channel;
+use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
-use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
+use stwo_prover::core::prover::{InvalidOodsSampleStructure, LOG_BLOWUP_FACTOR, LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, StarkProof, VerificationError};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
+use stwo_prover::core::fri::{CirclePolyDegreeBound, FriConfig};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
@@ -38,8 +39,15 @@ pub struct VerifierHints {
 
     /// Composition hint.
     pub composition_hint: CompositionHint,
-    // Testing purpose: composition_oods_value.
-    // pub test_only: SecureField,
+
+    /// second random_coeff hint
+    pub random_coeff_hint2: DrawQM31Hints,
+
+    /// circle_poly_alpha hint
+    pub circle_poly_alpha_hint: DrawQM31Hints,
+
+    // Testing purpose: final channel values.
+    pub test_only: BWSSha256Hash,
 }
 
 impl Pushable for VerifierHints {
@@ -55,7 +63,9 @@ impl Pushable for VerifierHints {
             builder = v.bitcoin_script_push(builder);
         }
         builder = self.composition_hint.bitcoin_script_push(builder);
-        // builder = self.test_only.bitcoin_script_push(builder);
+        builder = self.random_coeff_hint2.bitcoin_script_push(builder);
+        builder = self.circle_poly_alpha_hint.bitcoin_script_push(builder);
+        builder = self.test_only.bitcoin_script_push(builder);
 
         builder
     }
@@ -88,19 +98,19 @@ pub fn verify_with_hints(
 
     // TODO(spapini): Change when we support multiple interactions.
     // First tree - trace.
-    let mut sample_points = TreeVec::new(vec![trace_sample_points.flatten()]);
+    let mut sampled_points = TreeVec::new(vec![trace_sample_points.flatten()]);
     // Second tree - composition polynomial.
-    sample_points.push(vec![vec![oods_point]; 4]);
+    sampled_points.push(vec![vec![oods_point]; 4]);
 
     // this step is just a reorganization of the data
-    assert_eq!(sample_points.0[0][0][0], masked_points[0][0][0]);
-    assert_eq!(sample_points.0[0][0][1], masked_points[0][0][1]);
-    assert_eq!(sample_points.0[0][0][2], masked_points[0][0][2]);
+    assert_eq!(sampled_points.0[0][0][0], masked_points[0][0][0]);
+    assert_eq!(sampled_points.0[0][0][1], masked_points[0][0][1]);
+    assert_eq!(sampled_points.0[0][0][2], masked_points[0][0][2]);
 
-    assert_eq!(sample_points.0[1][0][0], oods_point);
-    assert_eq!(sample_points.0[1][1][0], oods_point);
-    assert_eq!(sample_points.0[1][2][0], oods_point);
-    assert_eq!(sample_points.0[1][3][0], oods_point);
+    assert_eq!(sampled_points.0[1][0][0], oods_point);
+    assert_eq!(sampled_points.0[1][1][0], oods_point);
+    assert_eq!(sampled_points.0[1][2][0], oods_point);
+    assert_eq!(sampled_points.0[1][3][0], oods_point);
 
     // TODO(spapini): Save clone.
     let (trace_oods_values, composition_oods_value) = sampled_values_to_mask(
@@ -110,6 +120,12 @@ pub fn verify_with_hints(
     .map_err(|_| {
         VerificationError::InvalidStructure("Unexpected sampled_values structure".to_string())
     })?;
+
+    if composition_oods_value
+        != air.eval_composition_polynomial_at_point(oods_point, &trace_oods_values, random_coeff)
+    {
+        return Err(VerificationError::OodsNotMatching);
+    }
 
     let composition_hint = CompositionHint {
         constraint_eval_quotients_by_mask: vec![
@@ -126,6 +142,34 @@ pub fn verify_with_hints(
 
     let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
 
+    channel.mix_felts(&proof.commitment_scheme_proof.sampled_values.clone().flatten_cols());
+    let (random_coeff, random_coeff_hint2) = channel.draw_felt_and_hints();
+
+    let bounds = commitment_scheme
+        .column_log_sizes()
+        .zip_cols(&sampled_points)
+        .map_cols(|(log_size, sampled_points)| {
+            vec![CirclePolyDegreeBound::new(log_size - LOG_BLOWUP_FACTOR); sampled_points.len()]
+        })
+        .flatten_cols()
+        .into_iter()
+        .sorted()
+        .rev()
+        .dedup()
+        .collect_vec();
+
+    // FRI commitment phase on OODS quotients.
+    let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, LOG_BLOWUP_FACTOR, N_QUERIES);
+
+    // from fri-verifier
+    let max_column_bound = bounds[0];
+    let _ =
+        max_column_bound.log_degree_bound + fri_config.log_blowup_factor;
+
+    // Circle polynomials can all be folded with the same alpha.
+    let (circle_poly_alpha, circle_poly_alpha_hint) = channel.draw_felt_and_hints();
+
+    let _ = circle_poly_alpha;
     let _ = random_coeff;
     let _ = oods_point;
     let _ = composition_oods_value;
@@ -147,7 +191,9 @@ pub fn verify_with_hints(
             sample_values[1][3][0],
         ],
         composition_hint,
-        // test_only: composition_oods_value,
+        random_coeff_hint2,
+        circle_poly_alpha_hint,
+        test_only: channel.digest,
     })
 }
 
