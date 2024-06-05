@@ -1,5 +1,6 @@
 use crate::circle::CirclePointGadget;
 use crate::treepp::*;
+use rust_bitcoin_m31::{qm31_add, qm31_roll, qm31_shift_by_i, qm31_shift_by_ij, qm31_shift_by_j};
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::ColumnVec;
 
@@ -35,6 +36,29 @@ impl AirGadget {
             } else {
                 { CirclePointGadget::drop() }
             }
+        }
+    }
+
+    /// Combine the evaluation on four points into one.
+    ///
+    /// Input:
+    /// - a (qm31)
+    /// - b (qm31)
+    /// - c (qm31)
+    /// - d (qm31)
+    ///
+    /// Output:
+    /// - a * (1, 0, 0, 0) + b * (0, 1, 0, 0) + c * (0, 0, 1, 0) + d * (0, 0, 0, 1)
+    pub fn eval_from_partial_evals() -> Script {
+        script! {
+            qm31_shift_by_ij
+            { qm31_roll(1) }
+            qm31_shift_by_j
+            qm31_add
+            { qm31_roll(1) }
+            qm31_shift_by_i
+            qm31_add
+            qm31_add
         }
     }
 }

@@ -1,9 +1,12 @@
 use crate::air::AirGadget;
 use crate::channel::Sha256ChannelGadget;
 use crate::circle::CirclePointGadget;
+use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::oods::OODSGadget;
 use crate::{treepp::*, OP_HINT};
+use rust_bitcoin_m31::{qm31_copy, qm31_drop, qm31_equalverify, qm31_from_bottom};
 use stwo_prover::core::channel::BWSSha256Channel;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
 
 mod composition;
@@ -39,25 +42,69 @@ impl FibonacciVerifierGadget {
             { OODSGadget::get_random_point() }
 
             // stack: c1, random_coeff (4), c2, channel_digest, oods point (8)
+            { CirclePointGadget::dup() }
 
             // mask the points
             { AirGadget::shifted_mask_points(&vec![vec![0, 1, 2]], &[CanonicCoset::new(FIB_LOG_SIZE)]) }
 
-            // test-only: masked points
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            { CirclePointGadget::equalverify() }
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            { CirclePointGadget::equalverify() }
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            OP_HINT OP_HINT OP_HINT OP_HINT
-            { CirclePointGadget::equalverify() }
+            // pull trace oods values from the hint
+            for _ in 0..3 {
+                qm31_from_bottom
+            }
+
+            // pull the composition oods raw values from the hint
+            for _ in 0..4 {
+                qm31_from_bottom
+            }
+
+            { AirGadget::eval_from_partial_evals() }
+
+            // stack:
+            //    c1, random_coeff (4), c2, channel_digest, oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odd value (4)
+
+            48 OP_ROLL OP_TOALTSTACK
+            48 OP_ROLL OP_TOALTSTACK
+
+            { qm31_copy(12) }
+            { qm31_copy(4) }
+            { qm31_copy(4) }
+            { qm31_copy(4) }
+            { qm31_copy(15) }
+            { qm31_copy(15) }
+
+            // stack:
+            //    c1, random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odd value (4)
+            //
+            //    random_coeff (4),
+            //    trace oods values (3 * 4 = 12)
+            //    oods point (8)
+            //
+            // altstack:
+            //    channel_digest, c2
+            { FibonacciCompositionGadget::eval_composition_polynomial_at_point(FIB_LOG_SIZE, M31::from_u32_unchecked(443693538)) }
+
+            qm31_equalverify
+
+            OP_FROMALTSTACK OP_FROMALTSTACK
 
             // test-only: clean up the stack
+
             OP_DROP // drop channel_digest
             OP_DROP // drop c2
-            OP_2DROP OP_2DROP // drop random_coeff
+            for _ in 0..3 {
+                qm31_drop // drop trace oods values
+            }
+            for _ in 0..3 {
+                { CirclePointGadget::drop() } // drop masked points
+            }
+            { CirclePointGadget::drop() } // drop oods point
+            qm31_drop // drop random_coeff
             OP_DROP // drop c1
         }
     }

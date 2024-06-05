@@ -3,6 +3,7 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
+use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
 use crate::oods::{OODSHint, OODS};
 use crate::treepp::pushable::{Builder, Pushable};
@@ -10,12 +11,13 @@ use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
+use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
@@ -28,8 +30,16 @@ pub struct VerifierHints {
     /// OODS hint.
     pub oods_hint: OODSHint,
 
-    /// Testing purpose: the ending channel digest.
-    pub test_only: Vec<ColumnVec<Vec<CirclePoint<QM31>>>>,
+    /// trace oods values.
+    pub trace_oods_values: [SecureField; 3],
+
+    /// composition odds raw values.
+    pub composition_oods_values: [SecureField; 4],
+
+    /// Composition hint.
+    pub composition_hint: CompositionHint,
+    // Testing purpose: composition_oods_value.
+    // pub test_only: SecureField,
 }
 
 impl Pushable for VerifierHints {
@@ -38,9 +48,15 @@ impl Pushable for VerifierHints {
         builder = self.random_coeff_hint.bitcoin_script_push(builder);
         builder = self.commitments[1].bitcoin_script_push(builder);
         builder = self.oods_hint.bitcoin_script_push(builder);
-        for p in self.test_only[0][0].iter().rev() {
-            builder = p.bitcoin_script_push(builder);
+        for v in self.trace_oods_values.iter() {
+            builder = v.bitcoin_script_push(builder);
         }
+        for v in self.composition_oods_values.iter() {
+            builder = v.bitcoin_script_push(builder);
+        }
+        builder = self.composition_hint.bitcoin_script_push(builder);
+        // builder = self.test_only.bitcoin_script_push(builder);
+
         builder
     }
 }
@@ -48,7 +64,7 @@ impl Pushable for VerifierHints {
 /// A verifier program that generates hints.
 pub fn verify_with_hints(
     proof: StarkProof,
-    air: &impl Air,
+    air: &FibonacciAir,
     channel: &mut BWSSha256Channel,
 ) -> Result<VerifierHints, VerificationError> {
     // Read trace commitment.
@@ -95,6 +111,21 @@ pub fn verify_with_hints(
         VerificationError::InvalidStructure("Unexpected sampled_values structure".to_string())
     })?;
 
+    let composition_hint = CompositionHint {
+        constraint_eval_quotients_by_mask: vec![
+            air.component.boundary_constraint_eval_quotient_by_mask(
+                oods_point,
+                trace_oods_values[0][0][..1].try_into().unwrap(),
+            ),
+            air.component.step_constraint_eval_quotient_by_mask(
+                oods_point,
+                trace_oods_values[0][0][..].try_into().unwrap(),
+            ),
+        ],
+    };
+
+    let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
+
     let _ = random_coeff;
     let _ = oods_point;
     let _ = composition_oods_value;
@@ -104,7 +135,19 @@ pub fn verify_with_hints(
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
         oods_hint,
-        test_only: masked_points,
+        trace_oods_values: [
+            sample_values[0][0][0],
+            sample_values[0][0][1],
+            sample_values[0][0][2],
+        ],
+        composition_oods_values: [
+            sample_values[1][0][0],
+            sample_values[1][1][0],
+            sample_values[1][2][0],
+            sample_values[1][3][0],
+        ],
+        composition_hint,
+        // test_only: composition_oods_value,
     })
 }
 

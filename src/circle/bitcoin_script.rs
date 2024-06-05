@@ -1,8 +1,8 @@
 use crate::treepp::*;
 use rust_bitcoin_m31::{
-    push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_fromaltstack, qm31_mul,
-    qm31_mul_by_constant, qm31_mul_m31_by_constant, qm31_roll, qm31_square, qm31_sub, qm31_swap,
-    qm31_toaltstack,
+    push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_from_bottom,
+    qm31_fromaltstack, qm31_mul, qm31_mul_by_constant, qm31_mul_m31_by_constant, qm31_roll,
+    qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
 };
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
@@ -33,6 +33,14 @@ impl CirclePointGadget {
         script! {
             OP_2DROP OP_2DROP
             OP_2DROP OP_2DROP
+        }
+    }
+
+    /// Pull a point from the hint
+    pub fn from_bottom() -> Script {
+        script! {
+            qm31_from_bottom
+            qm31_from_bottom
         }
     }
 
