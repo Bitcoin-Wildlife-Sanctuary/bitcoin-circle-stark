@@ -16,19 +16,22 @@ use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 /// A wrapper trait to implement hint-related method for channels.
 pub trait ChannelWithHint: Channel {
     /// Draw raw m31 elements.
-    fn draw_m31_and_hints<const N: usize>(&mut self) -> ([M31; N], DrawHints<N>);
+    fn draw_m31_and_hints(&mut self, m: usize) -> (Vec<M31>, DrawHints);
 
     /// Draw one qm31 and compute the hints.
-    fn draw_felt_and_hints(&mut self) -> (QM31, DrawHints<4>) {
-        let res = self.draw_m31_and_hints::<4>();
-        (QM31::from_m31_array(res.0), res.1)
+    fn draw_felt_and_hints(&mut self) -> (QM31, DrawHints) {
+        let res = self.draw_m31_and_hints(4);
+        (
+            QM31::from_m31(res.0[0], res.0[1], res.0[2], res.0[3]),
+            res.1,
+        )
     }
 
     /// Draw five queries and compute the hints.
-    fn draw_5queries(&mut self, logn: usize) -> ([usize; 5], DrawHints<5>) {
-        let res = self.draw_m31_and_hints::<5>();
+    fn draw_queries_and_hints(&mut self, m: usize, logn: usize) -> (Vec<usize>, DrawHints) {
+        let res = self.draw_m31_and_hints(m);
 
-        let mut trimmed_results = [0usize; 5];
+        let mut trimmed_results = vec![0usize; m];
         for (trimmed_result, result) in trimmed_results.iter_mut().zip(res.0.iter()) {
             *trimmed_result = trim_m31(result.0, logn) as usize;
         }
@@ -38,11 +41,11 @@ pub trait ChannelWithHint: Channel {
 }
 
 impl ChannelWithHint for Sha256Channel {
-    fn draw_m31_and_hints<const N: usize>(&mut self) -> ([M31; N], DrawHints<N>) {
+    fn draw_m31_and_hints(&mut self, m: usize) -> (Vec<M31>, DrawHints) {
         let mut extract = vec![];
         let mut count = 0;
 
-        while count < N {
+        while count < m {
             let mut hasher = Sha256::new();
             Digest::update(&mut hasher, self.digest);
             Digest::update(&mut hasher, [0u8]);
@@ -55,19 +58,19 @@ impl ChannelWithHint for Sha256Channel {
             count += 8;
         }
 
-        generate_hints(&extract)
+        generate_hints(m, &extract)
     }
 }
 
-fn generate_hints<const N: usize>(extract: &[u8]) -> ([M31; N], DrawHints<N>) {
-    let mut res_m31 = [M31::default(); N];
-    let mut res_hints = DrawHints::<N>::default();
+fn generate_hints(m: usize, extract: &[u8]) -> (Vec<M31>, DrawHints) {
+    let mut res_m31 = vec![M31::default(); m];
+    let mut res_hints = DrawHints::default();
 
-    for i in 0..N {
+    for i in 0..m {
         let res = u32::from_le_bytes(<[u8; 4]>::try_from(&extract[i * 4..(i + 1) * 4]).unwrap())
             & 0x7fffffff;
 
-        res_hints.0[i] = if extract[(i + 1) * 4 - 1] & 0x80 != 0 {
+        res_hints.0.push(if extract[(i + 1) * 4 - 1] & 0x80 != 0 {
             if res == 0 {
                 BitcoinIntegerEncodedData::NegativeZero
             } else {
@@ -75,13 +78,13 @@ fn generate_hints<const N: usize>(extract: &[u8]) -> ([M31; N], DrawHints<N>) {
             }
         } else {
             BitcoinIntegerEncodedData::Other(res as i64)
-        };
+        });
 
-        res_m31[i] = M31::from(res.saturating_sub(1));
+        res_m31[i] = M31::from(res);
     }
 
-    if N % 8 != 0 {
-        res_hints.1 = extract[N * 4..].to_vec();
+    if m % 8 != 0 {
+        res_hints.1 = extract[m * 4..].to_vec();
     }
 
     (res_m31, res_hints)
@@ -115,36 +118,35 @@ impl Pushable for BitcoinIntegerEncodedData {
 
 #[derive(Clone)]
 /// Hints for drawing m31 elements.
-pub struct DrawHints<const N: usize>(pub [BitcoinIntegerEncodedData; N], pub Vec<u8>);
+pub struct DrawHints(pub Vec<BitcoinIntegerEncodedData>, pub Vec<u8>);
 
-impl<const N: usize> Default for DrawHints<N> {
+impl Default for DrawHints {
     fn default() -> Self {
-        Self([BitcoinIntegerEncodedData::default(); N], vec![])
+        Self(vec![], vec![])
     }
 }
 
-/// Hints for drawing a QM31 element (most common).
-pub type DrawQM31Hints = DrawHints<4>;
-
-impl<const N: usize> Pushable for DrawHints<N> {
+impl Pushable for DrawHints {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
         (&self).bitcoin_script_push(builder)
     }
 }
 
-impl<const N: usize> Pushable for &DrawHints<N> {
+impl Pushable for &DrawHints {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        if N % 8 == 0 {
+        let n = self.0.len();
+
+        if n % 8 == 0 {
             assert!(self.1.is_empty());
         } else {
-            assert_eq!(self.1.len(), 32 - (N % 8) * 4);
+            assert_eq!(self.1.len(), 32 - (n % 8) * 4);
         }
 
-        for i in 0..N {
+        for i in 0..n {
             builder = self.0[i].bitcoin_script_push(builder);
         }
 
-        if N % 8 != 0 {
+        if n % 8 != 0 {
             builder = self.1.clone().bitcoin_script_push(builder);
         }
 

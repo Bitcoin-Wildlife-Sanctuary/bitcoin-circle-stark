@@ -37,7 +37,7 @@ pub struct OODSHint {
     /// The y coordinate.
     pub y: QM31,
     /// Hint for extracting t from the hash.
-    pub hint: DrawHints<4>,
+    pub hint: DrawHints,
 }
 
 impl Pushable for OODSHint {

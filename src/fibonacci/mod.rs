@@ -4,7 +4,7 @@ pub use bitcoin_script::*;
 use itertools::Itertools;
 
 use crate::air::CompositionHint;
-use crate::channel::{ChannelWithHint, DrawQM31Hints};
+use crate::channel::{ChannelWithHint, DrawHints};
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -34,7 +34,7 @@ pub struct VerifierHints {
     pub commitments: [BWSSha256Hash; 2],
 
     /// random_coeff comes from adding `proof.commitments[0]` to the channel.
-    pub random_coeff_hint: DrawQM31Hints,
+    pub random_coeff_hint: DrawHints,
 
     /// OODS hint.
     pub oods_hint: OODSHint,
@@ -49,13 +49,13 @@ pub struct VerifierHints {
     pub composition_hint: CompositionHint,
 
     /// second random_coeff hint
-    pub random_coeff_hint2: DrawQM31Hints,
+    pub random_coeff_hint2: DrawHints,
 
     /// circle_poly_alpha hint
-    pub circle_poly_alpha_hint: DrawQM31Hints,
+    pub circle_poly_alpha_hint: DrawHints,
 
     /// fri commit and hints for deriving the folding parameter
-    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawQM31Hints)>,
+    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawHints)>,
 
     /// last layer poly (assuming only one element)
     pub last_layer: QM31,
@@ -259,6 +259,20 @@ pub fn verify_with_hints(
     ProofOfWork::new(PROOF_OF_WORK_BITS)
         .verify(channel, &proof.commitment_scheme_proof.proof_of_work)?;
 
+    let column_log_sizes = bounds
+        .iter()
+        .dedup()
+        .map(|b| b.log_degree_bound + fri_config.log_blowup_factor)
+        .collect_vec();
+    // let queries = Queries::generate(channel, column_log_sizes[0], fri_config.n_queries);
+    // let (queries, query_hints) = Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
+    // let positions = get_opening_positions(&queries, &column_log_sizes);
+
+    // [16186, 25810, 34927, 35377, 38234, 40962, 52603, 61012]
+    // [40962, 34927, 25810, 61012, 16186, 52603, 35377, 38234]
+    //println!("{:?}", queries);
+
+    let _ = column_log_sizes;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;

@@ -1,5 +1,6 @@
 use crate::treepp::*;
 use crate::utils::{hash_felt_gadget, trim_m31_gadget};
+use rust_bitcoin_m31::MOD;
 
 /// Gadget for a channel.
 pub struct Sha256ChannelGadget;
@@ -69,21 +70,19 @@ impl Sha256ChannelGadget {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
             OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
-            { Self::unpack_multi_m31::<4>() }
+            { Self::unpack_multi_m31(4) }
         }
     }
 
     /// Draw queries from the channel, each of logn bits, using hints.
-    pub fn draw_5numbers_with_hint(logn: usize) -> Script {
+    pub fn draw_numbers_with_hint(m: usize, logn: usize) -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP
             OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
-            { Self::unpack_multi_m31::<5>() }
-            { trim_m31_gadget(logn) }
-            OP_SWAP { trim_m31_gadget(logn) }
-            OP_2SWAP { trim_m31_gadget(logn) }
-            OP_SWAP { trim_m31_gadget(logn) }
-            4 OP_ROLL { trim_m31_gadget(logn) }
+            { Self::unpack_multi_m31(m) }
+            for i in 0..m {
+                { i } OP_ROLL { trim_m31_gadget(logn) }
+            }
         }
     }
 
@@ -128,34 +127,33 @@ impl Sha256ChannelGadget {
     }
 
     /// Unpack multiple m31 and put them on the stack.
-    pub fn unpack_multi_m31<const N: usize>() -> Script {
+    pub fn unpack_multi_m31(m: usize) -> Script {
         script! {
-            for _ in 0..N {
+            for _ in 0..m {
                 OP_DEPTH OP_1SUB OP_ROLL
             }
 
-            for _ in 0..N {
-                { N - 1 } OP_ROLL
+            for _ in 0..m {
+                { m - 1 } OP_ROLL
                 { Self::reconstruct() }
             }
 
-            for _ in 0..N-1 {
+            for _ in 0..m-1 {
                 OP_CAT
             }
 
-            if N % 8 != 0 {
+            if m % 8 != 0 {
                 OP_DEPTH OP_1SUB OP_ROLL OP_CAT
             }
 
             OP_EQUALVERIFY
 
-            for _ in 0..N {
+            for _ in 0..m {
                 OP_FROMALTSTACK
 
-                // Reduce the number from [0, 2^31-1] to [0, 2^31-2] by subtracting 1 from any element that is not zero.
-                // This is because 2^31-1 is the modulus and a reduced element should be smaller than it.
-                // The sampling, therefore, has a small bias.
-                OP_DUP OP_NOT OP_NOTIF OP_1SUB OP_ENDIF
+                OP_DUP { MOD } OP_EQUAL OP_IF
+                    OP_NOT
+                OP_ENDIF
             }
         }
     }
@@ -273,7 +271,7 @@ mod test {
             let a = BWSSha256Hash::from(a.to_vec());
 
             let mut channel = Sha256Channel::new(a);
-            let (b, hint) = channel.draw_m31_and_hints::<8>();
+            let (b, hint) = channel.draw_m31_and_hints(8);
 
             let c = channel.digest;
 
@@ -282,7 +280,7 @@ mod test {
                 { a }
                 OP_DUP OP_SHA256 OP_SWAP
                 OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
-                { Sha256ChannelGadget::unpack_multi_m31::<8>() }
+                { Sha256ChannelGadget::unpack_multi_m31(8) }
                 for i in 0..8 {
                     { b[i] }
                     OP_EQUALVERIFY
@@ -330,7 +328,7 @@ mod test {
     fn test_draw_5numbers_with_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = Sha256ChannelGadget::draw_5numbers_with_hint(15);
+        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(5, 15);
 
         report_bitcoin_script_size("Channel", "draw_5numbers_with_hint", channel_script.len());
 
@@ -340,7 +338,7 @@ mod test {
             let a = BWSSha256Hash::from(a.to_vec());
 
             let mut channel = Sha256Channel::new(a);
-            let (b, hint) = channel.draw_5queries(15);
+            let (b, hint) = channel.draw_queries_and_hints(5, 15);
 
             let c = channel.digest;
 
@@ -401,11 +399,11 @@ mod test {
             *elem = prng.gen();
         }
 
-        let (_, hint) = generate_hints::<1>(&h);
+        let (_, hint) = generate_hints(1, &h);
 
         let script = script! {
             { hint }
-            { Sha256ChannelGadget::unpack_multi_m31::<1>() }
+            { Sha256ChannelGadget::unpack_multi_m31(1) }
             OP_NOT
         };
         let exec_result = execute_script(script);

@@ -1,4 +1,4 @@
-use crate::channel::{ChannelWithHint, DrawQM31Hints, Sha256Channel, Sha256ChannelGadget};
+use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel, Sha256ChannelGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree::MerkleTreeGadget;
 use crate::treepp::*;
@@ -21,7 +21,7 @@ impl FRIGadget {
         logn: usize,
         proof: &FriProof,
     ) -> Script {
-        let mut factors_hints = Vec::<DrawQM31Hints>::new();
+        let mut factors_hints = Vec::<DrawHints>::new();
 
         for c in proof.commitments.iter() {
             channel.mix_digest(*c);
@@ -30,7 +30,7 @@ impl FRIGadget {
         }
         channel.mix_felts(&proof.last_layer);
 
-        let res = channel.draw_5queries(logn);
+        let res = channel.draw_queries_and_hints(N_QUERIES, logn);
         let queries_hint = res.1;
 
         script! {
@@ -58,10 +58,10 @@ impl FRIGadget {
                 { Sha256ChannelGadget::mix_felt() }
             }
 
-            { Sha256ChannelGadget::draw_5numbers_with_hint(logn) }
+            { Sha256ChannelGadget::draw_numbers_with_hint(N_QUERIES, logn) }
 
             // remove the channel
-            5 OP_ROLL OP_DROP
+            8 OP_ROLL OP_DROP
 
             for _ in 0..n_layers {
                 qm31_fromaltstack
@@ -80,9 +80,9 @@ impl FRIGadget {
 
     /// Check all the twiddle Merkle tree proofs.
     ///
-    /// hint: twiddle proof * 5 (as hints)
-    /// input: pos * 5
-    /// output: leaves * 5
+    /// hint: twiddle proof * N_QUERIES (as hints)
+    /// input: pos * N_QUERIES
+    /// output: leaves * N_QUERIES
     pub fn check_twiddle_merkle_tree_proof(
         logn: usize,
         twiddle_merkle_tree_root: [u8; 32],
@@ -267,9 +267,7 @@ mod test {
     use crate::treepp::*;
     use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::{get_rand_qm31, permute_eval};
-    use bitcoin::hashes::Hash;
-    use bitcoin::{TapLeafHash, Transaction};
-    use bitcoin_scriptexec::{Exec, ExecCtx, Experimental, Options, TxTemplate};
+    use bitcoin_scriptexec::execute_script_with_witness_unlimited_stack;
     use num_traits::One;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -322,7 +320,7 @@ mod test {
             }
             channel.mix_felts(&proof.last_layer);
 
-            let res = channel.draw_5queries(logn);
+            let res = channel.draw_queries_and_hints(N_QUERIES, logn);
 
             let expected_2 = res.0;
 
@@ -386,7 +384,7 @@ mod test {
             }
 
             channel.mix_felts(&proof.last_layer);
-            channel.draw_5queries(logn).0
+            channel.draw_queries_and_hints(N_QUERIES, logn).0
         };
 
         let expected = {
@@ -447,7 +445,7 @@ mod test {
                 let _ = channel.draw_felt_and_hints();
             }
             channel.mix_felts(&proof.last_layer);
-            channel.draw_5queries(logn).0
+            channel.draw_queries_and_hints(5, logn).0
         };
 
         let expected = {
@@ -511,7 +509,7 @@ mod test {
             }
             channel.mix_felts(&proof.last_layer);
 
-            let queries = channel.draw_5queries(logn).0;
+            let queries = channel.draw_queries_and_hints(5, logn).0;
 
             (alphas, queries)
         };
@@ -595,7 +593,7 @@ mod test {
             }
             channel.mix_felts(&proof.last_layer);
 
-            let res = channel.draw_5queries(logn);
+            let res = channel.draw_queries_and_hints(N_QUERIES, logn);
 
             let expected_2 = res.0;
 
@@ -648,39 +646,39 @@ mod test {
 
             // stack:
             //    proof body -- leaves (n_queries qm31), last layer (some qm31), commitments (logn - 1)
-            //    5 queries
+            //    N_QUERIES queries
             //    factors (logn - 1) qm31
 
             // copy the input for check_twiddle_merkle_tree_proof
-            for _ in 0..5 {
-                { 5 + (logn - 1) * 4 - 1 } OP_PICK
+            for _ in 0..N_QUERIES {
+                { N_QUERIES + (logn - 1) * 4 - 1 } OP_PICK
             }
 
             { FRIGadget::check_twiddle_merkle_tree_proof(logn, TWIDDLE_MERKLE_TREE_ROOT_18) }
 
             // stack:
             //    proof body -- leaves (n_queries qm31), last layer (some qm31), commitments (logn - 1)
-            //    5 queries
+            //    N_QUERIES queries
             //    alphas (logn - 1) qm31
-            //    twiddle factors 5 * (logn - 1) m31
+            //    twiddle factors N_QUERIES * (logn - 1) m31
 
             // now handle the 1st query, start with the Merkle trees to obtain the siblings
             for i in 0..N_QUERIES {
                 // copy the input for check_single_query_merkle_tree
                 for _ in 0..logn - 1 {
-                    { 5 * (logn - 1) + (logn - 1) * 4 + 5 + (logn - 1) - 1 } OP_PICK
+                    { N_QUERIES * (logn - 1) + (logn - 1) * 4 + N_QUERIES + (logn - 1) - 1 } OP_PICK
                 }
 
                 // copy the query
-                { (logn - 1) + 5 * (logn - 1) + (logn - 1) * 4 + 4 - i } OP_PICK
+                { (logn - 1) + N_QUERIES * (logn - 1) + (logn - 1) * 4 + (N_QUERIES - 1 - i) } OP_PICK
 
                 { FRIGadget::check_single_query_merkle_tree_proof(logn) }
 
                 // stack:
                 //    proof body -- leaves (n_queries qm31), last layer (some qm31), commitments (logn - 1)
-                //    5 queries
+                //    N_QUERIES queries
                 //    alphas (logn - 1) qm31
-                //    twiddle factors 5 * (logn - 1) m31
+                //    twiddle factors N_QUERIES * (logn - 1) m31
                 //    siblings (logn - 1) qm31
 
                 // copy the input for check
@@ -690,11 +688,11 @@ mod test {
                 }
                 // twiddle factors
                 for _ in 0..(logn - 1) {
-                    { (4 - i) * (logn - 1) + (logn - 1) - 1 } OP_PICK
+                    { (N_QUERIES - 1 - i) * (logn - 1) + (logn - 1) - 1 } OP_PICK
                 }
                 // alphas
                 for _ in 0..(logn - 1) * 4 {
-                    { (logn - 1) + 5 * (logn - 1) + (logn - 1) * 4 - 1 } OP_PICK
+                    { (logn - 1) + N_QUERIES * (logn - 1) + (logn - 1) * 4 - 1 } OP_PICK
                 }
                 // siblings
                 for _ in 0..(logn - 1) * 4 {
@@ -702,18 +700,19 @@ mod test {
                 }
                 // leaf
                 for _ in 0..4 {
-                    { proof.last_layer.len() * 4 + (logn - 1) * (4 + 4 + 4 + 1) + (5 + 1) * (logn - 1) + 5 + 4 - 1 } OP_ROLL
+                    { (logn - 1) * 4 + (logn - 1) * 4 + (logn - 1) + N_QUERIES * (logn - 1) + (logn - 1) * 4 + N_QUERIES + (logn - 1) +
+                        proof.last_layer.len() * 4 + 4 - 1 } OP_ROLL
                 }
                 // position
-                { (logn - 1) * (4 + 4 + 1 + 4 + 5) + 4 + (4 - i) } OP_PICK
+                { (logn - 1) * 4 + (logn - 1) * 4 + (logn - 1) + N_QUERIES * (logn - 1) + (logn - 1) * 4 + 4 + (N_QUERIES - 1 - i) } OP_PICK
 
-                { FRIGadget::check_single_query_ibutterfly(logn, (5 + 4 + 1) * (logn - 1) + 5 + proof.last_layer.len() * 4) }
+                { FRIGadget::check_single_query_ibutterfly(logn, (N_QUERIES + 4 + 1) * (logn - 1) + N_QUERIES + proof.last_layer.len() * 4) }
 
                 // stack:
                 //    proof body -- leaves (n_queries - i qm31, disappearing), last layer (some qm31), commitments (logn - 1)
-                //    5 queries
+                //    N_QUERIES queries
                 //    alphas (logn - 1) qm31
-                //    twiddle factors 5 * (logn - 1) m31
+                //    twiddle factors N_QUERIES * (logn - 1) m31
             }
 
             for elem in expected_twiddle_tree.iter().rev() {
@@ -739,44 +738,12 @@ mod test {
 
         report_bitcoin_script_size("FRI", "End-to-End", script.len());
 
-        let mut exec = Exec::new(
-            ExecCtx::Tapscript,
-            Options {
-                require_minimal: true,
-                verify_cltv: true,
-                verify_csv: true,
-                verify_minimal_if: true,
-                enforce_stack_limit: false,
-                experimental: Experimental {
-                    op_cat: true,
-                    op_mul: false,
-                    op_div: false,
-                },
-            },
-            TxTemplate {
-                tx: Transaction {
-                    version: bitcoin::transaction::Version::TWO,
-                    lock_time: bitcoin::locktime::absolute::LockTime::ZERO,
-                    input: vec![],
-                    output: vec![],
-                },
-                prevouts: vec![],
-                input_idx: 0,
-                taproot_annex_scriptleaf: Some((TapLeafHash::all_zeros(), None)),
-            },
+        let exec_result = execute_script_with_witness_unlimited_stack(
             script,
             convert_to_witness(witness).unwrap(),
-        )
-        .expect("error creating exec");
-
-        loop {
-            if exec.exec_next().is_err() {
-                break;
-            }
-        }
-        let res = exec.result().unwrap();
-        println!("max stack size: {}", exec.stats().max_nb_stack_items);
-        assert!(res.success);
+        );
+        println!("max stack size: {}", exec_result.stats.max_nb_stack_items);
+        assert!(exec_result.success);
     }
 
     #[test]
