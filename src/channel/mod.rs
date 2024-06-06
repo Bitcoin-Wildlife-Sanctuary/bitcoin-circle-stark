@@ -116,15 +116,9 @@ impl Pushable for BitcoinIntegerEncodedData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 /// Hints for drawing m31 elements.
 pub struct DrawHints(pub Vec<BitcoinIntegerEncodedData>, pub Vec<u8>);
-
-impl Default for DrawHints {
-    fn default() -> Self {
-        Self(vec![], vec![])
-    }
-}
 
 impl Pushable for DrawHints {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
