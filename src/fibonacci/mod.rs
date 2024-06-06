@@ -18,9 +18,10 @@ use stwo_prover::core::fri::{
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::poly::line::LineDomain;
+use stwo_prover::core::proof_of_work::ProofOfWork;
 use stwo_prover::core::prover::{
     InvalidOodsSampleStructure, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
-    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES,
+    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
 };
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
@@ -58,6 +59,9 @@ pub struct VerifierHints {
     /// last layer poly (assuming only one element)
     pub last_layer: QM31,
 
+    /// nonce (to be replaced later since we use Bitcoin PoW)
+    pub nonce: u64,
+
     /// Testing purpose: final channel values.
     pub test_only: BWSSha256Hash,
 }
@@ -82,6 +86,11 @@ impl Pushable for VerifierHints {
             builder = h.bitcoin_script_push(builder);
         }
         builder = self.last_layer.bitcoin_script_push(builder);
+        builder = self
+            .nonce
+            .to_le_bytes()
+            .to_vec()
+            .bitcoin_script_push(builder);
         builder = self.test_only.bitcoin_script_push(builder);
 
         builder
@@ -243,6 +252,10 @@ pub fn verify_with_hints(
 
     channel.mix_felts(&last_layer_poly);
 
+    // Verify proof of work.
+    ProofOfWork::new(PROOF_OF_WORK_BITS)
+        .verify(channel, &proof.commitment_scheme_proof.proof_of_work)?;
+
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
@@ -270,6 +283,7 @@ pub fn verify_with_hints(
         circle_poly_alpha_hint,
         fri_commitment_and_folding_hints,
         last_layer: last_layer_poly.to_vec()[0],
+        nonce: proof.commitment_scheme_proof.proof_of_work.nonce,
         test_only: channel.digest,
     })
 }

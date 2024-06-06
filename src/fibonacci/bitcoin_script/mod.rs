@@ -153,6 +153,9 @@ impl FibonacciVerifierGadget {
             8 OP_ROLL
             { Sha256ChannelGadget::mix_felt() }
 
+            OP_HINT OP_SWAP
+            { Sha256ChannelGadget::mix_nonce() }
+
             OP_HINT OP_EQUALVERIFY
 
             // test-only: clean up the stack

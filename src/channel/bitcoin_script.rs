@@ -35,6 +35,28 @@ impl Sha256ChannelGadget {
         }
     }
 
+    /// Absorb a nonce.
+    ///
+    /// Input:
+    /// - nonce (8 bytes)
+    /// - old channel digest
+    ///
+    /// Output:
+    /// - new channel digest
+    pub fn mix_nonce() -> Script {
+        script! {
+            OP_SWAP
+            OP_SIZE 8 OP_EQUALVERIFY
+
+            OP_PUSHBYTES_3 OP_PUSHBYTES_0 OP_PUSHBYTES_0 OP_PUSHBYTES_0
+            OP_DUP OP_CAT
+            OP_DUP OP_CAT
+            OP_DUP OP_CAT
+            OP_CAT OP_SWAP
+            { Self::mix_digest() }
+        }
+    }
+
     /// Draw a qm31 element using hints.
     ///
     /// Input:
@@ -203,6 +225,35 @@ mod test {
 
         let script = script! {
             { elem }
+            { init_state }
+            { channel_script.clone() }
+            { final_state }
+            OP_EQUAL
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_mix_nonce() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let channel_script = Sha256ChannelGadget::mix_nonce();
+        report_bitcoin_script_size("Channel", "mix_nonce", channel_script.len());
+
+        let mut init_state = [0u8; 32];
+        init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = BWSSha256Hash::from(init_state.to_vec());
+
+        let nonce = prng.gen::<u64>();
+
+        let mut channel = Sha256Channel::new(init_state);
+        channel.mix_nonce(nonce);
+
+        let final_state = channel.digest;
+
+        let script = script! {
+            { nonce.to_le_bytes().to_vec() }
             { init_state }
             { channel_script.clone() }
             { final_state }
