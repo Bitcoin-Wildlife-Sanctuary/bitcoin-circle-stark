@@ -233,7 +233,7 @@ mod test {
                 let mut channel_digest = [0u8; 32].to_vec();
                 prng.fill_bytes(&mut channel_digest);
 
-                let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
+                let nonce = grind_find_nonce(channel_digest.clone(), n_bits);
 
                 let verify_pow_script = PowGadget::verify_pow(n_bits);
                 if prng_seed == 0 {

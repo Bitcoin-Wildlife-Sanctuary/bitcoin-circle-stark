@@ -33,7 +33,7 @@ impl PoWHint {
     pub fn new(channel_digest: BWSSha256Hash, nonce: u64, n_bits: u32) -> Self {
         assert!(n_bits > 0);
 
-        let digest = hash_with_nonce(&channel_digest.as_ref(), nonce);
+        let digest = hash_with_nonce(channel_digest.as_ref(), nonce);
         let n_bits = n_bits as usize;
 
         if n_bits % 8 == 0 {
