@@ -6,6 +6,7 @@ use itertools::Itertools;
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawQM31Hints};
 use crate::oods::{OODSHint, OODS};
+use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
@@ -59,8 +60,8 @@ pub struct VerifierHints {
     /// last layer poly (assuming only one element)
     pub last_layer: QM31,
 
-    /// nonce (to be replaced later since we use Bitcoin PoW)
-    pub nonce: u64,
+    /// PoW hint
+    pub pow_hint: PoWHint,
 
     /// Testing purpose: final channel values.
     pub test_only: BWSSha256Hash,
@@ -86,11 +87,7 @@ impl Pushable for VerifierHints {
             builder = h.bitcoin_script_push(builder);
         }
         builder = self.last_layer.bitcoin_script_push(builder);
-        builder = self
-            .nonce
-            .to_le_bytes()
-            .to_vec()
-            .bitcoin_script_push(builder);
+        builder = self.pow_hint.bitcoin_script_push(builder);
         builder = self.test_only.bitcoin_script_push(builder);
 
         builder
@@ -252,6 +249,12 @@ pub fn verify_with_hints(
 
     channel.mix_felts(&last_layer_poly);
 
+    let pow_hint = PoWHint::new(
+        channel.digest,
+        proof.commitment_scheme_proof.proof_of_work.nonce,
+        PROOF_OF_WORK_BITS,
+    );
+
     // Verify proof of work.
     ProofOfWork::new(PROOF_OF_WORK_BITS)
         .verify(channel, &proof.commitment_scheme_proof.proof_of_work)?;
@@ -283,7 +286,7 @@ pub fn verify_with_hints(
         circle_poly_alpha_hint,
         fri_commitment_and_folding_hints,
         last_layer: last_layer_poly.to_vec()[0],
-        nonce: proof.commitment_scheme_proof.proof_of_work.nonce,
+        pow_hint,
         test_only: channel.digest,
     })
 }

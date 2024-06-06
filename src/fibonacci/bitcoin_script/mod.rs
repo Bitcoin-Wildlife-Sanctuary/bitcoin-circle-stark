@@ -3,11 +3,13 @@ use crate::channel::Sha256ChannelGadget;
 use crate::circle::CirclePointGadget;
 use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::oods::OODSGadget;
+use crate::pow::PowGadget;
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom};
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
+use stwo_prover::core::prover::PROOF_OF_WORK_BITS;
 
 mod composition;
 
@@ -153,8 +155,7 @@ impl FibonacciVerifierGadget {
             8 OP_ROLL
             { Sha256ChannelGadget::mix_felt() }
 
-            OP_HINT OP_SWAP
-            { Sha256ChannelGadget::mix_nonce() }
+            { PowGadget::verify_pow(PROOF_OF_WORK_BITS) }
 
             OP_HINT OP_EQUALVERIFY
 
