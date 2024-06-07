@@ -1,4 +1,4 @@
-use crate::channel::{ChannelWithHint, Sha256Channel};
+use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel};
 use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 use crate::utils::get_twiddles;
@@ -6,10 +6,39 @@ use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::prover::N_QUERIES;
+use stwo_prover::core::queries::Queries;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
+
+/// A trait for generating the queries with hints.
+pub trait QueriesWithHint: Sized {
+    /// Generate the queries and the corresponding hints.
+    fn generate_with_hints(
+        channel: &mut impl ChannelWithHint,
+        log_domain_size: u32,
+        n_queries: usize,
+    ) -> (Self, DrawHints);
+}
+
+impl QueriesWithHint for Queries {
+    fn generate_with_hints(
+        channel: &mut impl ChannelWithHint,
+        log_domain_size: u32,
+        n_queries: usize,
+    ) -> (Self, DrawHints) {
+        let res = channel.draw_queries_and_hints(n_queries, log_domain_size as usize);
+        (
+            Self {
+                positions: res.0.into_iter().collect(),
+                log_domain_size,
+            },
+            res.1,
+        )
+    }
+}
 
 /// A FRI proof.
 #[derive(Clone, Debug)]
@@ -20,8 +49,6 @@ pub struct FriProof {
     merkle_proofs: Vec<Vec<MerkleTreeProof>>,
     twiddle_merkle_proofs: Vec<TwiddleMerkleTreeProof>,
 }
-
-const N_QUERIES: usize = 5; // cannot change. hardcoded in the Channel implementation
 
 /// Generate a FRI proof.
 pub fn fri_prove(channel: &mut Sha256Channel, evaluation: Vec<QM31>) -> FriProof {
@@ -63,7 +90,7 @@ pub fn fri_prove(channel: &mut Sha256Channel, evaluation: Vec<QM31>) -> FriProof
     channel.mix_felts(&last_layer);
 
     // Queries.
-    let queries = channel.draw_5queries(logn).0.to_vec();
+    let queries = channel.draw_queries_and_hints(N_QUERIES, logn).0.to_vec();
 
     // Decommit.
     let mut leaves = Vec::with_capacity(N_QUERIES);
@@ -111,7 +138,7 @@ pub fn fri_verify(
     // Check it's of half degree.
     assert_eq!(proof.last_layer[0], proof.last_layer[1]);
     // Queries.
-    let queries = channel.draw_5queries(logn).0.to_vec();
+    let queries = channel.draw_queries_and_hints(N_QUERIES, logn).0.to_vec();
     // Decommit.
     for (mut query, ((mut leaf, merkle_proof), twiddle_merkle_tree_proof)) in
         queries.iter().copied().zip(

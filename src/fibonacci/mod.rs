@@ -4,17 +4,29 @@ pub use bitcoin_script::*;
 use itertools::Itertools;
 
 use crate::air::CompositionHint;
-use crate::channel::{ChannelWithHint, DrawQM31Hints};
+use crate::channel::{ChannelWithHint, DrawHints};
+use crate::fri::QueriesWithHint;
 use crate::oods::{OODSHint, OODS};
+use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
-use stwo_prover::core::channel::BWSSha256Channel;
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::SecureField;
+use stwo_prover::core::channel::{BWSSha256Channel, Channel};
+use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::fri::{
+    get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
+    FriVerificationError, FOLD_STEP,
+};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
-use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
+use stwo_prover::core::poly::line::LineDomain;
+use stwo_prover::core::proof_of_work::ProofOfWork;
+use stwo_prover::core::prover::{
+    InvalidOodsSampleStructure, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
+    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
+};
+use stwo_prover::core::queries::Queries;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
@@ -25,7 +37,7 @@ pub struct VerifierHints {
     pub commitments: [BWSSha256Hash; 2],
 
     /// random_coeff comes from adding `proof.commitments[0]` to the channel.
-    pub random_coeff_hint: DrawQM31Hints,
+    pub random_coeff_hint: DrawHints,
 
     /// OODS hint.
     pub oods_hint: OODSHint,
@@ -38,8 +50,27 @@ pub struct VerifierHints {
 
     /// Composition hint.
     pub composition_hint: CompositionHint,
-    // Testing purpose: composition_oods_value.
-    // pub test_only: SecureField,
+
+    /// second random_coeff hint
+    pub random_coeff_hint2: DrawHints,
+
+    /// circle_poly_alpha hint
+    pub circle_poly_alpha_hint: DrawHints,
+
+    /// fri commit and hints for deriving the folding parameter
+    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawHints)>,
+
+    /// last layer poly (assuming only one element)
+    pub last_layer: QM31,
+
+    /// PoW hint
+    pub pow_hint: PoWHint,
+
+    /// Query sampling hints
+    pub queries_hints: DrawHints,
+
+    /// Testing purpose: final channel values.
+    pub test_only: BWSSha256Hash,
 }
 
 impl Pushable for VerifierHints {
@@ -55,7 +86,16 @@ impl Pushable for VerifierHints {
             builder = v.bitcoin_script_push(builder);
         }
         builder = self.composition_hint.bitcoin_script_push(builder);
-        // builder = self.test_only.bitcoin_script_push(builder);
+        builder = self.random_coeff_hint2.bitcoin_script_push(builder);
+        builder = self.circle_poly_alpha_hint.bitcoin_script_push(builder);
+        for (c, h) in self.fri_commitment_and_folding_hints.iter() {
+            builder = c.bitcoin_script_push(builder);
+            builder = h.bitcoin_script_push(builder);
+        }
+        builder = self.last_layer.bitcoin_script_push(builder);
+        builder = self.pow_hint.bitcoin_script_push(builder);
+        builder = self.queries_hints.bitcoin_script_push(builder);
+        builder = self.test_only.bitcoin_script_push(builder);
 
         builder
     }
@@ -88,19 +128,19 @@ pub fn verify_with_hints(
 
     // TODO(spapini): Change when we support multiple interactions.
     // First tree - trace.
-    let mut sample_points = TreeVec::new(vec![trace_sample_points.flatten()]);
+    let mut sampled_points = TreeVec::new(vec![trace_sample_points.flatten()]);
     // Second tree - composition polynomial.
-    sample_points.push(vec![vec![oods_point]; 4]);
+    sampled_points.push(vec![vec![oods_point]; 4]);
 
     // this step is just a reorganization of the data
-    assert_eq!(sample_points.0[0][0][0], masked_points[0][0][0]);
-    assert_eq!(sample_points.0[0][0][1], masked_points[0][0][1]);
-    assert_eq!(sample_points.0[0][0][2], masked_points[0][0][2]);
+    assert_eq!(sampled_points.0[0][0][0], masked_points[0][0][0]);
+    assert_eq!(sampled_points.0[0][0][1], masked_points[0][0][1]);
+    assert_eq!(sampled_points.0[0][0][2], masked_points[0][0][2]);
 
-    assert_eq!(sample_points.0[1][0][0], oods_point);
-    assert_eq!(sample_points.0[1][1][0], oods_point);
-    assert_eq!(sample_points.0[1][2][0], oods_point);
-    assert_eq!(sample_points.0[1][3][0], oods_point);
+    assert_eq!(sampled_points.0[1][0][0], oods_point);
+    assert_eq!(sampled_points.0[1][1][0], oods_point);
+    assert_eq!(sampled_points.0[1][2][0], oods_point);
+    assert_eq!(sampled_points.0[1][3][0], oods_point);
 
     // TODO(spapini): Save clone.
     let (trace_oods_values, composition_oods_value) = sampled_values_to_mask(
@@ -110,6 +150,12 @@ pub fn verify_with_hints(
     .map_err(|_| {
         VerificationError::InvalidStructure("Unexpected sampled_values structure".to_string())
     })?;
+
+    if composition_oods_value
+        != air.eval_composition_polynomial_at_point(oods_point, &trace_oods_values, random_coeff)
+    {
+        return Err(VerificationError::OodsNotMatching);
+    }
 
     let composition_hint = CompositionHint {
         constraint_eval_quotients_by_mask: vec![
@@ -126,6 +172,114 @@ pub fn verify_with_hints(
 
     let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
 
+    channel.mix_felts(
+        &proof
+            .commitment_scheme_proof
+            .sampled_values
+            .clone()
+            .flatten_cols(),
+    );
+    let (random_coeff, random_coeff_hint2) = channel.draw_felt_and_hints();
+
+    let bounds = commitment_scheme
+        .column_log_sizes()
+        .zip_cols(&sampled_points)
+        .map_cols(|(log_size, sampled_points)| {
+            vec![CirclePolyDegreeBound::new(log_size - LOG_BLOWUP_FACTOR); sampled_points.len()]
+        })
+        .flatten_cols()
+        .into_iter()
+        .sorted()
+        .rev()
+        .dedup()
+        .collect_vec();
+
+    // FRI commitment phase on OODS quotients.
+    let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, LOG_BLOWUP_FACTOR, N_QUERIES);
+
+    // from fri-verifier
+    let max_column_bound = bounds[0];
+    let _ = max_column_bound.log_degree_bound + fri_config.log_blowup_factor;
+
+    // Circle polynomials can all be folded with the same alpha.
+    let (circle_poly_alpha, circle_poly_alpha_hint) = channel.draw_felt_and_hints();
+
+    let mut inner_layers = Vec::new();
+    let mut layer_bound = max_column_bound.fold_to_line();
+    let mut layer_domain = LineDomain::new(Coset::half_odds(
+        layer_bound.log_degree_bound + fri_config.log_blowup_factor,
+    ));
+
+    let mut fri_commitment_and_folding_hints = vec![];
+
+    for (layer_index, proof) in proof
+        .commitment_scheme_proof
+        .fri_proof
+        .inner_layers
+        .into_iter()
+        .enumerate()
+    {
+        channel.mix_digest(proof.commitment);
+
+        let (folding_alpha, folding_alpha_hint) = channel.draw_felt_and_hints();
+
+        fri_commitment_and_folding_hints.push((proof.commitment, folding_alpha_hint));
+
+        inner_layers.push(FriLayerVerifier {
+            degree_bound: layer_bound,
+            domain: layer_domain,
+            folding_alpha,
+            layer_index,
+            proof,
+        });
+
+        layer_bound = layer_bound
+            .fold(FOLD_STEP)
+            .ok_or(FriVerificationError::InvalidNumFriLayers)?;
+        layer_domain = layer_domain.double();
+    }
+
+    if layer_bound.log_degree_bound != fri_config.log_last_layer_degree_bound {
+        return Err(VerificationError::Fri(
+            FriVerificationError::InvalidNumFriLayers,
+        ));
+    }
+
+    let last_layer_domain = layer_domain;
+    let last_layer_poly = proof.commitment_scheme_proof.fri_proof.last_layer_poly;
+
+    if last_layer_poly.len() > (1 << fri_config.log_last_layer_degree_bound) {
+        return Err(VerificationError::Fri(
+            FriVerificationError::LastLayerDegreeInvalid,
+        ));
+    }
+
+    channel.mix_felts(&last_layer_poly);
+
+    let pow_hint = PoWHint::new(
+        channel.digest,
+        proof.commitment_scheme_proof.proof_of_work.nonce,
+        PROOF_OF_WORK_BITS,
+    );
+
+    // Verify proof of work.
+    ProofOfWork::new(PROOF_OF_WORK_BITS)
+        .verify(channel, &proof.commitment_scheme_proof.proof_of_work)?;
+
+    let column_log_sizes = bounds
+        .iter()
+        .dedup()
+        .map(|b| b.log_degree_bound + fri_config.log_blowup_factor)
+        .collect_vec();
+
+    let (queries, queries_hints) =
+        Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
+    let positions = get_opening_positions(&queries, &column_log_sizes);
+
+    let _ = positions;
+    let _ = column_log_sizes;
+    let _ = last_layer_domain;
+    let _ = circle_poly_alpha;
     let _ = random_coeff;
     let _ = oods_point;
     let _ = composition_oods_value;
@@ -147,7 +301,13 @@ pub fn verify_with_hints(
             sample_values[1][3][0],
         ],
         composition_hint,
-        // test_only: composition_oods_value,
+        random_coeff_hint2,
+        circle_poly_alpha_hint,
+        fri_commitment_and_folding_hints,
+        last_layer: last_layer_poly.to_vec()[0],
+        pow_hint,
+        queries_hints,
+        test_only: channel.digest,
     })
 }
 

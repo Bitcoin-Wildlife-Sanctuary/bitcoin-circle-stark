@@ -1,63 +1,57 @@
-use crate::pow::hash_with_nonce;
+use crate::channel::Sha256ChannelGadget;
 use crate::treepp::*;
+use crate::OP_HINT;
 
 /// Gadget for verifying PoW.
 pub struct PowGadget;
 
 impl PowGadget {
     /// Verify the PoW in Bitcoin script.
-    /// input:
-    ///  channel (32 bytes)
-    ///  nonce (64-bit string, aka 8 bytes)
-    ///  suffix (the sha256 result after the leading zero bytes and the MSB [if applicable])
-    ///  msb (applicable if n_bits % 8 != 0)
     ///
-    /// output:
-    ///  channel' = sha256(channel || nonce)
+    /// Hint:
+    /// - nonce (64-bit string, aka 8 bytes)
+    /// - prefix (the sha256 result after the leading zero bytes and the MSB [if applicable])
+    /// - msb (applicable if n_bits % 8 != 0)
+    ///
+    /// Input:
+    ///  channel digest
+    ///
+    /// Output:
+    ///  new channel digest = channel.mix_nonce(nonce)
+    ///
+    /// It is important to know that channel.mix_nonce(nonce)
     ///
     /// require:
-    ///  {0x00}^(n_bits // 8) || msb || suffix != sha256(channel||nonce)
+    ///  prefix || msb || {0x00}^(n_bits // 8)  != sha256(channel||nonce)
     ///     where msb is required if n_bits % 8 != 0 and should not be present if it is not
     ///  msb starts with n_bits % 8 (which would be at least 1) zero bits.
-    pub fn verify_pow(n_bits: usize) -> Script {
+    pub fn verify_pow(n_bits: u32) -> Script {
         assert!(n_bits > 0);
+        let n_bits = n_bits as usize;
 
         script! {
-            // move the msb away for simplicity
-            if n_bits % 8 != 0 {
-                OP_TOALTSTACK
-            }
+            // pull the nonce
+            OP_HINT
 
             // check the length of the nonce
-            1 OP_PICK
             OP_SIZE 8 OP_EQUALVERIFY
-            OP_DROP
 
-            // check the length of the suffix
+            // compute sha256(channel||nonce)
+            OP_2DUP
+            OP_CAT OP_SHA256
+
+            // stack: channel, nonce, sha256(channel||nonce)
+
+            // pull the prefix
+            OP_HINT
+
+            // check the length of the prefix
             OP_SIZE { 32 - ((n_bits  + 7) / 8) } OP_EQUALVERIFY
-
-            // compute the channel and nonce
-            OP_ROT OP_ROT
-            OP_CAT
-            OP_SHA256
-            OP_SWAP
-
-            // current stack:
-            //   new channel
-            //   suffix
-            //
-            // altstack:
-            //   msb (if applicable)
-
-            // push the necessary number of zeroes
-            if n_bits / 8 > 0 {
-                { vec![0u8; n_bits / 8] }
-            }
 
             // if msb is present, check the msb is small enough,
             // and if it is a zero, make it `0x00`
             if n_bits % 8 != 0 {
-                OP_FROMALTSTACK
+                OP_HINT
                 OP_DUP
                 0 OP_GREATERTHANOREQUAL OP_VERIFY
                 OP_DUP
@@ -67,52 +61,61 @@ impl PowGadget {
                     OP_DROP OP_PUSHBYTES_1 OP_PUSHBYTES_0
                 OP_ENDIF
 
-                if n_bits / 8 > 0 {
-                    OP_CAT
-                }
+                OP_CAT
             }
 
-            // current stack:
-            //   new channel
-            //   suffix
-            //   prefix
+            // push the necessary number of zeroes
+            if n_bits / 8 > 0 {
+                { vec![0u8; n_bits / 8] }
+                OP_CAT
+            }
+
+            OP_EQUALVERIFY
 
             OP_SWAP
-            OP_CAT
-
-            OP_OVER
-            OP_EQUALVERIFY
-        }
-    }
-
-    /// Push the hint for verifying the PoW.
-    /// It contains the nonce, the suffix, and the msb (if n_bits % 8 != 0).
-    ///
-    /// Need to be copied to the right location. `verify_pow` does not use the hint stack.
-    pub fn push_pow_hint(channel_digest: Vec<u8>, nonce: u64, n_bits: usize) -> Script {
-        assert!(n_bits > 0);
-
-        let digest = hash_with_nonce(&channel_digest, nonce);
-
-        script! {
-            { nonce.to_le_bytes().to_vec() }
-            if n_bits % 8 == 0 {
-                { digest[(n_bits / 8)..].to_vec() }
-            } else {
-                { digest[(n_bits + 8 - 1) / 8..].to_vec() }
-                { digest[n_bits / 8] }
-            }
+            { Sha256ChannelGadget::mix_nonce() }
         }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::channel::Sha256Channel;
     use crate::{tests_utils::report::report_bitcoin_script_size, treepp::*};
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::channel::Channel;
+    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 
-    use crate::pow::{bitcoin_script::PowGadget, grind_find_nonce, hash_with_nonce};
+    use crate::pow::{bitcoin_script::PowGadget, hash_with_nonce, PoWHint};
+
+    // Check that the prefix leading zeros is greater than `bound_bits`.
+    fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
+        let mut n_bits = 0;
+        // bytes are in little endian order.
+        for byte in bytes.iter().rev() {
+            if *byte == 0 {
+                n_bits += 8;
+            } else {
+                n_bits += byte.leading_zeros();
+                break;
+            }
+        }
+        n_bits >= bound_bits
+    }
+
+    // A handy function for grinding, which finds a nonce that makes the resulting hash with enough zeroes.
+    fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
+        let mut nonce = 0u64;
+
+        loop {
+            let hash = hash_with_nonce(&channel_digest, nonce);
+            if check_leading_zeros(hash.as_ref(), n_bits) {
+                return nonce;
+            }
+            nonce += 1;
+        }
+    }
 
     #[test]
     fn test_push_pow_hint() {
@@ -124,11 +127,13 @@ mod test {
         let nonce = grind_find_nonce(channel_digest.clone(), 1);
         let new_channel = hash_with_nonce(&channel_digest, nonce);
 
+        let pow_hint = PoWHint::new(BWSSha256Hash::from(channel_digest), nonce, 1);
+
         let script = script! {
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, 1) }
-            { new_channel[0] }
+            { pow_hint }
+            { new_channel[31] }
             OP_EQUALVERIFY
-            { new_channel[1..].to_vec() }
+            { new_channel[..31].to_vec() }
             OP_EQUALVERIFY
             { nonce.to_le_bytes().to_vec() }
             OP_EQUALVERIFY
@@ -149,10 +154,16 @@ mod test {
 
         let nonce = 1337;
 
+        let pow_hint = PoWHint::new(
+            BWSSha256Hash::from(channel_digest.as_slice()),
+            nonce,
+            n_bits,
+        );
+
         let script = script! {
+            { pow_hint }
             { channel_digest.clone() }
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
-            { PowGadget::verify_pow(n_bits)}
+            { PowGadget::verify_pow(n_bits) }
             OP_DROP
             OP_TRUE
         };
@@ -169,9 +180,15 @@ mod test {
 
         let nonce = 1337 + 4;
 
+        let pow_hint = PoWHint::new(
+            BWSSha256Hash::from(channel_digest.as_slice()),
+            nonce,
+            n_bits,
+        );
+
         let script = script! {
+            { pow_hint }
             { channel_digest.clone() }
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
             { PowGadget::verify_pow(n_bits)}
             OP_DROP
             OP_TRUE
@@ -189,9 +206,15 @@ mod test {
 
         let nonce = 1337;
 
+        let pow_hint = PoWHint::new(
+            BWSSha256Hash::from(channel_digest.as_slice()),
+            nonce,
+            n_bits,
+        );
+
         let script = script! {
+            { pow_hint }
             { channel_digest.clone() }
-            { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
             { PowGadget::verify_pow(n_bits)}
             OP_DROP
             OP_TRUE
@@ -210,27 +233,30 @@ mod test {
                 let mut channel_digest = [0u8; 32].to_vec();
                 prng.fill_bytes(&mut channel_digest);
 
-                let nonce = grind_find_nonce(channel_digest.clone(), n_bits.try_into().unwrap());
+                let nonce = grind_find_nonce(channel_digest.clone(), n_bits);
 
                 let verify_pow_script = PowGadget::verify_pow(n_bits);
                 if prng_seed == 0 {
                     report_bitcoin_script_size(
                         "POW",
-                        format!("verify_pow({} bits)", n_bits).as_str(),
+                        format!("verify_pow ({} bits)", n_bits).as_str(),
                         verify_pow_script.len(),
                     );
                 }
 
+                let pow_hint =
+                    PoWHint::new(BWSSha256Hash::from(channel_digest.clone()), nonce, n_bits);
+
+                let mut channel =
+                    Sha256Channel::new(BWSSha256Hash::from(channel_digest.as_slice()));
+                channel.mix_nonce(nonce);
+
                 let script = script! {
+                    { pow_hint }
                     { channel_digest.clone() }
-                    { PowGadget::push_pow_hint(channel_digest.clone(), nonce, n_bits) }
                     { verify_pow_script.clone() }
-                    { channel_digest.clone() }
-                    { nonce.to_le_bytes().to_vec() }
-                    OP_CAT
-                    OP_SHA256
-                    OP_EQUALVERIFY // checking that indeed channel' = sha256(channel||nonce)
-                    OP_TRUE
+                    { channel.digest }
+                    OP_EQUAL
                 };
                 let exec_result = execute_script(script);
                 assert!(exec_result.success);
@@ -239,7 +265,7 @@ mod test {
 
         report_bitcoin_script_size(
             "POW",
-            "verify_pow(78 bits)",
+            "verify_pow (78 bits)",
             PowGadget::verify_pow(78).len(),
         );
     }
