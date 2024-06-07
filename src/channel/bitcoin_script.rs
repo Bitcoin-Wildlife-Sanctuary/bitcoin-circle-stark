@@ -75,6 +75,10 @@ impl Sha256ChannelGadget {
     }
 
     /// Draw queries from the channel, each of logn bits, using hints.
+    ///
+    /// Output:
+    ///    channel digest
+    ///    all the numbers (m)
     pub fn draw_numbers_with_hint(m: usize, logn: usize) -> Script {
         script! {
             OP_DUP OP_SHA256 OP_SWAP

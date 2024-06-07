@@ -9,7 +9,7 @@ use rust_bitcoin_m31::{qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_fr
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
-use stwo_prover::core::prover::PROOF_OF_WORK_BITS;
+use stwo_prover::core::prover::{LOG_BLOWUP_FACTOR, N_QUERIES, PROOF_OF_WORK_BITS};
 
 mod composition;
 
@@ -157,10 +157,15 @@ impl FibonacciVerifierGadget {
 
             { PowGadget::verify_pow(PROOF_OF_WORK_BITS) }
 
+            { Sha256ChannelGadget::draw_numbers_with_hint(N_QUERIES, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+
+            { N_QUERIES } OP_ROLL
             OP_HINT OP_EQUALVERIFY
 
             // test-only: clean up the stack
-
+            for _ in 0..N_QUERIES {
+                OP_DROP // drop the queries (out of order)
+            }
             qm31_drop // drop the last layer eval
             for _ in 0..FIB_LOG_SIZE {
                 qm31_drop // drop the derived folding_alpha

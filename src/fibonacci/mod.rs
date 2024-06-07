@@ -5,6 +5,7 @@ use itertools::Itertools;
 
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
+use crate::fri::QueriesWithHint;
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -14,7 +15,8 @@ use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fri::{
-    CirclePolyDegreeBound, FriConfig, FriLayerVerifier, FriVerificationError, FOLD_STEP,
+    get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
+    FriVerificationError, FOLD_STEP,
 };
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
@@ -24,6 +26,7 @@ use stwo_prover::core::prover::{
     InvalidOodsSampleStructure, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
     LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
 };
+use stwo_prover::core::queries::Queries;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
@@ -63,6 +66,9 @@ pub struct VerifierHints {
     /// PoW hint
     pub pow_hint: PoWHint,
 
+    /// Query sampling hints
+    pub queries_hints: DrawHints,
+
     /// Testing purpose: final channel values.
     pub test_only: BWSSha256Hash,
 }
@@ -88,6 +94,7 @@ impl Pushable for VerifierHints {
         }
         builder = self.last_layer.bitcoin_script_push(builder);
         builder = self.pow_hint.bitcoin_script_push(builder);
+        builder = self.queries_hints.bitcoin_script_push(builder);
         builder = self.test_only.bitcoin_script_push(builder);
 
         builder
@@ -264,14 +271,12 @@ pub fn verify_with_hints(
         .dedup()
         .map(|b| b.log_degree_bound + fri_config.log_blowup_factor)
         .collect_vec();
-    // let queries = Queries::generate(channel, column_log_sizes[0], fri_config.n_queries);
-    // let (queries, query_hints) = Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
-    // let positions = get_opening_positions(&queries, &column_log_sizes);
 
-    // [16186, 25810, 34927, 35377, 38234, 40962, 52603, 61012]
-    // [40962, 34927, 25810, 61012, 16186, 52603, 35377, 38234]
-    //println!("{:?}", queries);
+    let (queries, queries_hints) =
+        Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
+    let positions = get_opening_positions(&queries, &column_log_sizes);
 
+    let _ = positions;
     let _ = column_log_sizes;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
@@ -301,6 +306,7 @@ pub fn verify_with_hints(
         fri_commitment_and_folding_hints,
         last_layer: last_layer_poly.to_vec()[0],
         pow_hint,
+        queries_hints,
         test_only: channel.digest,
     })
 }
