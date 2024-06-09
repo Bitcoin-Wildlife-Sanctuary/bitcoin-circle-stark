@@ -57,13 +57,11 @@ impl FibonacciCompositionGadget {
             qm31_fromaltstack
             qm31_fromaltstack
             {
-                ConstraintsGadget::pair_vanishing(
+                ConstraintsGadget::pair_vanishing_with_constant_m31_points(
                     constraint_zero_domain
-                        .at(constraint_zero_domain.size() - 2)
-                        .into_ef(),
+                        .at(constraint_zero_domain.size() - 2),
                     constraint_zero_domain
-                        .at(constraint_zero_domain.size() - 1)
-                        .into_ef()
+                        .at(constraint_zero_domain.size() - 1),
                 )
             }
             qm31_mul // num
@@ -115,7 +113,7 @@ impl FibonacciCompositionGadget {
 
             qm31_fromaltstack // bring back z.x from altstack
             qm31_fromaltstack // bring back z.y from altstack
-            { ConstraintsGadget::pair_vanishing(p.into_ef(), CirclePoint::zero())} // denom
+            { ConstraintsGadget::pair_vanishing_with_constant_m31_points(p, CirclePoint::zero())} // denom
 
             qm31_from_bottom // pull num/denom from hint
 

@@ -1,5 +1,6 @@
 use crate::{circle::CirclePointGadget, treepp::*};
-use rust_bitcoin_m31::{qm31_add, qm31_mul, qm31_swap};
+use rust_bitcoin_m31::{m31_add, qm31_add, qm31_mul_m31_by_constant, qm31_swap};
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
     circle::{CirclePoint, Coset},
     fields::qm31::QM31,
@@ -9,8 +10,6 @@ use stwo_prover::core::{
 pub struct ConstraintsGadget;
 
 impl ConstraintsGadget {
-    //TODO: point_vanishing_fraction(). Depends on what format we'll end up needing its output in FRI
-
     /// Evaluates a vanishing polynomial P : CirclePoint -> QM31 of the given coset
     ///
     /// input:
@@ -41,18 +40,19 @@ impl ConstraintsGadget {
     ///
     /// output:
     ///  P(z)
-    pub fn pair_vanishing(excluded0: CirclePoint<QM31>, excluded1: CirclePoint<QM31>) -> Script {
+    pub fn pair_vanishing_with_constant_m31_points(
+        excluded0: CirclePoint<M31>,
+        excluded1: CirclePoint<M31>,
+    ) -> Script {
         script! {
-            { excluded1.x - excluded0.x }
-            qm31_mul    //(excluded1.x - excluded0.x) * z.y
+            { qm31_mul_m31_by_constant((excluded1.x - excluded0.x).0) } // (excluded1.x - excluded0.x) * z.y
 
             qm31_swap
-            { excluded0.y - excluded1.y }
-            qm31_mul    //(excluded0.y - excluded1.y) * z.x
+            { qm31_mul_m31_by_constant((excluded0.y - excluded1.y).0) } // (excluded0.y - excluded1.y) * z.x
 
             qm31_add
             { excluded0.x * excluded1.y - excluded0.y * excluded1.x }
-            qm31_add
+            m31_add
             //(excluded0.y - excluded1.y) * z.x
             //    + (excluded1.x - excluded0.x) * z.y
             //    + (excluded0.x * excluded1.y - excluded0.y * excluded1.x)
@@ -67,10 +67,12 @@ mod test {
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-    use stwo_prover::core::circle::{CirclePoint, Coset};
+    use stwo_prover::core::circle::{
+        CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
+    };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
 
     #[test]
@@ -112,28 +114,19 @@ mod test {
     }
 
     #[test]
-    fn test_pair_vanishing() {
+    fn test_pair_vanishing_with_constant_m31_points() {
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
 
-            let z = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let z = CirclePoint::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
 
-            let excluded0 = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let excluded0 = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+            let excluded1 = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
-            let excluded1 = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let res = pair_vanishing(excluded0.into_ef(), excluded1.into_ef(), z);
 
-            let res = pair_vanishing(excluded0, excluded1, z);
-
-            let pair_vanishing_script = ConstraintsGadget::pair_vanishing(excluded0, excluded1);
+            let pair_vanishing_script =
+                ConstraintsGadget::pair_vanishing_with_constant_m31_points(excluded0, excluded1);
             if seed == 0 {
                 report_bitcoin_script_size(
                     "Constraints",
