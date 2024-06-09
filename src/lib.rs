@@ -22,7 +22,7 @@ pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
 /// Module for the Merkle tree.
-pub mod merkle_tree;
+pub mod merkle_tree_old;
 /// Module for out-of-domain sampling.
 pub mod oods;
 /// Module for PoW.

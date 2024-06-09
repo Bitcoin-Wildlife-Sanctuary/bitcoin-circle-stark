@@ -1,6 +1,6 @@
 use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel, Sha256ChannelGadget};
 use crate::fri::{FriProof, N_QUERIES};
-use crate::merkle_tree::MerkleTreeGadget;
+use crate::merkle_tree_old::MerkleTreeGadget;
 use crate::treepp::*;
 use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;

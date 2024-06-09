@@ -77,7 +77,7 @@ mod test {
     use crate::treepp::*;
     use crate::utils::get_rand_qm31;
     use crate::{
-        merkle_tree::{MerkleTree, MerkleTreeGadget},
+        merkle_tree_old::{MerkleTree, MerkleTreeGadget},
         tests_utils::report::report_bitcoin_script_size,
     };
     use rand::{Rng, SeedableRng};

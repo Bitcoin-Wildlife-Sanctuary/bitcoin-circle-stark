@@ -1,5 +1,5 @@
 use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel};
-use crate::merkle_tree::{MerkleTree, MerkleTreeProof};
+use crate::merkle_tree_old::{MerkleTree, MerkleTreeProof};
 use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
 use crate::utils::get_twiddles;
 use stwo_prover::core::channel::Channel;

@@ -142,7 +142,7 @@ impl Pushable for &MerkleTreeProof {
 
 #[cfg(test)]
 mod test {
-    use crate::merkle_tree::MerkleTree;
+    use crate::merkle_tree_old::MerkleTree;
     use crate::utils::get_rand_qm31;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;

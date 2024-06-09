@@ -274,9 +274,34 @@ pub fn verify_with_hints(
 
     let (queries, queries_hints) =
         Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
-    let positions = get_opening_positions(&queries, &column_log_sizes);
+    let fri_query_domains = get_opening_positions(&queries, &column_log_sizes);
 
-    let _ = positions;
+    // Verify merkle decommitments.
+    commitment_scheme
+        .trees
+        .as_ref()
+        .zip(proof.commitment_scheme_proof.decommitments)
+        .zip(proof.commitment_scheme_proof.queried_values.clone())
+        .map(|((tree, decommitment), queried_values)| {
+            let queries = fri_query_domains
+                .iter()
+                .map(|(&log_size, domain)| {
+                    let mut points = domain.flatten();
+                    points.sort();
+                    (log_size, points)
+                })
+                .collect();
+            println!("{:?}", tree.column_log_sizes);
+            println!("{:?}", queries);
+            println!("{:?}", queried_values);
+            println!("{:?}", decommitment.hash_witness.len());
+            println!("{:?}", decommitment.column_witness.len());
+            tree.verify(queries, queried_values, decommitment)
+        })
+        .0
+        .into_iter()
+        .collect::<Result<_, _>>()?;
+
     let _ = column_log_sizes;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
