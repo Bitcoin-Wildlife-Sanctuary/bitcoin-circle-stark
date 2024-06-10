@@ -28,10 +28,10 @@ pub mod merkle_tree_old;
 pub mod oods;
 /// Module for PoW.
 pub mod pow;
+/// Module for the precomputed data Merkle tree.
+pub mod precomputed_merkle_tree;
 /// Module for test utils.
 pub mod tests_utils;
-/// Module for the twiddle Merkle tree.
-pub mod twiddle_merkle_tree;
 /// Module for utility functions.
 pub mod utils;
 
@@ -93,11 +93,11 @@ pub(crate) fn OP_HINT() -> treepp::Script {
 mod test {
     use crate::channel::Sha256Channel;
     use crate::fri;
+    use crate::precomputed_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::treepp::{
         pushable::{Builder, Pushable},
         *,
     };
-    use crate::twiddle_merkle_tree::TWIDDLE_MERKLE_TREE_ROOT_4;
     use crate::utils::{get_rand_qm31, permute_eval};
     use num_traits::One;
     use rand::{Rng, RngCore, SeedableRng};

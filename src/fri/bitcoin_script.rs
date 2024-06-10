@@ -1,8 +1,8 @@
 use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel, Sha256ChannelGadget};
 use crate::fri::{FriProof, N_QUERIES};
 use crate::merkle_tree_old::MerkleTreeGadget;
+use crate::precomputed_merkle_tree::PrecomputedMerkleTreeGadget;
 use crate::treepp::*;
-use crate::twiddle_merkle_tree::TwiddleMerkleTreeGadget;
 use crate::utils::copy_to_altstack_top_item_first_in;
 use crate::utils::{limb_to_be_bits, limb_to_be_bits_toaltstack};
 use rust_bitcoin_m31::{
@@ -95,7 +95,7 @@ impl FRIGadget {
             for _ in 0..N_QUERIES {
                 { twiddle_merkle_tree_root.to_vec() }
                 OP_FROMALTSTACK
-                { TwiddleMerkleTreeGadget::query_and_verify(logn) }
+                { PrecomputedMerkleTreeGadget::query_and_verify(logn) }
             }
         }
     }
@@ -263,9 +263,9 @@ mod test {
     use crate::channel::{ChannelWithHint, Sha256Channel};
     use crate::fri;
     use crate::fri::{FFTGadget, FRIGadget, N_QUERIES};
+    use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TWIDDLE_MERKLE_TREE_ROOT_18};
     use crate::utils::{get_rand_qm31, permute_eval};
     use bitcoin_scriptexec::execute_script_with_witness_unlimited_stack;
     use num_traits::One;
@@ -314,7 +314,7 @@ mod test {
         let expected = {
             let mut expected = vec![];
 
-            let twiddle_tree = TwiddleMerkleTree::new(logn - 1);
+            let twiddle_tree = PrecomputedMerkleTree::new(logn - 1);
 
             for query in queries.iter() {
                 expected.extend_from_slice(&twiddle_tree.query(*query).elements);
@@ -527,7 +527,7 @@ mod test {
         let expected_twiddle_tree = {
             let mut expected = vec![];
 
-            let twiddle_tree = TwiddleMerkleTree::new(logn - 1);
+            let twiddle_tree = PrecomputedMerkleTree::new(logn - 1);
 
             for query in expected_fiat_shamir.1.iter() {
                 expected.extend_from_slice(&twiddle_tree.query(*query).elements);

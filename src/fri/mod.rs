@@ -1,6 +1,6 @@
 use crate::channel::{ChannelWithHint, DrawHints, Sha256Channel};
 use crate::merkle_tree_old::{MerkleTree, MerkleTreeProof};
-use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeProof};
+use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, TwiddleMerkleTreeProof};
 use crate::utils::get_twiddles;
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fft::ibutterfly;
@@ -97,7 +97,7 @@ pub fn fri_prove(channel: &mut Sha256Channel, evaluation: Vec<QM31>) -> FriProof
     let mut merkle_proofs = Vec::with_capacity(N_QUERIES);
     let mut twiddle_merkle_proofs = Vec::with_capacity(N_QUERIES);
 
-    let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);
+    let twiddle_merkle_tree = PrecomputedMerkleTree::new(n_layers);
 
     for mut query in queries {
         leaves.push(layers[0][query]);
@@ -150,7 +150,7 @@ pub fn fri_verify(
                 .zip(proof.twiddle_merkle_proofs.iter()),
         )
     {
-        assert!(TwiddleMerkleTree::verify(
+        assert!(PrecomputedMerkleTree::verify(
             twiddle_merkle_tree_root,
             logn - 1,
             twiddle_merkle_tree_proof,

@@ -1,10 +1,10 @@
 use crate::treepp::*;
 use crate::utils::limb_to_le_bits;
 
-/// Gadget for verifying a Merkle tree path in a twiddle tree.
-pub struct TwiddleMerkleTreeGadget;
+/// Gadget for verifying a Merkle tree path in a precomputed data tree.
+pub struct PrecomputedMerkleTreeGadget;
 
-impl TwiddleMerkleTreeGadget {
+impl PrecomputedMerkleTreeGadget {
     /// Query the twiddle tree on a point and verify the Merkle tree proof (as a hint).
     ///
     /// hint:
@@ -80,8 +80,8 @@ impl TwiddleMerkleTreeGadget {
 
 #[cfg(test)]
 mod test {
+    use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeGadget};
     use crate::treepp::*;
-    use crate::twiddle_merkle_tree::{TwiddleMerkleTree, TwiddleMerkleTreeGadget};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
@@ -90,12 +90,12 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for logn in 12..=20 {
-            let verify_script = TwiddleMerkleTreeGadget::query_and_verify(logn);
+            let verify_script = PrecomputedMerkleTreeGadget::query_and_verify(logn);
             println!("TMT.verify(2^{}) = {} bytes", logn, verify_script.len());
 
             let n_layers = logn - 1;
 
-            let twiddle_merkle_tree = TwiddleMerkleTree::new(n_layers);
+            let twiddle_merkle_tree = PrecomputedMerkleTree::new(n_layers);
 
             let mut pos: u32 = prng.gen();
             pos &= (1 << logn) - 1;
