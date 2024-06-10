@@ -5,6 +5,7 @@
 
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::circle::CirclePoint;
+use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
@@ -46,6 +47,14 @@ pub(crate) mod treepp {
 impl Pushable for M31 {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
         self.0.bitcoin_script_push(builder)
+    }
+}
+
+impl Pushable for CM31 {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.1.bitcoin_script_push(builder);
+        builder = self.0.bitcoin_script_push(builder);
+        builder
     }
 }
 
