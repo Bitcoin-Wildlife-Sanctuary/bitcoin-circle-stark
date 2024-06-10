@@ -72,7 +72,7 @@ impl ConstraintsGadget {
     ///   * exclude0.y.1 (2 elements)
     ///   * exclude0.y.0 (2 elements)
     /// - z.x (1 element)
-    /// - z.y (1 eleemnt)
+    /// - z.y (1 element)
     ///
     /// Output:
     /// - qm31
