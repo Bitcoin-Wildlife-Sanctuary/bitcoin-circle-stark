@@ -238,13 +238,13 @@ mod test {
     #[test]
     fn test_column_line_coeffs_single() {
         const LOG_SIZE: u32 = 7;
-        let polynomial = CpuCirclePoly::new((0..1 << LOG_SIZE).map(|i| M31(i)).collect());
-        let point = SECURE_FIELD_CIRCLE_GEN;
-        let value = polynomial.eval_at_point(point);
+        let polynomial = CpuCirclePoly::new((0..1 << LOG_SIZE).map(M31).collect());
+        let sample_point = SECURE_FIELD_CIRCLE_GEN;
+        let value = polynomial.eval_at_point(sample_point);
 
         let samples = vec![super::ColumnSampleBatch {
-            point: point.clone(),
-            columns_and_values: vec![(0 as usize, value)],
+            point: sample_point,
+            columns_and_values: vec![(0_usize, value)],
         }];
         let mut prng = ChaCha20Rng::seed_from_u64(0);
         let random_coeff = get_rand_qm31(&mut prng);
@@ -285,12 +285,12 @@ mod test {
             .map(|_| {
                 let mut prng = ChaCha20Rng::seed_from_u64(6u64);
                 let scalar: u32 = prng.gen();
-                let point = generator.mul(scalar as u128);
+                let sample_point = generator.mul(scalar as u128);
                 let column_values = (0..num_columns)
                     .map(|i| (i as usize, get_rand_qm31(&mut prng)))
                     .collect_vec();
                 super::ColumnSampleBatch {
-                    point: point,
+                    point: sample_point,
                     columns_and_values: column_values,
                 }
             })
