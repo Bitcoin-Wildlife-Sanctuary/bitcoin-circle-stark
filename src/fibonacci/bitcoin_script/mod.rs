@@ -5,7 +5,9 @@ use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
 use crate::{treepp::*, OP_HINT};
-use rust_bitcoin_m31::{qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom};
+use rust_bitcoin_m31::{
+    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over,
+};
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
@@ -73,8 +75,8 @@ impl FibonacciVerifierGadget {
             { qm31_copy(4) } OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
             { qm31_copy(3) } OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
             { qm31_copy(2) } OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
-            { qm31_copy(1) } OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
-            { qm31_copy(0) } OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
+            qm31_over OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
+            qm31_dup OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
 
             // stack:
             //    c1, random_coeff (4), c2, oods point (8),

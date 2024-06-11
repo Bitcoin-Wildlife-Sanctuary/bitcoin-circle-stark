@@ -1,7 +1,7 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
     m31_double, m31_neg, push_m31_zero, push_qm31_one, qm31_add, qm31_complex_conjugate, qm31_copy,
-    qm31_drop, qm31_mul, qm31_roll, qm31_sub, qm31_swap,
+    qm31_drop, qm31_dup, qm31_mul, qm31_over, qm31_roll, qm31_sub, qm31_swap,
 };
 use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
 use stwo_prover::core::{
@@ -9,7 +9,7 @@ use stwo_prover::core::{
     fields::qm31::{SecureField, QM31},
 };
 
-/// Gadget for constraints over the circle curve
+/// Gadget for constraints over the circle curve.
 pub struct ConstraintsGadget;
 
 impl ConstraintsGadget {
@@ -38,12 +38,12 @@ impl ConstraintsGadget {
 
                     // let a = sample.value.complex_conjugate() - sample.value;
                     { *sampled_value }
-                    { qm31_copy(0) }
+                    qm31_dup
                     qm31_complex_conjugate
-                    { qm31_roll(1) }
+                    qm31_swap
                     qm31_sub
                     // [alpha^i, a]
-                    { qm31_copy(1) }
+                    qm31_over
                     qm31_mul
                     // [alpha^i, alpha^i * a]
 
@@ -61,7 +61,7 @@ impl ConstraintsGadget {
                     // [alpha^i, alpha^i * a, alpha^i * c]
 
                     // let b = sample.value * c - a * sample.point.y;
-                    { qm31_copy(0) }
+                    qm31_dup
                     { *sampled_value }
                     qm31_mul
                     { qm31_copy(2) }
@@ -70,7 +70,7 @@ impl ConstraintsGadget {
                     qm31_sub
                     // [alpha^i, alpha^i * a, alpha^i * c, alpha^i * b]
 
-                    { qm31_roll(1) }
+                    qm31_swap
                     { qm31_roll(3) }
                     // [alpha^i * a, alpha^i * b, alpha^i * c, alpha^i]
                 }
@@ -141,7 +141,7 @@ mod test {
     use itertools::Itertools;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_m31::qm31_equalverify;
+    use rust_bitcoin_m31::{qm31_equalverify, qm31_roll, qm31_rot};
     use stwo_prover::core::backend::cpu::quotients::column_line_coeffs;
     use stwo_prover::core::backend::cpu::CpuCirclePoly;
     use stwo_prover::core::circle::SECURE_FIELD_CIRCLE_GEN;
@@ -255,13 +255,13 @@ mod test {
                     { hints[i][j].0 }
                     { hints[i][j].1 }
                     { hints[i][j].2 }
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
-                    { super::qm31_roll(3) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
+                    { qm31_roll(3) }
                     qm31_equalverify
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
-                    { super::qm31_roll(2) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
+                    qm31_rot
                     qm31_equalverify
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
                     qm31_equalverify
                 }
             }
@@ -305,13 +305,13 @@ mod test {
                     { hints[i][j].0 }
                     { hints[i][j].1 }
                     { hints[i][j].2 }
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
-                    { super::qm31_roll(3) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
+                    { qm31_roll(3) }
                     qm31_equalverify
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
-                    { super::qm31_roll(2) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
+                    qm31_rot
                     qm31_equalverify
-                    { super::qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
                     qm31_equalverify
                 }
             }

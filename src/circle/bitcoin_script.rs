@@ -22,6 +22,7 @@ impl CirclePointGadget {
     /// Output:
     /// - qm31 x'
     /// - qm31 y'
+    ///
     pub fn complex_conjugate() -> Script {
         script! {
             qm31_complex_conjugate
