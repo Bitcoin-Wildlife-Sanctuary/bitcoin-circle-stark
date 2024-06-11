@@ -3,7 +3,8 @@ use crate::{
     treepp::*,
 };
 use rust_bitcoin_m31::{
-    push_qm31_one, qm31_add, qm31_copy, qm31_drop, qm31_mul, qm31_roll, qm31_sub, qm31_swap,
+    m31_double, m31_neg, push_m31_zero, push_qm31_one, qm31_add, qm31_copy, qm31_drop, qm31_mul,
+    qm31_roll, qm31_sub, qm31_swap,
 };
 use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
 use stwo_prover::core::{
@@ -35,50 +36,48 @@ impl ConstraintsGadget {
                 for (_, sampled_value) in sample_batch.columns_and_values.iter() {
                     // update alpha, alpha^{i - 1} *= random_coeff
                     { random_coeff }
-                    { qm31_mul() }
+                    qm31_mul
                     // [alpha^i]
 
                     // let a = sample.value.complex_conjugate() - sample.value;
                     { *sampled_value }
                     { qm31_copy(0) }
-                    { qm31_complex_conjugate() }
+                    qm31_complex_conjugate
                     { qm31_roll(1) }
-                    { qm31_sub() }
+                    qm31_sub
                     // [alpha^i, a]
                     { qm31_copy(1) }
-                    { qm31_mul() }
+                    qm31_mul
                     // [alpha^i, alpha^i * a]
 
-                    // let c = sample.point.complex_conjugate().y - sample.point.y;
-                    { sample_batch.point.x }
-                    { sample_batch.point.y }
-                    { CirclePointGadget::complex_conjugate() }
-                    { qm31_roll(1) }
-                    { qm31_drop() }
-                    { sample_batch.point.y }
-                    { qm31_sub() }
+                    { sample_batch.point.y.1.1 }
+                    m31_double
+                    m31_neg
+                    { sample_batch.point.y.1.0 }
+                    m31_double
+                    m31_neg
+                    push_m31_zero
+                    push_m31_zero
                     // [alpha^i, alpha^i * a, c]
                     { qm31_copy(2) }
-                    { qm31_mul() }
+                    qm31_mul
                     // [alpha^i, alpha^i * a, alpha^i * c]
 
                     // let b = sample.value * c - a * sample.point.y;
                     { qm31_copy(0) }
                     { *sampled_value }
-                    { qm31_mul() }
+                    qm31_mul
                     { qm31_copy(2) }
                     { sample_batch.point.y }
-                    { qm31_mul() }
-                    { qm31_sub() }
-                    // { qm31_copy(3) }
-                    // { qm31_mul() }
+                    qm31_mul
+                    qm31_sub
                     // [alpha^i, alpha^i * a, alpha^i * c, alpha^i * b]
 
                     { qm31_roll(1) }
                     { qm31_roll(3) }
                     // [alpha^i * a, alpha^i * b, alpha^i * c, alpha^i]
                 }
-                { qm31_drop() }
+                qm31_drop
                 // [(alpha^n * a, alpha^n * c, alpha^i * b)]
             }
         }

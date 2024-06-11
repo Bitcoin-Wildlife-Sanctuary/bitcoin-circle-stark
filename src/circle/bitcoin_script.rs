@@ -18,17 +18,12 @@ use stwo_prover::core::fields::qm31::QM31;
 pub fn qm31_complex_conjugate() -> Script {
     script! {
         // !!!reversed order
-        // 1 OP_ROLL
-        // { m31_neg() }
-        // 1 OP_ROLL
-        // { m31_neg() }
-
-        { 3 } OP_ROLL
-        { m31_neg() }
-        { 3 } OP_ROLL
-        { m31_neg() }
-        { 3 } OP_ROLL
-        { 3 } OP_ROLL
+        3 OP_ROLL
+        m31_neg
+        3 OP_ROLL
+        m31_neg
+        3 OP_ROLL
+        3 OP_ROLL
     }
 }
 
@@ -47,9 +42,9 @@ impl CirclePointGadget {
     pub fn complex_conjugate() -> Script {
         script! {
             { qm31_roll(1) }
-            { qm31_complex_conjugate() }
+            qm31_complex_conjugate
             { qm31_roll(1) }
-            { qm31_complex_conjugate() }
+            qm31_complex_conjugate
         }
     }
 
