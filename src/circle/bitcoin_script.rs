@@ -1,6 +1,6 @@
 use crate::treepp::*;
 use rust_bitcoin_m31::{
-    push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_from_bottom,
+    m31_neg, push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_from_bottom,
     qm31_fromaltstack, qm31_mul, qm31_mul_by_constant, qm31_mul_m31_by_constant, qm31_roll,
     qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
 };
@@ -8,10 +8,51 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
+/// complex conjugation of qm31
+///
+/// input:
+/// d, c, b, a
+///
+/// output:
+/// -d, -c, b, a
+pub fn qm31_complex_conjugate() -> Script {
+    script! {
+        // !!!reversed order
+        // 1 OP_ROLL
+        // { m31_neg() }
+        // 1 OP_ROLL
+        // { m31_neg() }
+
+        { 3 } OP_ROLL
+        { m31_neg() }
+        { 3 } OP_ROLL
+        { m31_neg() }
+        { 3 } OP_ROLL
+        { 3 } OP_ROLL
+    }
+}
+
 /// Gadget for points on the circle curve in the qm31 field.
 pub struct CirclePointGadget;
 
 impl CirclePointGadget {
+    /// conjugate circle point
+    /// input:
+    /// x: QM31
+    /// y: QM31
+    ///
+    /// output:
+    /// x': QM31
+    /// y': QM31
+    pub fn complex_conjugate() -> Script {
+        script! {
+            { qm31_roll(1) }
+            { qm31_complex_conjugate() }
+            { qm31_roll(1) }
+            { qm31_complex_conjugate() }
+        }
+    }
+
     /// Duplicate the circle point
     pub fn dup() -> Script {
         script! {
@@ -245,7 +286,7 @@ mod test {
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::{Field, FieldExpOps};
+    use stwo_prover::core::fields::{ComplexConjugate, Field, FieldExpOps};
 
     use crate::circle::CirclePointGadget;
     use crate::utils::get_rand_qm31;
@@ -395,5 +436,41 @@ mod test {
             let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
+    }
+
+    #[test]
+    fn test_qm31_complex_conjugate() {
+        let complex_conjugate_script = super::qm31_complex_conjugate();
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        let a = get_rand_qm31(&mut prng);
+        let script = script! {
+            { a }
+            { complex_conjugate_script.clone() }
+            { a.complex_conjugate() }
+            qm31_equalverify
+            OP_TRUE
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
+    }
+
+    #[test]
+    fn test_circle_complex_conjugate() {
+        let complex_conjugate_script = CirclePointGadget::complex_conjugate();
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        let a = CirclePoint {
+            x: get_rand_qm31(&mut prng),
+            y: get_rand_qm31(&mut prng),
+        };
+        let script = script! {
+            { a.x }
+            { a.y }
+            { complex_conjugate_script.clone() }
+            { a.complex_conjugate() }
+            { CirclePointGadget::equalverify() }
+            OP_TRUE
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }
