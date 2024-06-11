@@ -1,10 +1,7 @@
-use crate::{
-    circle::{qm31_complex_conjugate, CirclePointGadget},
-    treepp::*,
-};
+use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    m31_double, m31_neg, push_m31_zero, push_qm31_one, qm31_add, qm31_copy, qm31_drop, qm31_mul,
-    qm31_roll, qm31_sub, qm31_swap,
+    m31_double, m31_neg, push_m31_zero, push_qm31_one, qm31_add, qm31_complex_conjugate, qm31_copy,
+    qm31_drop, qm31_mul, qm31_roll, qm31_sub, qm31_swap,
 };
 use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
 use stwo_prover::core::{
