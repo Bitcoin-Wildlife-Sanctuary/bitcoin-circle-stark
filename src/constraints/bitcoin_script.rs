@@ -222,7 +222,7 @@ mod test {
     use stwo_prover::core::circle::{CirclePoint, Coset};
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::{ComplexConjugate, FieldExpOps};
+    use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
     fn test_coset_vanishing() {
@@ -358,7 +358,7 @@ mod test {
                 let scalar: u32 = prng.gen();
                 let sample_point = generator.mul(scalar as u128);
                 let column_values = (0..num_columns)
-                    .map(|i| (i as usize, get_rand_qm31(&mut prng)))
+                    .map(|i| (i, get_rand_qm31(&mut prng)))
                     .collect_vec();
                 super::ColumnSampleBatch {
                     point: sample_point,
@@ -396,8 +396,8 @@ mod test {
 
     #[test]
     fn test_column_line_coeffs_new() {
-        let num_points = 1 as usize;
-        let num_columns = 1 as usize;
+        let num_points = 1_usize;
+        let num_columns = 1_usize;
         let generator = SECURE_FIELD_CIRCLE_GEN;
 
         let samples = (0..num_points)
@@ -406,7 +406,7 @@ mod test {
                 let scalar: u32 = prng.gen();
                 let sample_point = generator.mul(scalar as u128);
                 let column_values = (0..num_columns)
-                    .map(|i| (i as usize, get_rand_qm31(&mut prng)))
+                    .map(|i| (i, get_rand_qm31(&mut prng)))
                     .collect_vec();
                 super::ColumnSampleBatch {
                     point: sample_point,
