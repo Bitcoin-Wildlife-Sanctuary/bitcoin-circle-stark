@@ -1,12 +1,11 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    m31_double, m31_neg, push_m31_zero, push_qm31_one, qm31_add, qm31_complex_conjugate, qm31_copy,
-    qm31_drop, qm31_dup, qm31_from_bottom, qm31_mul, qm31_over, qm31_roll, qm31_sub, qm31_swap,
+    m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_from_bottom,
+    qm31_mul, qm31_roll, qm31_sub, qm31_swap,
 };
-use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
 use stwo_prover::core::{
     circle::{CirclePoint, Coset},
-    fields::qm31::{SecureField, QM31},
+    fields::qm31::QM31,
 };
 
 /// Gadget for constraints over the circle curve.
@@ -19,7 +18,7 @@ impl ConstraintsGadget {
     ///
     /// output:
     /// [(`alpha_0 * a`, `alpha_0 * b`, `alpha_0 * c`), (`alpha_1 * a`, `alpha_1 * b`, `alpha_1 * c`), ...]
-    pub fn column_line_coeffs_new(num_points: usize, num_columns: usize) -> Script {
+    pub fn column_line_coeffs(num_points: usize, num_columns: usize) -> Script {
         script! {
             for i in 0..num_points {
                 for j in 0..num_columns {
@@ -29,45 +28,45 @@ impl ConstraintsGadget {
 
                     // let a = sample.value.complex_conjugate() - sample.value;
                     // copy imagic part of sample value, 3 is imagic offset
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3) * 4 + 3 } OP_PICK
+                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3) * 4 + 3 } OP_PICK
                     m31_double
                     m31_neg
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3) * 4 + 3 } OP_PICK
+                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3) * 4 + 3 } OP_PICK
                     m31_double
                     m31_neg
                     push_m31_zero
                     push_m31_zero
                     // [..., a]
                     // copy alpha_j, 1 denotes the incremental a
-                    { qm31_copy((num_points - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3 + 1) }
+                    { qm31_copy((num_points - i) * (num_columns + 1) - j + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 1) }
                     qm31_mul
                     // [..., alpha_j * a]
 
                     // let c = sample.point.complex_conjugate().y - sample.point.y;
                     // copy imagic part of sample point y, 3 denotes imagic offset, 4 denotes the incremental a
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + j * 3 + 1) * 4 + 3} OP_PICK
+                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + (i * num_columns + j) * 3 + 1) * 4 + 3} OP_PICK
                     m31_double
                     m31_neg
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + j * 3 + 1) * 4 + 3 } OP_PICK
+                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + (i * num_columns + j) * 3 + 1) * 4 + 3 } OP_PICK
                     m31_double
                     m31_neg
                     push_m31_zero
                     push_m31_zero
                     // [..., alpha_j * a, c]
                     // copy alpha_j, 2 denotes the incremental a, c
-                    { qm31_copy((num_points - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3 + 2) }
+                    { qm31_copy((num_points - i) * (num_columns + 1) - j + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 2) }
                     qm31_mul
                     // [..., alpha_j * a, alpha_j * c]
 
                     // let b = sample.value * c - a * sample.point.y;
                     // copy sample value, 2 denote the incremental a, c
                     qm31_dup
-                    { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3 + 3) }
+                    { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
                     qm31_mul
                     if j == num_columns - 1 {
-                        { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3 + 3) }
+                        { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
                     } else {
-                        { qm31_copy((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + j * 3 + 3) }
+                        { qm31_copy((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
                     }
                     { qm31_copy(3) }
                     qm31_mul
@@ -82,74 +81,6 @@ impl ConstraintsGadget {
             for _ in 0..num_columns {
                 qm31_from_bottom
                 qm31_drop
-            }
-        }
-    }
-
-    /// Precompute the complex conjugate line coefficients for each column in each sample batch
-    ///
-    /// input:
-    /// p: (QM31, QM31)
-    /// F(p): QM31
-    /// alpha: QM31
-    ///
-    /// output:
-    /// [(`alpha^0 * a`, `alpha^0 * b`, `alpha^0 * c`), (`alpha^1 * a`, `alpha^1 * b`, `alpha^1 * c`), ...]
-    pub fn column_line_coeffs(
-        sample_batches: &[ColumnSampleBatch],
-        random_coeff: SecureField,
-    ) -> Script {
-        script! {
-            for sample_batch in sample_batches.iter() {
-                // alpha
-                { push_qm31_one() }
-                for (_, sampled_value) in sample_batch.columns_and_values.iter() {
-                    // update alpha, alpha^{i - 1} *= random_coeff
-                    { random_coeff }
-                    qm31_mul
-                    // [alpha^i]
-
-                    // let a = sample.value.complex_conjugate() - sample.value;
-                    { *sampled_value }
-                    qm31_dup
-                    qm31_complex_conjugate
-                    qm31_swap
-                    qm31_sub
-                    // [alpha^i, a]
-                    qm31_over
-                    qm31_mul
-                    // [alpha^i, alpha^i * a]
-
-                    // let c = sample.point.complex_conjugate().y - sample.point.y;
-                    { sample_batch.point.y.1.1 }
-                    m31_double
-                    m31_neg
-                    { sample_batch.point.y.1.0 }
-                    m31_double
-                    m31_neg
-                    push_m31_zero
-                    push_m31_zero
-                    // [alpha^i, alpha^i * a, c]
-                    { qm31_copy(2) }
-                    qm31_mul
-                    // [alpha^i, alpha^i * a, alpha^i * c]
-
-                    // let b = sample.value * c - a * sample.point.y;
-                    qm31_dup
-                    { *sampled_value }
-                    qm31_mul
-                    { qm31_copy(2) }
-                    { sample_batch.point.y }
-                    qm31_mul
-                    qm31_sub
-                    // [alpha^i, alpha^i * a, alpha^i * c, alpha^i * b]
-
-                    qm31_swap
-                    { qm31_roll(3) }
-                    // [alpha^i * a, alpha^i * b, alpha^i * c, alpha^i]
-                }
-                qm31_drop
-                // [(alpha^n * a, alpha^n * c, alpha^i * b)]
             }
         }
     }
@@ -217,12 +148,11 @@ mod test {
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::{qm31_equalverify, qm31_roll, qm31_rot};
     use stwo_prover::core::backend::cpu::quotients::column_line_coeffs;
-    use stwo_prover::core::backend::cpu::CpuCirclePoly;
     use stwo_prover::core::circle::SECURE_FIELD_CIRCLE_GEN;
     use stwo_prover::core::circle::{CirclePoint, Coset};
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
-    use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::FieldExpOps;
+    use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
 
     #[test]
     fn test_coset_vanishing() {
@@ -307,120 +237,38 @@ mod test {
     }
 
     #[test]
-    fn test_column_line_coeffs_single() {
-        const LOG_SIZE: u32 = 7;
-        let polynomial = CpuCirclePoly::new((0..1 << LOG_SIZE).map(M31).collect());
-        let sample_point = SECURE_FIELD_CIRCLE_GEN;
-        let value = polynomial.eval_at_point(sample_point);
-
-        let samples = vec![super::ColumnSampleBatch {
-            point: sample_point,
-            columns_and_values: vec![(0_usize, value)],
-        }];
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-        let random_coeff = get_rand_qm31(&mut prng);
-        let hints = column_line_coeffs(&samples, random_coeff);
-        let num_points = hints.len();
-        let num_columns = hints[0].len();
-        println!("points {}, columns {}", num_points, num_columns);
-        let script = script! {
-            { ConstraintsGadget::column_line_coeffs(&samples, random_coeff) }
-            for i in 0..num_points {
-                for j in 0..num_columns {
-                    { hints[i][j].0 }
-                    { hints[i][j].1 }
-                    { hints[i][j].2 }
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
-                    { qm31_roll(3) }
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
-                    qm31_rot
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
-                    qm31_equalverify
-                }
-            }
-            OP_TRUE
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-    }
-
-    #[test]
-    fn test_column_line_coeffs_multiple() {
-        let num_points = 4;
-        let num_columns = 6;
+    fn test_column_line_coeffs() {
+        let num_points = 2_usize;
+        let num_columns = 4_usize;
         let generator = SECURE_FIELD_CIRCLE_GEN;
 
+        let mut prng = ChaCha20Rng::seed_from_u64(6u64);
         let samples = (0..num_points)
             .map(|_| {
-                let mut prng = ChaCha20Rng::seed_from_u64(6u64);
                 let scalar: u32 = prng.gen();
                 let sample_point = generator.mul(scalar as u128);
                 let column_values = (0..num_columns)
                     .map(|i| (i, get_rand_qm31(&mut prng)))
                     .collect_vec();
-                super::ColumnSampleBatch {
+                ColumnSampleBatch {
                     point: sample_point,
                     columns_and_values: column_values,
                 }
             })
             .collect_vec();
 
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
-        let random_coeff = get_rand_qm31(&mut prng);
-        let hints = column_line_coeffs(&samples, random_coeff);
-        println!("points {}, columns {}", num_points, num_columns);
-        let script = script! {
-            { ConstraintsGadget::column_line_coeffs(&samples, random_coeff) }
-            for i in 0..num_points {
-                for j in 0..num_columns {
-                    { hints[i][j].0 }
-                    { hints[i][j].1 }
-                    { hints[i][j].2 }
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
-                    { qm31_roll(3) }
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
-                    qm31_rot
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
-                    qm31_equalverify
-                }
-            }
-            OP_TRUE
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-    }
-
-    #[test]
-    fn test_column_line_coeffs_new() {
-        let num_points = 1_usize;
-        let num_columns = 1_usize;
-        let generator = SECURE_FIELD_CIRCLE_GEN;
-
-        let samples = (0..num_points)
-            .map(|_| {
-                let mut prng = ChaCha20Rng::seed_from_u64(6u64);
-                let scalar: u32 = prng.gen();
-                let sample_point = generator.mul(scalar as u128);
-                let column_values = (0..num_columns)
-                    .map(|i| (i, get_rand_qm31(&mut prng)))
-                    .collect_vec();
-                super::ColumnSampleBatch {
-                    point: sample_point,
-                    columns_and_values: column_values,
-                }
-            })
-            .collect_vec();
-
-        let mut prng = ChaCha20Rng::seed_from_u64(0);
         let random_coeff = get_rand_qm31(&mut prng);
         let hints = column_line_coeffs(&samples, random_coeff);
         let alphas = (0..num_columns)
             .map(|i| random_coeff.pow(i as u128 + 1))
             .collect_vec();
+        let column_line_coeffs_script =
+            ConstraintsGadget::column_line_coeffs(num_points, num_columns);
+        report_bitcoin_script_size(
+            "Constraints",
+            "pair_vanishing",
+            column_line_coeffs_script.len(),
+        );
         let script = script! {
             // push alpha_0, alpha_1, alpha_2, alpha_3, ...
             for j in 0..num_columns {
@@ -433,7 +281,7 @@ mod test {
                     { samples[i].columns_and_values[j].1 }
                 }
             }
-            { ConstraintsGadget::column_line_coeffs_new(num_points, num_columns) }
+            { column_line_coeffs_script.clone() }
             for i in 0..num_points {
                 for j in 0..num_columns {
                     { hints[i][j].0 }
