@@ -206,7 +206,7 @@ VC based in San Francisco and Hong Kong. The work receives support from Starkwar
 disclosure, L2IV has also invested into numerous companies active in the Bitcoin ecosystem, but this work is open-source 
 and nonprofit, and is not intended for competition. The code is not investment advice.
 
-Starkware contribtues a portion of the code, including the original Rust FRI implementation (from stwo) and some Bitcoin scripts.
+Starkware contributes a portion of the code, including the original Rust FRI implementation (from stwo) and some Bitcoin scripts.
 
 There are also community members contributing to the code and contributing to the ideas. Bitcoin Wildlife Sanctuary is a 
 public-good project supported by many people. 
