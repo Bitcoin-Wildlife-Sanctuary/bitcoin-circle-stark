@@ -116,19 +116,24 @@ mod test {
     use crate::utils::get_rand_qm31;
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use stwo_prover::core::fields::cm31::CM31;
     use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_pushable() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        // m31
         let m31 = M31::reduce(prng.next_u64());
+        let cm31 = CM31::from_m31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64()));
         let qm31 = get_rand_qm31(&mut prng);
 
         let mut builder = Builder::new();
         builder = m31.bitcoin_script_push(builder);
         assert_eq!(script! { {m31} }.as_bytes(), builder.as_bytes());
+
+        let mut builder = Builder::new();
+        builder = cm31.bitcoin_script_push(builder);
+        assert_eq!(script! { {cm31} }.as_bytes(), builder.as_bytes());
 
         let mut builder = Builder::new();
         builder = qm31.bitcoin_script_push(builder);

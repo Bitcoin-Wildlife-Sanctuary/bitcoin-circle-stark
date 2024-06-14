@@ -116,11 +116,11 @@ mod test {
                 { pos }
                 { verify_script.clone() }
                 for elem in last_layer[(pos | 1) as usize].iter().rev() {
-                    { *elem }
+                    { elem }
                     OP_EQUALVERIFY
                 }
                 for elem in last_layer[pos as usize].iter().rev() {
-                    { *elem }
+                    { elem }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE
