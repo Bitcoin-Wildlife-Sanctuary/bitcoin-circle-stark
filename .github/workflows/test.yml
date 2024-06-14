@@ -21,7 +21,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: dtolnay/rust-toolchain@7ba5d857b13a2c335579877a00c25c134410d383 # nightly
       - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2.7.3
       - run: cargo test -- --nocapture
@@ -41,7 +41,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: dtolnay/rust-toolchain@7ba5d857b13a2c335579877a00c25c134410d383 # nightly
       - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2.7.3
       - run: cargo clippy --all --all-features --all-targets -- -D warnings
@@ -49,7 +49,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: dtolnay/rust-toolchain@7ba5d857b13a2c335579877a00c25c134410d383 # nightly
         with:
           components: rustfmt
@@ -59,7 +59,7 @@ jobs:
   typos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: crate-ci/typos@acbff432fb0e7c8cbb9f032311d8f13927dbaaf3 # v1.22.4
         with:
           files: .
