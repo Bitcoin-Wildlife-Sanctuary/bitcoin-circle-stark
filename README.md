@@ -58,7 +58,7 @@ These performance numbers are obtained from `cargo test -- --nocapture` over com
   * CirclePoint.add_constant_m31_point = ~9235 bytes
   * CirclePoint.add_x_only = 26791 bytes
 - **Constraints on the circle curve over QM31**
-  * Constraints.pair_vanishing = 26932 bytes
+  * Constraints.pair_vanishing_with_constant_m31_points = ~6195 bytes
   * Constraints.coset_vanishing(log_size=5) = 80827 bytes
   * Constraints.coset_vanishing(log_size=6) = 94332 bytes
   * Constraints.coset_vanishing(log_size=7) = 107837 bytes

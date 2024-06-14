@@ -1,79 +1,64 @@
-use sha2::{Digest, Sha256};
-use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
+use stwo_prover::core::vcs::ops::MerkleHasher;
 
 mod bitcoin_script;
 use crate::treepp::pushable::{Builder, Pushable};
-use crate::utils::hash_qm31;
 pub use bitcoin_script::*;
 
 /// A Merkle tree.
 pub struct MerkleTree {
-    /// Leaf layers, consisting of qm31 elements.
-    pub leaf_layer: Vec<QM31>,
+    /// Leaf layers, consisting of m31 elements.
+    pub leaf_layer: Vec<Vec<M31>>,
     /// Intermediate layers.
-    pub intermediate_layers: Vec<Vec<[u8; 32]>>,
+    pub intermediate_layers: Vec<Vec<BWSSha256Hash>>,
     /// Root hash.
     pub root_hash: BWSSha256Hash,
 }
 
 impl MerkleTree {
     /// Create a new Merkle tree.
-    pub fn new(leaf_layer: Vec<QM31>) -> Self {
+    pub fn new(leaf_layer: Vec<Vec<M31>>) -> Self {
         assert!(leaf_layer.len().is_power_of_two());
 
         let mut intermediate_layers = vec![];
         let mut cur = leaf_layer
             .chunks_exact(2)
             .map(|v| {
-                let commit_1 = hash_qm31(&v[0]);
-                let commit_2 = hash_qm31(&v[1]);
+                let commit_1 = BWSSha256MerkleHasher::hash_node(None, &v[0]);
+                let commit_2 = BWSSha256MerkleHasher::hash_node(None, &v[1]);
 
-                let mut hash_result = [0u8; 32];
-
-                let mut hasher = Sha256::new();
-                Digest::update(&mut hasher, commit_1);
-                Digest::update(&mut hasher, commit_2);
-                hash_result.copy_from_slice(hasher.finalize().as_slice());
-                hash_result
+                BWSSha256MerkleHasher::hash_node(Some((commit_1, commit_2)), &[])
             })
-            .collect::<Vec<[u8; 32]>>();
+            .collect::<Vec<BWSSha256Hash>>();
         intermediate_layers.push(cur.clone());
 
         while cur.len() > 1 {
             cur = cur
                 .chunks_exact(2)
-                .map(|v| {
-                    let mut hash_result = [0u8; 32];
-                    let mut hasher = Sha256::new();
-                    Digest::update(&mut hasher, v[0]);
-                    Digest::update(&mut hasher, v[1]);
-                    hash_result.copy_from_slice(hasher.finalize().as_slice());
-                    hash_result
-                })
-                .collect::<Vec<[u8; 32]>>();
+                .map(|v| BWSSha256MerkleHasher::hash_node(Some((v[0], v[1])), &[]))
+                .collect::<Vec<BWSSha256Hash>>();
             intermediate_layers.push(cur.clone());
         }
 
         Self {
             leaf_layer,
             intermediate_layers,
-            root_hash: BWSSha256Hash::from(cur[0].to_vec()),
+            root_hash: cur[0],
         }
     }
 
     /// Query the Merkle tree and generate a corresponding proof.
-    pub fn query(&self, mut pos: usize) -> MerkleTreeProof {
+    pub fn query(&self, mut pos: usize) -> MerkleTreeTwinProof {
         let logn = self.intermediate_layers.len();
+        assert_eq!(pos & 1, 0);
 
-        let mut merkle_tree_proof = MerkleTreeProof {
-            leaf: self.leaf_layer[pos],
+        let mut merkle_tree_proof = MerkleTreeTwinProof {
+            left: self.leaf_layer[pos].clone(),
+            right: self.leaf_layer[pos | 1].clone(),
             ..Default::default()
         };
-        merkle_tree_proof.leaf = self.leaf_layer[pos];
-        merkle_tree_proof
-            .siblings
-            .push(hash_qm31(&self.leaf_layer[pos ^ 1]));
 
         for i in 0..(logn - 1) {
             pos >>= 1;
@@ -86,55 +71,63 @@ impl MerkleTree {
     }
 
     /// Verify a Merkle tree proof.
-    pub fn verify(
+    pub fn verify_twin(
         root_hash: &BWSSha256Hash,
         logn: usize,
-        proof: &MerkleTreeProof,
+        proof: &MerkleTreeTwinProof,
         mut query: usize,
     ) -> bool {
-        assert_eq!(proof.siblings.len(), logn);
+        assert_eq!(proof.siblings.len(), logn - 1);
+        assert_eq!(query & 1, 0);
 
-        let mut leaf_hash = hash_qm31(&proof.leaf);
+        let left_hash = BWSSha256MerkleHasher::hash_node(None, &proof.left);
+        let right_hash = BWSSha256MerkleHasher::hash_node(None, &proof.right);
 
-        for i in 0..logn {
+        let mut leaf_hash = BWSSha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
+        query >>= 1;
+
+        for i in 0..logn - 1 {
             let (f0, f1) = if query & 1 == 0 {
                 (leaf_hash, proof.siblings[i])
             } else {
                 (proof.siblings[i], leaf_hash)
             };
 
-            let mut hasher = Sha256::new();
-            Digest::update(&mut hasher, f0);
-            Digest::update(&mut hasher, f1);
-            leaf_hash.copy_from_slice(hasher.finalize().as_slice());
-
+            leaf_hash = BWSSha256MerkleHasher::hash_node(Some((f0, f1)), &[]);
             query >>= 1;
         }
 
-        leaf_hash == root_hash.as_ref()
+        leaf_hash == *root_hash
     }
 }
 
 /// A Merkle tree proof.
 #[derive(Default, Clone, Debug)]
-pub struct MerkleTreeProof {
-    /// Leaf as a qm31 element.
-    pub leaf: QM31,
+pub struct MerkleTreeTwinProof {
+    /// Leaf as an M31 array.
+    pub left: Vec<M31>,
+    /// Leaf sibling as an M31 array.
+    pub right: Vec<M31>,
     /// All the intermediate sibling nodes.
-    pub siblings: Vec<[u8; 32]>,
+    pub siblings: Vec<BWSSha256Hash>,
 }
 
-impl Pushable for MerkleTreeProof {
+impl Pushable for MerkleTreeTwinProof {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
         (&self).bitcoin_script_push(builder)
     }
 }
 
-impl Pushable for &MerkleTreeProof {
+impl Pushable for &MerkleTreeTwinProof {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = self.leaf.bitcoin_script_push(builder);
+        for v in self.left.iter() {
+            builder = v.bitcoin_script_push(builder);
+        }
+        for v in self.right.iter() {
+            builder = v.bitcoin_script_push(builder);
+        }
         for elem in self.siblings.iter() {
-            builder = elem.to_vec().bitcoin_script_push(builder);
+            builder = elem.bitcoin_script_push(builder);
         }
         builder
     }
@@ -153,16 +146,20 @@ mod test {
 
         let mut last_layer = vec![];
         for _ in 0..1 << 12 {
-            last_layer.push(get_rand_qm31(&mut prng));
+            let a = get_rand_qm31(&mut prng);
+            last_layer.push(a.to_m31_array().to_vec());
         }
 
         let merkle_tree = MerkleTree::new(last_layer.clone());
 
         for _ in 0..10 {
-            let query = (prng.gen::<u32>() % (1 << 12)) as usize;
+            let mut query = (prng.gen::<u32>() % (1 << 12)) as usize;
+            if query & 1 != 0 {
+                query ^= 1;
+            }
 
             let proof = merkle_tree.query(query);
-            assert!(MerkleTree::verify(
+            assert!(MerkleTree::verify_twin(
                 &merkle_tree.root_hash,
                 12,
                 &proof,

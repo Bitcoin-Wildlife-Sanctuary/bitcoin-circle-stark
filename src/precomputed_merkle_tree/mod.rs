@@ -11,8 +11,8 @@ mod constants;
 use crate::treepp::pushable::{Builder, Pushable};
 pub use constants::*;
 
-/// A twiddle Merkle tree.
-pub struct TwiddleMerkleTree {
+/// A precomputed data Merkle tree.
+pub struct PrecomputedMerkleTree {
     /// The inverse of the twiddle factors.
     pub twiddles_inverse: Vec<Vec<M31>>,
     /// Layers, which are compressed through hashes of (left || twiddle factor || right).
@@ -21,8 +21,8 @@ pub struct TwiddleMerkleTree {
     pub root_hash: [u8; 32],
 }
 
-impl TwiddleMerkleTree {
-    /// Construct the twiddle Merkle tree.
+impl PrecomputedMerkleTree {
+    /// Construct the precomputed data Merkle tree.
     pub fn new(logn: usize) -> Self {
         let mut twiddles = get_twiddles(logn + 1).to_vec();
 
@@ -188,7 +188,7 @@ impl Pushable for &TwiddleMerkleTreeProof {
 
 #[cfg(test)]
 mod test {
-    use crate::twiddle_merkle_tree::TwiddleMerkleTree;
+    use crate::precomputed_merkle_tree::PrecomputedMerkleTree;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
@@ -196,13 +196,13 @@ mod test {
     fn test_twiddle_merkle_tree() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let twiddle_merkle_tree = TwiddleMerkleTree::new(20);
+        let twiddle_merkle_tree = PrecomputedMerkleTree::new(20);
 
         for _ in 0..10 {
             let query = (prng.gen::<u32>() % (1 << 21)) as usize;
 
             let proof = twiddle_merkle_tree.query(query);
-            assert!(TwiddleMerkleTree::verify(
+            assert!(PrecomputedMerkleTree::verify(
                 twiddle_merkle_tree.root_hash,
                 20,
                 &proof,

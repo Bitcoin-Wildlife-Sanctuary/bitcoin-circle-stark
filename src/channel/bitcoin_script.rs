@@ -1,5 +1,5 @@
 use crate::treepp::*;
-use crate::utils::{hash_felt_gadget, trim_m31_gadget};
+use crate::utils::{hash_m31_vec_gadget, trim_m31_gadget};
 use rust_bitcoin_m31::MOD;
 
 /// Gadget for a channel.
@@ -31,7 +31,7 @@ impl Sha256ChannelGadget {
     pub fn mix_felt() -> Script {
         script! {
             OP_TOALTSTACK
-            hash_felt_gadget
+            { hash_m31_vec_gadget(4) }
             OP_FROMALTSTACK OP_CAT OP_SHA256
         }
     }
@@ -168,7 +168,7 @@ mod test {
     use crate::channel::{generate_hints, ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::utils::{get_rand_qm31, hash_felt_gadget, hash_qm31};
+    use crate::utils::{get_rand_qm31, hash_m31_vec_gadget, hash_qm31};
     use bitcoin_script::script;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -367,7 +367,7 @@ mod test {
     fn test_hash_felt() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let commit_script = hash_felt_gadget();
+        let commit_script = hash_m31_vec_gadget(4);
         report_bitcoin_script_size("QM31", "hash", commit_script.len());
 
         for _ in 0..100 {
