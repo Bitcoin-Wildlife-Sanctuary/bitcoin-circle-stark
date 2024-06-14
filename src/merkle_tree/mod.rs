@@ -82,12 +82,9 @@ impl MerkleTree {
 
         let left_hash = BWSSha256MerkleHasher::hash_node(None, &proof.left);
         let right_hash = BWSSha256MerkleHasher::hash_node(None, &proof.right);
-        println!("left_hash: {}", left_hash);
-        println!("right_hash: {}", right_hash);
 
         let mut leaf_hash = BWSSha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
         query >>= 1;
-        println!("leaf_hash: {}", leaf_hash);
 
         for i in 0..logn - 1 {
             let (f0, f1) = if query & 1 == 0 {
