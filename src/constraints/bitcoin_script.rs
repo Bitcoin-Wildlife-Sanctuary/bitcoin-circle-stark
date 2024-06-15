@@ -1,8 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
     cm31_add, cm31_double, cm31_fromaltstack, cm31_mul, cm31_mul_m31, cm31_sub, cm31_swap,
-    cm31_toaltstack, m31_add, m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_from_bottom,
-    qm31_mul, qm31_mul_m31_by_constant, qm31_roll, qm31_sub, qm31_swap
+    cm31_toaltstack, m31_add, m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop,
+    qm31_dup, qm31_from_bottom, qm31_mul, qm31_mul_m31_by_constant, qm31_roll, qm31_sub, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -188,14 +188,14 @@ mod test {
     use rust_bitcoin_m31::{qm31_equalverify, qm31_roll, qm31_rot};
     use stwo_prover::core::backend::cpu::quotients::column_line_coeffs;
     use stwo_prover::core::circle::SECURE_FIELD_CIRCLE_GEN;
-    use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
-    use stwo_prover::core::fields::FieldExpOps;
-    use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
     use stwo_prover::core::circle::{
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
+    use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::qm31::QM31;
-    
+    use stwo_prover::core::fields::FieldExpOps;
+    use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
+
     #[test]
     fn test_coset_vanishing() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
@@ -336,7 +336,7 @@ mod test {
         let exec_result = execute_script(script);
         assert!(exec_result.success);
     }
-  
+
     #[test]
     fn test_fast_pair_vanishing() {
         for seed in 0..20 {
