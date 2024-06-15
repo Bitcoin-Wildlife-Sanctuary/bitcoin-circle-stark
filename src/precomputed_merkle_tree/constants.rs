@@ -75,44 +75,44 @@ pub const TWIDDLE_MERKLE_TREE_ROOT_25: [u8; 32] = [
 ];
 #[cfg(test)]
 mod test {
-    use crate::twiddle_merkle_tree::*;
+    use crate::precomputed_merkle_tree::*;
 
     #[test]
     fn test_consistency() {
         // for the testing
         assert_eq!(
-            TwiddleMerkleTree::new(4).root_hash,
+            PrecomputedMerkleTree::new(4).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_4
         );
 
         // unit tests are running until 18.
 
         assert_eq!(
-            TwiddleMerkleTree::new(12).root_hash,
+            PrecomputedMerkleTree::new(12).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_12
         );
         assert_eq!(
-            TwiddleMerkleTree::new(13).root_hash,
+            PrecomputedMerkleTree::new(13).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_13
         );
         assert_eq!(
-            TwiddleMerkleTree::new(14).root_hash,
+            PrecomputedMerkleTree::new(14).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_14
         );
         assert_eq!(
-            TwiddleMerkleTree::new(15).root_hash,
+            PrecomputedMerkleTree::new(15).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_15
         );
         assert_eq!(
-            TwiddleMerkleTree::new(16).root_hash,
+            PrecomputedMerkleTree::new(16).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_16
         );
         assert_eq!(
-            TwiddleMerkleTree::new(17).root_hash,
+            PrecomputedMerkleTree::new(17).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_17
         );
         assert_eq!(
-            TwiddleMerkleTree::new(18).root_hash,
+            PrecomputedMerkleTree::new(18).root_hash,
             TWIDDLE_MERKLE_TREE_ROOT_18
         );
     }

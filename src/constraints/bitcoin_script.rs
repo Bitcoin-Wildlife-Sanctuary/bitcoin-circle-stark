@@ -1,8 +1,10 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_from_bottom,
-    qm31_mul, qm31_roll, qm31_sub, qm31_swap,
+    cm31_add, cm31_double, cm31_fromaltstack, cm31_mul, cm31_mul_m31, cm31_sub, cm31_swap,
+    cm31_toaltstack, m31_add, m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_from_bottom,
+    qm31_mul, qm31_mul_m31_by_constant, qm31_roll, qm31_sub, qm31_swap
 };
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
     circle::{CirclePoint, Coset},
     fields::qm31::QM31,
@@ -85,8 +87,6 @@ impl ConstraintsGadget {
         }
     }
 
-    //TODO: point_vanishing_fraction(). Depends on what format we'll end up needing its output in FRI
-
     /// Evaluates a vanishing polynomial P : CirclePoint -> QM31 of the given coset
     ///
     /// input:
@@ -111,34 +111,73 @@ impl ConstraintsGadget {
 
     /// Evaluates a polynomial P : CirclePoint -> QM31 that vanishes at excluded0 and excluded1
     ///
-    /// input:
-    ///  z.x (QM31)
-    ///  z.y (QM31)
+    /// Input:
+    /// - z.x (QM31)
+    /// - z.y (QM31)
     ///
-    /// output:
-    ///  P(z)
-    pub fn pair_vanishing(excluded0: CirclePoint<QM31>, excluded1: CirclePoint<QM31>) -> Script {
+    /// Output:
+    /// - P(z)
+    pub fn pair_vanishing_with_constant_m31_points(
+        excluded0: CirclePoint<M31>,
+        excluded1: CirclePoint<M31>,
+    ) -> Script {
         script! {
-            { excluded1.x - excluded0.x }
-            qm31_mul    //(excluded1.x - excluded0.x) * z.y
+            { qm31_mul_m31_by_constant((excluded1.x - excluded0.x).0) } // (excluded1.x - excluded0.x) * z.y
 
             qm31_swap
-            { excluded0.y - excluded1.y }
-            qm31_mul    //(excluded0.y - excluded1.y) * z.x
+            { qm31_mul_m31_by_constant((excluded0.y - excluded1.y).0) } // (excluded0.y - excluded1.y) * z.x
 
             qm31_add
             { excluded0.x * excluded1.y - excluded0.y * excluded1.x }
-            qm31_add
-            //(excluded0.y - excluded1.y) * z.x
+            m31_add
+            // (excluded0.y - excluded1.y) * z.x
             //    + (excluded1.x - excluded0.x) * z.y
             //    + (excluded0.x * excluded1.y - excluded0.y * excluded1.x)
+        }
+    }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Input:
+    /// - exclude0
+    ///   * exclude0.x.1 (2 elements)
+    ///   * exclude0.x.0 (2 elements)
+    ///   * exclude0.y.1 (2 elements)
+    ///   * exclude0.y.0 (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - qm31
+    ///
+    pub fn fast_pair_vanishing() -> Script {
+        script! {
+            // copy exclude0.y.1
+            5 OP_PICK 5 OP_PICK
+            // copy p.x
+            3 OP_ROLL
+            cm31_mul_m31
+
+            // copy exclude0.x.1
+            10 OP_PICK 10 OP_PICK
+            // copy p.y
+            4 OP_ROLL
+            cm31_mul_m31
+
+            cm31_sub cm31_toaltstack
+
+            cm31_toaltstack cm31_mul cm31_swap cm31_fromaltstack cm31_mul
+            cm31_swap cm31_sub cm31_fromaltstack cm31_add cm31_double
+
+            { 0 } { 0 }
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-
+    use crate::constraints::fast_pair_vanishing;
     use crate::utils::get_rand_qm31;
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
@@ -149,11 +188,14 @@ mod test {
     use rust_bitcoin_m31::{qm31_equalverify, qm31_roll, qm31_rot};
     use stwo_prover::core::backend::cpu::quotients::column_line_coeffs;
     use stwo_prover::core::circle::SECURE_FIELD_CIRCLE_GEN;
-    use stwo_prover::core::circle::{CirclePoint, Coset};
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::FieldExpOps;
     use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
-
+    use stwo_prover::core::circle::{
+        CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
+    };
+    use stwo_prover::core::fields::qm31::QM31;
+    
     #[test]
     fn test_coset_vanishing() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
@@ -193,28 +235,19 @@ mod test {
     }
 
     #[test]
-    fn test_pair_vanishing() {
+    fn test_pair_vanishing_with_constant_m31_points() {
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
 
-            let z = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let z = CirclePoint::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
 
-            let excluded0 = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let excluded0 = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+            let excluded1 = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
-            let excluded1 = CirclePoint {
-                x: get_rand_qm31(&mut prng),
-                y: get_rand_qm31(&mut prng),
-            };
+            let res = pair_vanishing(excluded0.into_ef(), excluded1.into_ef(), z);
 
-            let res = pair_vanishing(excluded0, excluded1, z);
-
-            let pair_vanishing_script = ConstraintsGadget::pair_vanishing(excluded0, excluded1);
+            let pair_vanishing_script =
+                ConstraintsGadget::pair_vanishing_with_constant_m31_points(excluded0, excluded1);
             if seed == 0 {
                 report_bitcoin_script_size(
                     "Constraints",
@@ -302,5 +335,38 @@ mod test {
         };
         let exec_result = execute_script(script);
         assert!(exec_result.success);
+    }
+  
+    #[test]
+    fn test_fast_pair_vanishing() {
+        for seed in 0..20 {
+            let mut prng = ChaCha20Rng::seed_from_u64(seed);
+
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let res = fast_pair_vanishing(e0, p);
+
+            let pair_vanishing_script = ConstraintsGadget::fast_pair_vanishing();
+            if seed == 0 {
+                report_bitcoin_script_size(
+                    "Constraints",
+                    "fast_pair_vanishing",
+                    pair_vanishing_script.len(),
+                );
+            }
+
+            let script = script! {
+                { e0 }
+                { p.x }
+                { p.y }
+                { pair_vanishing_script.clone() }
+                { res }
+                qm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
     }
 }

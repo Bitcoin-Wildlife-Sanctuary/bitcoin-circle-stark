@@ -43,7 +43,7 @@ fn finalize() {
 /// * `script_size_bytes` - The size of the script in bytes.
 pub fn report_bitcoin_script_size(category: &str, name: &str, script_size_bytes: usize) {
     let mut file = REPORT_FILE.lock().unwrap();
-    println!("{}.{}() = {} bytes", category, name, script_size_bytes);
+    println!("{}.{} = {} bytes", category, name, script_size_bytes);
     writeln!(file, "{},{},{}", category, name, script_size_bytes).unwrap();
 }
 
