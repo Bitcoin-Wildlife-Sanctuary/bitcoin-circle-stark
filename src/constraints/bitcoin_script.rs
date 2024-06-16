@@ -1,8 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_double, cm31_fromaltstack, cm31_mul, cm31_mul_m31, cm31_sub, cm31_swap,
-    cm31_toaltstack, m31_add, m31_double, m31_neg, push_m31_zero, qm31_add, qm31_copy, qm31_drop,
-    qm31_dup, qm31_from_bottom, qm31_mul, qm31_mul_m31_by_constant, qm31_roll, qm31_sub, qm31_swap,
+    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_fromaltstack, cm31_mul, cm31_mul_m31,
+    cm31_neg, cm31_over, cm31_sub, cm31_swap, cm31_toaltstack, m31_add, qm31_add,
+    qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -14,75 +14,59 @@ use stwo_prover::core::{
 pub struct ConstraintsGadget;
 
 impl ConstraintsGadget {
-    /// clear parameters of column_line_coeffs
-    /// stack input:
-    /// [alpha_0, alpha_1, ..., alpha_{n - 1}, p1y, f1(p1), f2(p1), ..., fn(p1), p2y, f1(p2), f2(p2), ..., fn(p2), ..., pmy, f1(pm), f2(pm), ..., fn(pm)]
+    /// Compute the parameters of `column_line_coeffs` without applying alpha.
     ///
-    /// output:
-    /// [(`alpha_0 * a`, `alpha_0 * b`, `alpha_0 * c`), (`alpha_1 * a`, `alpha_1 * b`, `alpha_1 * c`), ...]
-    pub fn column_line_coeffs(num_points: usize, num_columns: usize) -> Script {
+    /// Input:
+    /// - `p.y, f1(p), f2(p), ..., fn(p)`
+    ///
+    /// Output:
+    /// - `c, (a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
+    /// where all of them are cm31 (and it represents the imaginary part rather than the real part).
+    /// where:
+    /// - `ai = conjugate(fi(p)) - fi(p) = -2yi`, aka double-neg of the imaginary part (which is a cm31)
+    /// - `bi = fi(p) * c - a * p.y
+    ///       = fi(p) * (conjugate(p.y) - p.y) - (conjugate(fi(p)) - fi(p)) * p.y
+    ///       = fi(p) * conjugate(p.y) - conjugate(fi(p)) * p.y
+    ///       = (x + yi) * (u - vi) - (x - yi) * (u + vi)
+    ///       = 2(yu - xv)i`, which is also cm31.
+    /// - `c = conjugate(p.y) - p.y = -2vi`, aka double-neg of the imaginary part (which is a cm31)
+    ///
+    pub fn column_line_coeffs(num_columns: usize) -> Script {
+        assert!(num_columns > 0);
         script! {
-            for i in 0..num_points {
-                for j in 0..num_columns {
-                    // index of sample.value: (num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j)
-                    // index of sample.point: (num_points - 1 - i) * (num_columns + 1) + num_columns
-                    // index of alpha: (num_points - i) * (num_columns + 1)
+            // roll p.y
+            { qm31_roll(num_columns) }
 
-                    // let a = sample.value.complex_conjugate() - sample.value;
-                    // copy imagic part of sample value, 3 is imagic offset
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3) * 4 + 3 } OP_PICK
-                    m31_double
-                    m31_neg
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3) * 4 + 3 } OP_PICK
-                    m31_double
-                    m31_neg
-                    push_m31_zero
-                    push_m31_zero
-                    // [..., a]
-                    // copy alpha_j, 1 denotes the incremental a
-                    { qm31_copy((num_points - i) * (num_columns + 1) - j + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 1) }
-                    qm31_mul
-                    // [..., alpha_j * a]
-
-                    // let c = sample.point.complex_conjugate().y - sample.point.y;
-                    // copy imagic part of sample point y, 3 denotes imagic offset, 4 denotes the incremental a
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + (i * num_columns + j) * 3 + 1) * 4 + 3} OP_PICK
-                    m31_double
-                    m31_neg
-                    { ((num_points - 1 - i) * (num_columns + 1) + (num_columns - j) + (i * num_columns + j) * 3 + 1) * 4 + 3 } OP_PICK
-                    m31_double
-                    m31_neg
-                    push_m31_zero
-                    push_m31_zero
-                    // [..., alpha_j * a, c]
-                    // copy alpha_j, 2 denotes the incremental a, c
-                    { qm31_copy((num_points - i) * (num_columns + 1) - j + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 2) }
-                    qm31_mul
-                    // [..., alpha_j * a, alpha_j * c]
-
-                    // let b = sample.value * c - a * sample.point.y;
-                    // copy sample value, 2 denote the incremental a, c
-                    qm31_dup
-                    { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
-                    qm31_mul
-                    if j == num_columns - 1 {
-                        { qm31_roll((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
-                    } else {
-                        { qm31_copy((num_points - 1 - i) * (num_columns + 1) + (num_columns - 1 - j) + (i * num_columns + j) * 3 + 3) }
-                    }
-                    { qm31_copy(3) }
-                    qm31_mul
-                    qm31_sub
-                    // [..., alpha_j * a, alpha_j * c, alpha_j * b]
-
-                    qm31_swap
-                    // [..., alpha_j * a, alpha_j * b, alpha_j * c]
-                }
-            }
-            // drop all alphas
+            // process each column
             for _ in 0..num_columns {
-                qm31_from_bottom
-                qm31_drop
+                qm31_swap
+                // top of the stack:
+                //   c: v cm31
+                //   c: u cm31
+                //   fn(p): y cm31
+                //   fn(p): x cm31
+
+                { cm31_copy(3) }
+
+                cm31_mul cm31_toaltstack
+                cm31_over cm31_over cm31_mul
+                cm31_fromaltstack cm31_sub cm31_double
+                cm31_toaltstack
+
+                cm31_double cm31_neg cm31_toaltstack
+            }
+
+            // stack:
+            //   c
+            //
+            // altstack:
+            //   bn, an, ..., ..., b1, a1
+            cm31_drop
+            cm31_double cm31_neg
+
+            for _ in 0..num_columns {
+                cm31_fromaltstack
+                cm31_fromaltstack
             }
         }
     }
@@ -182,19 +166,16 @@ mod test {
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
-    use itertools::Itertools;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_m31::{qm31_equalverify, qm31_roll, qm31_rot};
-    use stwo_prover::core::backend::cpu::quotients::column_line_coeffs;
-    use stwo_prover::core::circle::SECURE_FIELD_CIRCLE_GEN;
+    use rust_bitcoin_m31::{cm31_equalverify, qm31_equalverify};
+    use std::ops::{Mul, Sub};
     use stwo_prover::core::circle::{
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::FieldExpOps;
-    use stwo_prover::core::pcs::quotients::ColumnSampleBatch;
+    use stwo_prover::core::fields::ComplexConjugate;
 
     #[test]
     fn test_coset_vanishing() {
@@ -270,74 +251,6 @@ mod test {
     }
 
     #[test]
-    fn test_column_line_coeffs() {
-        let num_points = 2_usize;
-        let num_columns = 4_usize;
-        let generator = SECURE_FIELD_CIRCLE_GEN;
-
-        let mut prng = ChaCha20Rng::seed_from_u64(6u64);
-        let samples = (0..num_points)
-            .map(|_| {
-                let scalar: u32 = prng.gen();
-                let sample_point = generator.mul(scalar as u128);
-                let column_values = (0..num_columns)
-                    .map(|i| (i, get_rand_qm31(&mut prng)))
-                    .collect_vec();
-                ColumnSampleBatch {
-                    point: sample_point,
-                    columns_and_values: column_values,
-                }
-            })
-            .collect_vec();
-
-        let random_coeff = get_rand_qm31(&mut prng);
-        let hints = column_line_coeffs(&samples, random_coeff);
-        let alphas = (0..num_columns)
-            .map(|i| random_coeff.pow(i as u128 + 1))
-            .collect_vec();
-        let column_line_coeffs_script =
-            ConstraintsGadget::column_line_coeffs(num_points, num_columns);
-        report_bitcoin_script_size(
-            "Constraints",
-            "pair_vanishing",
-            column_line_coeffs_script.len(),
-        );
-        let script = script! {
-            // push alpha_0, alpha_1, alpha_2, alpha_3, ...
-            for j in 0..num_columns {
-                { alphas[j] }
-            }
-            // push p1_y, f1(p1), f2(p1), ..., fn(p1), p2_y, f1(p2), ..., fn(p2), ..., pm_y, fn(pm)
-            for i in 0..num_points {
-                { samples[i].point.y }
-                for j in 0..num_columns {
-                    { samples[i].columns_and_values[j].1 }
-                }
-            }
-            { column_line_coeffs_script.clone() }
-            for i in 0..num_points {
-                for j in 0..num_columns {
-                    { hints[i][j].0 }
-                    { hints[i][j].1 }
-                    { hints[i][j].2 }
-
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 3 + 2) }
-                    { qm31_roll(3) }
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 2 + 1) }
-                    qm31_rot
-                    qm31_equalverify
-                    { qm31_roll((num_points - 1 - i) * (num_columns * 3) + (num_columns - 1 - j) * 3 + 1) }
-                    qm31_equalverify
-                }
-            }
-            OP_TRUE
-        };
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
-    }
-
-    #[test]
     fn test_fast_pair_vanishing() {
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
@@ -365,6 +278,59 @@ mod test {
                 qm31_equalverify
                 OP_TRUE
             };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_column_line_coeffs() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for column_len in 1..=10 {
+            let point = CirclePoint::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let mut values = vec![];
+            for _ in 0..column_len {
+                values.push(get_rand_qm31(&mut prng));
+            }
+
+            let column_line_coeffs_script = ConstraintsGadget::column_line_coeffs(column_len);
+
+            report_bitcoin_script_size(
+                "Constraints",
+                format!("column_line_coeffs({})", column_len).as_str(),
+                column_line_coeffs_script.len(),
+            );
+
+            let expected = {
+                let mut res = vec![];
+                for value in values.iter() {
+                    let a = value.complex_conjugate().sub(*value);
+                    let c = point.complex_conjugate().y - point.y;
+                    let b = value.mul(c) - a * point.y;
+
+                    res.push((a, b, c));
+                }
+                res
+            };
+
+            let script = script! {
+                { point.y }
+                for value in values.iter() {
+                    { value }
+                }
+                { column_line_coeffs_script.clone() }
+                for elems in expected.iter().rev() {
+                    { elems.1.1 }
+                    cm31_equalverify
+                    { elems.0.1 }
+                    cm31_equalverify
+                }
+                { expected[0].2.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+
             let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
