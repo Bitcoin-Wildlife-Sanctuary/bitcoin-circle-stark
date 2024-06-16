@@ -1,8 +1,9 @@
 use crate::treepp::*;
 use rust_bitcoin_m31::{
-    push_qm31_one, qm31_add, qm31_copy, qm31_double, qm31_equalverify, qm31_from_bottom,
-    qm31_fromaltstack, qm31_mul, qm31_mul_by_constant, qm31_mul_m31_by_constant, qm31_roll,
-    qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
+    push_qm31_one, qm31_add, qm31_complex_conjugate, qm31_copy, qm31_double, qm31_dup,
+    qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul, qm31_mul_by_constant,
+    qm31_mul_m31_by_constant, qm31_over, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap,
+    qm31_toaltstack,
 };
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
@@ -12,11 +13,30 @@ use stwo_prover::core::fields::qm31::QM31;
 pub struct CirclePointGadget;
 
 impl CirclePointGadget {
+    /// Conjugate a circle point
+    ///
+    /// Input:
+    /// - qm31 x
+    /// - qm31 y
+    ///
+    /// Output:
+    /// - qm31 x'
+    /// - qm31 y'
+    ///
+    pub fn complex_conjugate() -> Script {
+        script! {
+            qm31_complex_conjugate
+            qm31_swap
+            qm31_complex_conjugate
+            qm31_swap
+        }
+    }
+
     /// Duplicate the circle point
     pub fn dup() -> Script {
         script! {
-            { qm31_copy(1) }
-            { qm31_copy(1) }
+            qm31_over
+            qm31_over
         }
     }
 
@@ -48,10 +68,10 @@ impl CirclePointGadget {
     pub fn add_x_only() -> Script {
         script! {
             { qm31_roll(3) }
-            { qm31_roll(2) }
+            qm31_rot
             qm31_mul
-            { qm31_roll(1) }
-            { qm31_roll(2) }
+            qm31_swap
+            qm31_rot
             qm31_mul
             qm31_sub
         }
@@ -85,8 +105,8 @@ impl CirclePointGadget {
             qm31_add
             qm31_mul
             qm31_toaltstack
-            { qm31_copy(1) }
-            { qm31_copy(1) }
+            qm31_over
+            qm31_over
             qm31_add
             qm31_fromaltstack
             qm31_swap
@@ -110,7 +130,7 @@ impl CirclePointGadget {
     pub fn add_constant_point(point: &CirclePoint<QM31>) -> Script {
         script! {
             // compute p.y * q.y
-            { qm31_copy(0) }
+            qm31_dup
             { qm31_mul_by_constant(
                 point.y.1.1.0,
                 point.y.1.0.0,
@@ -120,7 +140,7 @@ impl CirclePointGadget {
             qm31_toaltstack
 
             // compute p.x * q.x
-            { qm31_copy(1) }
+            qm31_over
             { qm31_mul_by_constant(
                 point.x.1.1.0,
                 point.x.1.0.0,
@@ -143,12 +163,12 @@ impl CirclePointGadget {
 
             qm31_fromaltstack
             qm31_swap
-            { qm31_copy(1) }
+            qm31_over
             qm31_sub
 
             qm31_fromaltstack
             qm31_swap
-            { qm31_copy(1) }
+            qm31_over
             qm31_sub
 
             // stack: p.x * q.x, p.y * q.y, p.x * q.y + p.y * q.x
@@ -172,12 +192,12 @@ impl CirclePointGadget {
     pub fn add_constant_m31_point(point: &CirclePoint<M31>) -> Script {
         script! {
             // compute p.y * q.y
-            { qm31_copy(0) }
+            qm31_dup
             { qm31_mul_m31_by_constant(point.y.0) }
             qm31_toaltstack
 
             // compute p.x * q.x
-            { qm31_copy(1) }
+            qm31_over
             { qm31_mul_m31_by_constant(point.x.0) }
             qm31_toaltstack
 
@@ -190,12 +210,12 @@ impl CirclePointGadget {
 
             qm31_fromaltstack
             qm31_swap
-            { qm31_copy(1) }
+            qm31_over
             qm31_sub
 
             qm31_fromaltstack
             qm31_swap
-            { qm31_copy(1) }
+            qm31_over
             qm31_sub
 
             // stack: p.x * q.x, p.y * q.y, p.x * q.y + p.y * q.x
@@ -209,7 +229,7 @@ impl CirclePointGadget {
     /// Fail the execution if the two points are not equal.
     pub fn equalverify() -> Script {
         script! {
-            { qm31_roll(2) }
+            qm31_rot
             qm31_equalverify
             qm31_equalverify
         }
@@ -245,7 +265,7 @@ mod test {
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::{Field, FieldExpOps};
+    use stwo_prover::core::fields::{ComplexConjugate, Field, FieldExpOps};
 
     use crate::circle::CirclePointGadget;
     use crate::utils::get_rand_qm31;
@@ -395,5 +415,31 @@ mod test {
             let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
+    }
+
+    #[test]
+    fn test_circle_complex_conjugate() {
+        let complex_conjugate_script = CirclePointGadget::complex_conjugate();
+        report_bitcoin_script_size(
+            "CirclePoint",
+            "complex_conjugate",
+            complex_conjugate_script.len(),
+        );
+
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+        let a = CirclePoint {
+            x: get_rand_qm31(&mut prng),
+            y: get_rand_qm31(&mut prng),
+        };
+        let script = script! {
+            { a.x }
+            { a.y }
+            { complex_conjugate_script.clone() }
+            { a.complex_conjugate() }
+            { CirclePointGadget::equalverify() }
+            OP_TRUE
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 }

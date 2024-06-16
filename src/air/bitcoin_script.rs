@@ -1,6 +1,6 @@
 use crate::circle::CirclePointGadget;
 use crate::treepp::*;
-use rust_bitcoin_m31::{qm31_add, qm31_roll, qm31_shift_by_i, qm31_shift_by_ij, qm31_shift_by_j};
+use rust_bitcoin_m31::{qm31_add, qm31_shift_by_i, qm31_shift_by_ij, qm31_shift_by_j, qm31_swap};
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::ColumnVec;
 
@@ -52,10 +52,10 @@ impl AirGadget {
     pub fn eval_from_partial_evals() -> Script {
         script! {
             qm31_shift_by_ij
-            { qm31_roll(1) }
+            qm31_swap
             qm31_shift_by_j
             qm31_add
-            { qm31_roll(1) }
+            qm31_swap
             qm31_shift_by_i
             qm31_add
             qm31_add

@@ -3,7 +3,7 @@ use crate::treepp::*;
 use num_traits::One;
 use rust_bitcoin_m31::{
     qm31_add, qm31_copy, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul,
-    qm31_mul_m31, qm31_roll, qm31_rot, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
+    qm31_mul_m31, qm31_over, qm31_rot, qm31_square, qm31_sub, qm31_swap, qm31_toaltstack,
 };
 use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::fields::m31::M31;
@@ -34,8 +34,8 @@ impl FibonacciCompositionGadget {
         let constraint_zero_domain = Coset::subgroup(log_size);
 
         script! {
-            { qm31_copy(1) }
-            { qm31_copy(1) }
+            qm31_over
+            qm31_over
 
             // (fg)^2 + f^2 - fg2,
             // x, y, x, y
@@ -100,7 +100,7 @@ impl FibonacciCompositionGadget {
         script! {
             qm31_dup
             qm31_toaltstack
-            { qm31_roll(1) }
+            qm31_swap
             qm31_toaltstack // stack: f(z), z.y; altstack: z.y, z.x
 
             { (claim - M31::one()) * p.y.inverse() }

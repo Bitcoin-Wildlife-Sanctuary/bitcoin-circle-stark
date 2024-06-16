@@ -1,7 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_double, cm31_fromaltstack, cm31_mul, cm31_mul_m31, cm31_sub, cm31_swap,
-    cm31_toaltstack, m31_add, qm31_add, qm31_mul_m31_by_constant, qm31_swap,
+    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_fromaltstack, cm31_mul, cm31_mul_m31,
+    cm31_neg, cm31_over, cm31_sub, cm31_swap, cm31_toaltstack, m31_add, qm31_add,
+    qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -9,10 +10,67 @@ use stwo_prover::core::{
     fields::qm31::QM31,
 };
 
-/// Gadget for constraints over the circle curve
+/// Gadget for constraints over the circle curve.
 pub struct ConstraintsGadget;
 
 impl ConstraintsGadget {
+    /// Compute the parameters of `column_line_coeffs` without applying alpha.
+    ///
+    /// Input:
+    /// - `p.y, f1(p), f2(p), ..., fn(p)`
+    ///
+    /// Output:
+    /// - `c, (a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
+    /// where all of them are cm31 (and it represents the imaginary part rather than the real part).
+    /// where:
+    /// - `ai = conjugate(fi(p)) - fi(p) = -2yi`, aka double-neg of the imaginary part (which is a cm31)
+    /// - `bi = fi(p) * c - a * p.y
+    ///       = fi(p) * (conjugate(p.y) - p.y) - (conjugate(fi(p)) - fi(p)) * p.y
+    ///       = fi(p) * conjugate(p.y) - conjugate(fi(p)) * p.y
+    ///       = (x + yi) * (u - vi) - (x - yi) * (u + vi)
+    ///       = 2(yu - xv)i`, which is also cm31.
+    /// - `c = conjugate(p.y) - p.y = -2vi`, aka double-neg of the imaginary part (which is a cm31)
+    ///
+    pub fn column_line_coeffs(num_columns: usize) -> Script {
+        assert!(num_columns > 0);
+        script! {
+            // roll p.y
+            { qm31_roll(num_columns) }
+
+            // process each column
+            for _ in 0..num_columns {
+                qm31_swap
+                // top of the stack:
+                //   c: v cm31
+                //   c: u cm31
+                //   fn(p): y cm31
+                //   fn(p): x cm31
+
+                { cm31_copy(3) }
+
+                cm31_mul cm31_toaltstack
+                cm31_over cm31_over cm31_mul
+                cm31_fromaltstack cm31_sub cm31_double
+                cm31_toaltstack
+
+                cm31_double cm31_neg cm31_toaltstack
+            }
+
+            // stack:
+            //   c
+            //
+            // altstack:
+            //   bn, an, ..., ..., b1, a1
+            cm31_drop
+            cm31_double cm31_neg
+
+            for _ in 0..num_columns {
+                cm31_fromaltstack
+                cm31_fromaltstack
+            }
+        }
+    }
+
     /// Evaluates a vanishing polynomial P : CirclePoint -> QM31 of the given coset
     ///
     /// input:
@@ -110,12 +168,14 @@ mod test {
     };
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use rust_bitcoin_m31::qm31_equalverify;
+    use rust_bitcoin_m31::{cm31_equalverify, qm31_equalverify};
+    use std::ops::{Mul, Sub};
     use stwo_prover::core::circle::{
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::fields::ComplexConjugate;
 
     #[test]
     fn test_coset_vanishing() {
@@ -218,6 +278,59 @@ mod test {
                 qm31_equalverify
                 OP_TRUE
             };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_column_line_coeffs() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for column_len in 1..=10 {
+            let point = CirclePoint::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let mut values = vec![];
+            for _ in 0..column_len {
+                values.push(get_rand_qm31(&mut prng));
+            }
+
+            let column_line_coeffs_script = ConstraintsGadget::column_line_coeffs(column_len);
+
+            report_bitcoin_script_size(
+                "Constraints",
+                format!("column_line_coeffs({})", column_len).as_str(),
+                column_line_coeffs_script.len(),
+            );
+
+            let expected = {
+                let mut res = vec![];
+                for value in values.iter() {
+                    let a = value.complex_conjugate().sub(*value);
+                    let c = point.complex_conjugate().y - point.y;
+                    let b = value.mul(c) - a * point.y;
+
+                    res.push((a, b, c));
+                }
+                res
+            };
+
+            let script = script! {
+                { point.y }
+                for value in values.iter() {
+                    { value }
+                }
+                { column_line_coeffs_script.clone() }
+                for elems in expected.iter().rev() {
+                    { elems.1.1 }
+                    cm31_equalverify
+                    { elems.0.1 }
+                    cm31_equalverify
+                }
+                { expected[0].2.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+
             let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
