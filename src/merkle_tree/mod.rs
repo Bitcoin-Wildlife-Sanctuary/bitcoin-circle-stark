@@ -184,6 +184,7 @@ impl MerkleTreeTwinProof {
         let mut positions = queries_parents.to_vec();
         positions.sort_unstable();
 
+        // create the intermediate layers
         for i in 0..(logn - 1) {
             let mut layer = HashMap::new();
             let mut parents = BTreeSet::new();
@@ -212,6 +213,7 @@ impl MerkleTreeTwinProof {
 
         assert_eq!(hash_iterator.next(), None);
 
+        // cheery-pick the Merkle tree paths to construct the deterministic proofs
         let mut res = vec![];
         for &queries_parent in queries_parents.iter() {
             let mut siblings = vec![];
