@@ -139,8 +139,8 @@ impl MerkleTreeTwinProof {
     /// Convert a stwo Merkle proof into twin proofs for each pairs of queries.
     pub fn from_stwo_proof(
         logn: usize,
-        queries_parents: &Vec<usize>,
-        values: &Vec<Vec<BaseField>>,
+        queries_parents: &[usize],
+        values: &[Vec<BaseField>],
         merkle_decommitment: &MerkleDecommitment<BWSSha256MerkleHasher>,
     ) -> Vec<Self> {
         // find out all the queried positions and sort them
@@ -159,8 +159,8 @@ impl MerkleTreeTwinProof {
         let mut queries_values_map = HashMap::new();
         for (idx, &query) in queries.iter().enumerate() {
             let mut v = vec![];
-            for i in 0..column_num {
-                v.push(values[i][idx]);
+            for value in values.iter().take(column_num) {
+                v.push(value[idx]);
             }
             queries_values_map.insert(query, v);
         }
@@ -181,7 +181,7 @@ impl MerkleTreeTwinProof {
         }
         layers.push(layer);
 
-        let mut positions = queries_parents.clone();
+        let mut positions = queries_parents.to_vec();
         positions.sort_unstable();
 
         for i in 0..(logn - 1) {
@@ -193,15 +193,15 @@ impl MerkleTreeTwinProof {
                     position,
                     BWSSha256MerkleHasher::hash_node(
                         Some((
-                            layers[i].get(&(position << 1)).unwrap().clone(),
-                            layers[i].get(&((position << 1) + 1)).unwrap().clone(),
+                            *layers[i].get(&(position << 1)).unwrap(),
+                            *layers[i].get(&((position << 1) + 1)).unwrap(),
                         )),
                         &[],
                     ),
                 );
 
                 if !positions.contains(&(position ^ 1)) && !layer.contains_key(&(position ^ 1)) {
-                    layer.insert(position ^ 1, hash_iterator.next().unwrap().clone());
+                    layer.insert(position ^ 1, *hash_iterator.next().unwrap());
                 }
                 parents.insert(position >> 1);
             }
@@ -217,8 +217,8 @@ impl MerkleTreeTwinProof {
             let mut siblings = vec![];
 
             let mut cur = queries_parent;
-            for i in 1..logn {
-                siblings.push(layers[i].get(&(cur ^ 1)).unwrap().clone());
+            for layer in layers.iter().take(logn).skip(1) {
+                siblings.push(*layer.get(&(cur ^ 1)).unwrap());
                 cur >>= 1;
             }
 
@@ -231,7 +231,7 @@ impl MerkleTreeTwinProof {
                     .get(&((queries_parent << 1) + 1))
                     .unwrap()
                     .clone(),
-                siblings: siblings,
+                siblings,
             });
         }
         res
