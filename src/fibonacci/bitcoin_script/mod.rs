@@ -167,7 +167,7 @@ impl FibonacciVerifierGadget {
             //    c2
             //    random_coeff2 (4)
             //    circle_poly_alpha (4)
-            //    (commitment, alpha), ..., (commitment, alpha) (1 + FIB_LOG_SIZE * 4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    channel_digest
 
             // incorporate the last layer
@@ -184,7 +184,7 @@ impl FibonacciVerifierGadget {
             //    c2
             //    random_coeff2 (4)
             //    circle_poly_alpha (4)
-            //    (commitment, alpha), ..., (commitment, alpha) (1 + FIB_LOG_SIZE * 4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
             //    channel_digest
 
