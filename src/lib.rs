@@ -38,7 +38,9 @@ pub mod utils;
 pub(crate) mod treepp {
     pub use bitcoin_script::{define_pushable, script};
     #[cfg(test)]
-    pub use bitcoin_scriptexec::execute_script;
+    pub use bitcoin_scriptexec::{
+        convert_to_witness, execute_script, execute_script_with_witness_unlimited_stack,
+    };
 
     define_pushable!();
     pub use bitcoin::ScriptBuf as Script;
