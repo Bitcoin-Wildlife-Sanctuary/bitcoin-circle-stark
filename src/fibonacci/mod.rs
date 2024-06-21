@@ -6,6 +6,7 @@ use itertools::Itertools;
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
 use crate::fri::QueriesWithHint;
+use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -69,6 +70,12 @@ pub struct VerifierHints {
     /// Query sampling hints
     pub queries_hints: DrawHints,
 
+    /// Merkle proofs for the trace Merkle tree
+    pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
+
+    /// Merkle proofs for the composition Merkle tree
+    pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
+
     /// Testing purpose: final channel values.
     pub test_only: BWSSha256Hash,
 }
@@ -95,6 +102,12 @@ impl Pushable for VerifierHints {
         builder = self.last_layer.bitcoin_script_push(builder);
         builder = self.pow_hint.bitcoin_script_push(builder);
         builder = self.queries_hints.bitcoin_script_push(builder);
+        for proof in self.merkle_proofs_traces.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
+        for proof in self.merkle_proofs_compositions.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
         builder = self.test_only.bitcoin_script_push(builder);
 
         builder
@@ -276,31 +289,54 @@ pub fn verify_with_hints(
         Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
     let fri_query_domains = get_opening_positions(&queries, &column_log_sizes);
 
-    // Verify merkle decommitments.
-    commitment_scheme
-        .trees
-        .as_ref()
-        .zip(proof.commitment_scheme_proof.decommitments)
-        .zip(proof.commitment_scheme_proof.queried_values.clone())
-        .map(|((tree, decommitment), queried_values)| {
-            let queries = fri_query_domains
-                .iter()
-                .map(|(&log_size, domain)| {
-                    let mut points = domain.flatten();
-                    points.sort();
-                    (log_size, points)
-                })
-                .collect();
-            println!("{:?}", tree.column_log_sizes);
-            println!("{:?}", queries);
-            println!("{:?}", queried_values);
-            println!("{:?}", decommitment.hash_witness.len());
-            println!("{:?}", decommitment.column_witness.len());
-            tree.verify(queries, queried_values, decommitment)
+    assert_eq!(fri_query_domains.len(), 1);
+    let query_domain = fri_query_domains.first_key_value().unwrap();
+    assert_eq!(
+        *query_domain.0,
+        max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+    );
+    let queries_parents: Vec<usize> = query_domain
+        .1
+        .iter()
+        .map(|subdomain| {
+            assert_eq!(subdomain.log_size, 1);
+            subdomain.coset_index
         })
-        .0
-        .into_iter()
-        .collect::<Result<_, _>>()?;
+        .collect();
+
+    let merkle_proofs_traces = MerkleTreeTwinProof::from_stwo_proof(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        &queries_parents,
+        &proof.commitment_scheme_proof.queried_values[0],
+        &proof.commitment_scheme_proof.decommitments[0],
+    );
+    let merkle_proofs_compositions = MerkleTreeTwinProof::from_stwo_proof(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        &queries_parents,
+        &proof.commitment_scheme_proof.queried_values[1],
+        &proof.commitment_scheme_proof.decommitments[1],
+    );
+
+    for (&query, twin_proof) in queries_parents.iter().zip(merkle_proofs_traces.iter()) {
+        assert!(MerkleTree::verify_twin(
+            &proof.commitments[0],
+            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            twin_proof,
+            query << 1
+        ));
+    }
+
+    for (&query, twin_proof) in queries_parents
+        .iter()
+        .zip(merkle_proofs_compositions.iter())
+    {
+        assert!(MerkleTree::verify_twin(
+            &proof.commitments[1],
+            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            twin_proof,
+            query << 1
+        ));
+    }
 
     let _ = column_log_sizes;
     let _ = last_layer_domain;
@@ -332,6 +368,8 @@ pub fn verify_with_hints(
         last_layer: last_layer_poly.to_vec()[0],
         pow_hint,
         queries_hints,
+        merkle_proofs_traces,
+        merkle_proofs_compositions,
         test_only: channel.digest,
     })
 }

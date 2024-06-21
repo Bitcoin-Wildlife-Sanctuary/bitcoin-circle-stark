@@ -2,6 +2,7 @@ use crate::air::AirGadget;
 use crate::channel::Sha256ChannelGadget;
 use crate::circle::CirclePointGadget;
 use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
+use crate::merkle_tree::MerkleTreeTwinGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
 use crate::{treepp::*, OP_HINT};
@@ -78,6 +79,8 @@ impl FibonacciVerifierGadget {
             qm31_over OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
             qm31_dup OP_FROMALTSTACK { Sha256ChannelGadget::mix_felt() } OP_TOALTSTACK
 
+            // compute the composition eval
+            //
             // stack:
             //    c1, random_coeff (4), c2, oods point (8),
             //    masked points (3 * 8 = 24)
@@ -93,6 +96,8 @@ impl FibonacciVerifierGadget {
             { qm31_copy(3) }
             { AirGadget::eval_from_partial_evals() }
 
+            // prepare the input to `eval_composition_polynomial_at_point`
+            //
             // stack:
             //    c1, random_coeff (4), c2, oods point (8),
             //    masked points (3 * 8 = 24)
@@ -131,11 +136,13 @@ impl FibonacciVerifierGadget {
 
             OP_FROMALTSTACK OP_FROMALTSTACK
 
+            // obtain random_coeff2 and circle_poly_alpha
             { Sha256ChannelGadget::draw_felt_with_hint() }
-
             4 OP_ROLL { Sha256ChannelGadget::draw_felt_with_hint() }
             4 OP_ROLL
 
+            // compute all the intermediate alphas
+            //
             // stack:
             //    c1, random_coeff (4), oods point (8),
             //    masked points (3 * 8 = 24)
@@ -152,19 +159,135 @@ impl FibonacciVerifierGadget {
                 4 OP_ROLL
             }
 
+            // stack:
+            //    c1, random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    c2
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    channel_digest
+
+            // incorporate the last layer
             qm31_from_bottom
             qm31_dup
             8 OP_ROLL
             { Sha256ChannelGadget::mix_felt() }
 
+            // stack:
+            //    c1, random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    c2
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    channel_digest
+
+            // check proof of work
             { PowGadget::verify_pow(PROOF_OF_WORK_BITS) }
 
+            // derive N_QUERIES queries
             { Sha256ChannelGadget::draw_numbers_with_hint(N_QUERIES, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
 
             { N_QUERIES } OP_ROLL
+
+            // stack:
+            //    c1, random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    c2
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    channel_digest
+
+            // pull c1, which is the commitment of the trace Merkle tree
+            { 1 + N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 1 + 16 + 12 + 24 + 8 + 4 } OP_ROLL
+
+            // stack:
+            //    random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    c2
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    channel_digest
+            //    c1
+
+            // handle each query for trace
+            for i in 0..N_QUERIES {
+                { 2 * i } OP_PICK // copy c1
+                { 1 + 2 * i + 1 + 1 + N_QUERIES - i - 1 } OP_PICK // copy query
+                { MerkleTreeTwinGadget::query_and_verify(1, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+            }
+
+            // drop c1
+            { 2 * N_QUERIES } OP_ROLL OP_DROP
+
+            // stack:
+            //    random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    c2
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    channel_digest
+            //    trace queries (2 * N_QUERIES)
+
+            // pull c2, which is the commitment of the composition Merkle tree
+            { 2 * N_QUERIES + 1 + N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 } OP_ROLL
+
+            // handle each query for composition
+            for i in 0..N_QUERIES {
+                { 8 * i } OP_PICK // copy c2
+                { 1 + 8 * i + 1 + 2 * N_QUERIES + 1 + N_QUERIES - i - 1 } OP_PICK // copy query
+                { MerkleTreeTwinGadget::query_and_verify(4, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+            }
+
+            // drop c2
+            { 8 * N_QUERIES } OP_ROLL OP_DROP
+
+            // stack:
+            //    random_coeff (4), oods point (8),
+            //    masked points (3 * 8 = 24)
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    channel_digest
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+
+            { (2 + 8) * N_QUERIES } OP_ROLL
+            // check the final channel digest is the same
             OP_HINT OP_EQUALVERIFY
 
             // test-only: clean up the stack
+            for _ in 0..N_QUERIES {
+                OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
+            }
+            for _ in 0..N_QUERIES {
+                OP_2DROP // drop the queried values for trace
+            }
             for _ in 0..N_QUERIES {
                 OP_DROP // drop the queries (out of order)
             }
@@ -175,7 +298,6 @@ impl FibonacciVerifierGadget {
             }
             qm31_drop // drop circle_poly_alpha
             qm31_drop // drop random_coeff2
-            OP_DROP // drop c2
             for _ in 0..(3 + 4) {
                 qm31_drop // drop trace oods values and composition oods raw values
             }
@@ -184,7 +306,6 @@ impl FibonacciVerifierGadget {
             }
             { CirclePointGadget::drop() } // drop oods point
             qm31_drop // drop random_coeff
-            OP_DROP // drop c1
         }
     }
 }
@@ -194,7 +315,6 @@ mod test {
     use crate::fibonacci::bitcoin_script::FIB_LOG_SIZE;
     use crate::fibonacci::{verify_with_hints, FibonacciVerifierGadget};
     use crate::treepp::*;
-    use bitcoin_scriptexec::execute_script;
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
@@ -224,13 +344,19 @@ mod test {
 
         let hint = verify_with_hints(proof, &fib.air, channel).unwrap();
 
-        let script = script! {
+        let witness = script! {
             { hint }
+        };
+
+        let script = script! {
             { FibonacciVerifierGadget::run_verifier(&channel_clone) }
             OP_TRUE
         };
 
-        let exec_result = execute_script(script);
+        let exec_result = execute_script_with_witness_unlimited_stack(
+            script,
+            convert_to_witness(witness).unwrap(),
+        );
         assert!(exec_result.success);
     }
 }

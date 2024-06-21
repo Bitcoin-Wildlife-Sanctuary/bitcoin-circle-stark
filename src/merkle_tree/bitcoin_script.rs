@@ -46,19 +46,23 @@ impl MerkleTreeTwinGadget {
     }
 
     /// Query and verify using the Merkle path as a hint.
-    /// input:
-    ///   root_hash
-    ///   pos
     ///
-    /// output:
-    ///   vl (the element on the left)
-    ///   vr (the element on the right)
+    /// Hint:
+    /// - Merkle path
+    ///
+    /// Input:
+    /// - root_hash
+    /// - pos
+    ///
+    /// Output:
+    /// - vl (the element on the left)
+    /// - vr (the element on the right)
     pub fn query_and_verify(len: usize, logn: usize) -> Script {
         script! {
             // push the root hash to the altstack, first
             OP_SWAP OP_TOALTSTACK
             { limb_to_be_bits_toaltstack(logn as u32) }
-            OP_FROMALTSTACK 0 OP_EQUALVERIFY // enforce the lowest bit is zero and drop it
+            OP_FROMALTSTACK OP_DROP // drop the lowest bit
             { Self::query_and_verify_internal(len, logn) }
         }
     }
