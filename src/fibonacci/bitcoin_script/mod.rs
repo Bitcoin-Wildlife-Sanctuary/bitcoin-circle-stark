@@ -6,7 +6,9 @@ use crate::merkle_tree::MerkleTreeTwinGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
 use crate::{treepp::*, OP_HINT};
-use rust_bitcoin_m31::{qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll};
+use rust_bitcoin_m31::{
+    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
+};
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
