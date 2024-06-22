@@ -391,7 +391,7 @@ pub fn verify_with_hints(
             .map(|sample_batch| {
                 sample_batch
                     .iter()
-                    .map(|sample| complex_conjugate_line_coeffs(&sample, SecureField::one()))
+                    .map(|sample| complex_conjugate_line_coeffs(sample, SecureField::one()))
                     .collect()
             })
             .collect()
