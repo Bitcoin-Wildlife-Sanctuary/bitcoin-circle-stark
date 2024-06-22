@@ -2,6 +2,8 @@ mod bitcoin_script;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
+use num_traits::One;
+use std::iter::zip;
 
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
@@ -14,11 +16,13 @@ use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::constraints::complex_conjugate_line_coeffs;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fri::{
     get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
     FriVerificationError, FOLD_STEP,
 };
+use stwo_prover::core::pcs::quotients::PointSample;
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::poly::line::LineDomain;
@@ -75,6 +79,9 @@ pub struct VerifierHints {
 
     /// Merkle proofs for the composition Merkle tree
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
+
+    /// test only: line coeffs
+    pub test_only_line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>>,
 }
 
 impl Pushable for VerifierHints {
@@ -104,6 +111,13 @@ impl Pushable for VerifierHints {
         }
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
+        }
+        for batch in self.test_only_line_coeffs.iter().rev() {
+            for (a, b, c) in batch.iter().rev() {
+                builder = b.1.bitcoin_script_push(builder);
+                builder = a.1.bitcoin_script_push(builder);
+                builder = c.1.bitcoin_script_push(builder);
+            }
         }
 
         builder
@@ -334,6 +348,55 @@ pub fn verify_with_hints(
         ));
     }
 
+    let column_size: Vec<u32> = commitment_scheme
+        .column_log_sizes()
+        .flatten()
+        .into_iter()
+        .dedup()
+        .collect();
+    assert_eq!(column_size.len(), 1);
+    assert_eq!(
+        column_size[0],
+        max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+    );
+
+    // trace polynomials are evaluated on oods, oods+1, oods+2
+    assert_eq!(proof.commitment_scheme_proof.sampled_values.0[0].len(), 1);
+    assert_eq!(
+        proof.commitment_scheme_proof.sampled_values.0[0][0].len(),
+        3
+    );
+
+    // composition polynomials are evaluated on oods 4 times
+    assert_eq!(proof.commitment_scheme_proof.sampled_values.0[1].len(), 4);
+    assert_eq!(
+        proof.commitment_scheme_proof.sampled_values.0[1][0].len(),
+        1
+    );
+
+    // construct the list of samples
+    // Answer FRI queries.
+    let samples = sampled_points
+        .zip_cols(&proof.commitment_scheme_proof.sampled_values)
+        .map_cols(|(sampled_points, sampled_values)| {
+            zip(sampled_points, sampled_values)
+                .map(|(point, &value)| PointSample { point, value })
+                .collect_vec()
+        })
+        .flatten();
+
+    let expected: Vec<Vec<(SecureField, SecureField, SecureField)>> = {
+        samples
+            .iter()
+            .map(|sample_batch| {
+                sample_batch
+                    .iter()
+                    .map(|sample| complex_conjugate_line_coeffs(&sample, SecureField::one()))
+                    .collect()
+            })
+            .collect()
+    };
+
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
@@ -362,6 +425,7 @@ pub fn verify_with_hints(
         queries_hints,
         merkle_proofs_traces,
         merkle_proofs_compositions,
+        test_only_line_coeffs: expected,
     })
 }
 

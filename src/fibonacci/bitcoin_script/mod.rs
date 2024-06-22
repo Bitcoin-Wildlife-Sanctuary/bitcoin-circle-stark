@@ -1,13 +1,15 @@
 use crate::air::AirGadget;
 use crate::channel::Sha256ChannelGadget;
 use crate::circle::CirclePointGadget;
+use crate::constraints::ConstraintsGadget;
 use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::merkle_tree::MerkleTreeTwinGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
+    cm31_drop, cm31_equalverify, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
+    qm31_from_bottom, qm31_over, qm31_roll,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -99,7 +101,7 @@ impl FibonacciVerifierGadget {
             // prepare the input to `eval_composition_polynomial_at_point`
             //
             // stack:
-            //    c1, random_coeff (4), c2, oods point (8),
+            //    c1, random_coeff (4), c2, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -113,11 +115,11 @@ impl FibonacciVerifierGadget {
             { qm31_copy(8) }
             { qm31_copy(8) }
             { qm31_copy(8) }
-            { qm31_roll(19) }
-            { qm31_roll(19) }
+            { qm31_copy(19) }
+            { qm31_copy(19) }
 
             // stack:
-            //    c1
+            //    c1, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -144,7 +146,7 @@ impl FibonacciVerifierGadget {
             // compute all the intermediate alphas
             //
             // stack:
-            //    c1
+            //    c1, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -160,7 +162,7 @@ impl FibonacciVerifierGadget {
             }
 
             // stack:
-            //    c1
+            //    c1, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -177,7 +179,7 @@ impl FibonacciVerifierGadget {
             { Sha256ChannelGadget::mix_felt() }
 
             // stack:
-            //    c1
+            //    c1, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -198,7 +200,7 @@ impl FibonacciVerifierGadget {
             { N_QUERIES } OP_ROLL OP_DROP
 
             // stack:
-            //    c1
+            //    c1, oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -210,9 +212,10 @@ impl FibonacciVerifierGadget {
             //    queries (N_QUERIES)
 
             // pull c1, which is the commitment of the trace Merkle tree
-            { N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 1 + 16 + 12 + 24 } OP_ROLL
+            { N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 1 + 16 + 12 + 24 + 8 } OP_ROLL
 
             // stack:
+            //    oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -235,6 +238,7 @@ impl FibonacciVerifierGadget {
             { 2 * N_QUERIES } OP_ROLL OP_DROP
 
             // stack:
+            //    oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -252,7 +256,7 @@ impl FibonacciVerifierGadget {
             // handle each query for composition
             for i in 0..N_QUERIES {
                 { 8 * i } OP_PICK // copy c2
-                { 1 + 8 * i + 2 * N_QUERIES + 1 + N_QUERIES - i - 1 } OP_PICK // copy query
+                { 1 + 8 * i + 1 + 2 * N_QUERIES + N_QUERIES - i - 1 } OP_PICK // copy query
                 { MerkleTreeTwinGadget::query_and_verify(4, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
             }
 
@@ -260,6 +264,7 @@ impl FibonacciVerifierGadget {
             { 8 * N_QUERIES } OP_ROLL OP_DROP
 
             // stack:
+            //    oods point (8)
             //    masked points (3 * 8 = 24)
             //    trace oods values (3 * 4 = 12)
             //    composition odds raw values (4 * 4 = 16)
@@ -271,7 +276,88 @@ impl FibonacciVerifierGadget {
             //    trace queries (2 * N_QUERIES)
             //    composition queries (8 * N_QUERIES)
 
+            // pull the masked points
+            for _ in 0..24 {
+                { (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + 12 + 24 - 1 } OP_ROLL
+            }
+
+            // pull the OODS point
+            for _ in 0..8 {
+                { 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + 12 + 8 - 1 } OP_ROLL
+            }
+
+            // stack:
+            //    trace oods values (3 * 4 = 12)
+            //    composition odds raw values (4 * 4 = 16)
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+
+            // prepare to compute points for trace:
+            // - input: p.y, f1(p)
+            // - output: c, a1, b1
+
+            for i in 0..3 {
+                for _ in 0..4 {
+                    { i * 6 + 8 + (16 - 8 * i) + 4 - 1 } OP_PICK
+                }
+                for _ in 0..4 {
+                    { i * 6 + 4 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + (8 - 4 * i) + 4 - 1 } OP_ROLL
+                }
+                { ConstraintsGadget::column_line_coeffs(1) }
+            }
+
+            // stack:
+            //    composition odds raw values (4 * 4 = 16)
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
+
+            // prepare to compute points for composition:
+            // - input: p.y, f1(p), f2(p), f3(p), f4(p)
+            // - output: c, a1, b1, a2, b2, a3, b3, a4, b4
+
+            for _ in 0..4 {
+                { 18 + 4 - 1 } OP_PICK
+            }
+            for _ in 0..16 {
+                { 4 + 18 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 - 1 } OP_ROLL
+            }
+            { ConstraintsGadget::column_line_coeffs(4) }
+
             // test-only: clean up the stack
+            for _ in 0..3 {
+                OP_HINT OP_HINT cm31_equalverify
+                OP_HINT OP_HINT cm31_equalverify
+                OP_HINT OP_HINT cm31_drop
+            }
+            OP_HINT OP_HINT cm31_equalverify
+            OP_HINT OP_HINT cm31_equalverify
+            OP_HINT OP_HINT cm31_equalverify
+            // test only: drop the composition results
+            for _ in 0..3 {
+                OP_HINT OP_HINT cm31_equalverify
+                OP_HINT OP_HINT cm31_equalverify
+                OP_HINT OP_HINT cm31_equalverify
+                // test only: drop the trace results
+            }
+            for _ in 0..3 {
+                { CirclePointGadget::drop() } // drop masked points
+            }
+            { CirclePointGadget::drop() } // drop oods point
             for _ in 0..N_QUERIES {
                 OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
             }
@@ -288,12 +374,6 @@ impl FibonacciVerifierGadget {
             }
             qm31_drop // drop circle_poly_alpha
             qm31_drop // drop random_coeff2
-            for _ in 0..(3 + 4) {
-                qm31_drop // drop trace oods values and composition oods raw values
-            }
-            for _ in 0..3 {
-                { CirclePointGadget::drop() } // drop masked points
-            }
         }
     }
 }
