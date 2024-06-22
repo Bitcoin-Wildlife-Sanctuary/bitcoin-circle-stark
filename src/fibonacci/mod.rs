@@ -75,9 +75,6 @@ pub struct VerifierHints {
 
     /// Merkle proofs for the composition Merkle tree
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
-
-    /// Testing purpose: final channel values.
-    pub test_only: BWSSha256Hash,
 }
 
 impl Pushable for VerifierHints {
@@ -108,7 +105,6 @@ impl Pushable for VerifierHints {
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        builder = self.test_only.bitcoin_script_push(builder);
 
         builder
     }
@@ -338,13 +334,9 @@ pub fn verify_with_hints(
         ));
     }
 
-    let _ = column_log_sizes;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
-    let _ = oods_point;
-    let _ = composition_oods_value;
-    let _ = trace_oods_values;
 
     Ok(VerifierHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
@@ -370,7 +362,6 @@ pub fn verify_with_hints(
         queries_hints,
         merkle_proofs_traces,
         merkle_proofs_compositions,
-        test_only: channel.digest,
     })
 }
 
