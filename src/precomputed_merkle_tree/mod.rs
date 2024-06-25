@@ -1,8 +1,11 @@
-use crate::utils::get_twiddles;
 use crate::utils::num_to_bytes;
+use crate::utils::{bit_reverse_index, get_twiddles};
 use sha2::{Digest, Sha256};
+use std::ops::Neg;
+use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::poly::circle::CanonicCoset;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -13,6 +16,8 @@ pub use constants::*;
 
 /// A precomputed data Merkle tree.
 pub struct PrecomputedMerkleTree {
+    /// The twin children's point coordinates
+    pub twin_points: Vec<(CirclePoint<M31>, CirclePoint<M31>)>,
     /// The inverse of the twiddle factors.
     pub twiddles_inverse: Vec<Vec<M31>>,
     /// Layers, which are compressed through hashes of (left || twiddle factor || right).
@@ -24,6 +29,17 @@ pub struct PrecomputedMerkleTree {
 impl PrecomputedMerkleTree {
     /// Construct the precomputed data Merkle tree.
     pub fn new(logn: usize) -> Self {
+        let mut domain_iter = CanonicCoset::new((logn + 1) as u32)
+            .circle_domain()
+            .half_coset
+            .iter();
+
+        let mut twin_points = vec![(CirclePoint::zero(), CirclePoint::zero()); 1 << logn];
+        for i in 0..(1 << logn) {
+            let point = domain_iter.next().unwrap();
+            twin_points[bit_reverse_index(i, logn)] = (point, point.neg());
+        }
+
         let mut twiddles = get_twiddles(logn + 1).to_vec();
 
         twiddles
@@ -88,6 +104,7 @@ impl PrecomputedMerkleTree {
         }
 
         Self {
+            twin_points,
             twiddles_inverse: twiddles,
             layers,
             root_hash: cur[0],
@@ -189,25 +206,49 @@ impl Pushable for &TwiddleMerkleTreeProof {
 #[cfg(test)]
 mod test {
     use crate::precomputed_merkle_tree::PrecomputedMerkleTree;
+    use crate::utils::bit_reverse_index;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use std::ops::Neg;
+    use stwo_prover::core::poly::circle::CanonicCoset;
 
     #[test]
     fn test_twiddle_merkle_tree() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let twiddle_merkle_tree = PrecomputedMerkleTree::new(20);
+        let precomputed_merkle_tree = PrecomputedMerkleTree::new(20);
 
         for _ in 0..10 {
             let query = (prng.gen::<u32>() % (1 << 21)) as usize;
 
-            let proof = twiddle_merkle_tree.query(query);
+            let proof = precomputed_merkle_tree.query(query);
             assert!(PrecomputedMerkleTree::verify(
-                twiddle_merkle_tree.root_hash,
+                precomputed_merkle_tree.root_hash,
                 20,
                 &proof,
                 query
             ));
         }
+    }
+
+    #[test]
+    fn test_consistency() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let precomptued_merkle_tree = PrecomputedMerkleTree::new(20);
+
+        let coset_index = prng.gen::<u32>() % (1 << 20);
+
+        let expected_left = CanonicCoset::new(21)
+            .circle_domain()
+            .at(bit_reverse_index((coset_index << 1) as usize, 21));
+        let expected_right = CanonicCoset::new(21)
+            .circle_domain()
+            .at(bit_reverse_index(((coset_index << 1) + 1) as usize, 21));
+
+        let result = precomptued_merkle_tree.twin_points[coset_index as usize];
+        assert_eq!(expected_left, result.0);
+        assert_eq!(expected_right, result.1);
+        assert_eq!(expected_left, expected_right.neg());
     }
 }

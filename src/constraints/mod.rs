@@ -28,6 +28,25 @@ pub fn fast_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> QM31 {
     QM31(CM31::zero(), (term1 - term2 + term3).double())
 }
 
+/// Pair vanishing over a circle point and its conjugated point as well.
+pub fn fast_twin_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> (QM31, QM31) {
+    // Extending from `fast_pair_vanishing`, but it computes it for p and its conjugated point.
+
+    let term1 = e0.y.1 * p.x;
+    let term3 = e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1;
+
+    let term13 = term1 + term3;
+    let term2 = e0.x.1 * p.y;
+
+    let first = term13 - term2;
+    let second = term13 + term2;
+
+    (
+        QM31(CM31::zero(), first.double()),
+        QM31(CM31::zero(), second.double()),
+    )
+}
+
 /// Compute column line coeffs without involving alpha and obtain the imaginary part of the result.
 pub fn fast_column_line_coeffs(point_y: &SecureField, value: &SecureField) -> (CM31, CM31, CM31) {
     // - `ai = conjugate(fi(p)) - fi(p) = -2yi`, aka double-neg of the imaginary part (which is a cm31)
@@ -48,11 +67,14 @@ pub fn fast_column_line_coeffs(point_y: &SecureField, value: &SecureField) -> (C
 
 #[cfg(test)]
 mod test {
-    use crate::constraints::{fast_column_line_coeffs, fast_pair_vanishing};
+    use crate::constraints::{
+        fast_column_line_coeffs, fast_pair_vanishing, fast_twin_pair_vanishing,
+    };
     use crate::utils::get_rand_qm31;
     use num_traits::Zero;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use std::ops::Neg;
     use stwo_prover::core::circle::{CirclePoint, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER};
     use stwo_prover::core::constraints::pair_vanishing;
     use stwo_prover::core::fields::cm31::CM31;
@@ -68,6 +90,22 @@ mod test {
 
         let left = pair_vanishing(e0, e0.complex_conjugate(), p.into_ef());
         let right = fast_pair_vanishing(e0, p);
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_fast_twin_pair_vanishing() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+        let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+        let neg_p = p.neg();
+
+        let left = (
+            pair_vanishing(e0, e0.complex_conjugate(), p.into_ef()),
+            pair_vanishing(e0, e0.complex_conjugate(), neg_p.into_ef()),
+        );
+        let right = fast_twin_pair_vanishing(e0, p);
         assert_eq!(left, right);
     }
 
