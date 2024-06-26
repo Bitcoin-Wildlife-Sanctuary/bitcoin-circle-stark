@@ -3,8 +3,6 @@
 
 #![deny(missing_docs)]
 
-extern crate core;
-
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::cm31::CM31;
