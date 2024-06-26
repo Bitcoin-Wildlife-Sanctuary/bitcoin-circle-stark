@@ -2,6 +2,7 @@ use crate::treepp::*;
 use crate::utils::{
     dup_m31_vec_gadget, hash_m31_vec_gadget, limb_to_be_bits_toaltstack, m31_vec_from_bottom_gadget,
 };
+use crate::OP_HINT;
 
 /// Gadget for verifying a regular binary Merkle tree.
 pub struct MerkleTreeTwinGadget;
@@ -35,7 +36,7 @@ impl MerkleTreeTwinGadget {
             OP_SWAP OP_CAT OP_SHA256
 
             for _ in 0..(logn - 1) {
-                OP_DEPTH OP_1SUB OP_ROLL
+                OP_HINT
                 OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
                 OP_CAT OP_SHA256
             }

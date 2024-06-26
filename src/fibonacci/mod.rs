@@ -2,7 +2,6 @@ mod bitcoin_script;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
-use num_traits::One;
 use std::iter::zip;
 
 use crate::air::CompositionHint;
@@ -11,14 +10,14 @@ use crate::fri::QueriesWithHint;
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
+use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
-use crate::utils::bit_reverse_index;
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::cpu::quotients::batch_random_coeffs;
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::constraints::complex_conjugate_line_coeffs;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{
@@ -27,7 +26,7 @@ use stwo_prover::core::fri::{
 };
 use stwo_prover::core::pcs::quotients::{ColumnSampleBatch, PointSample};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
-use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
+use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::poly::line::LineDomain;
 use stwo_prover::core::proof_of_work::ProofOfWork;
 use stwo_prover::core::prover::{
@@ -83,8 +82,14 @@ pub struct VerifierHints {
     /// Merkle proofs for the composition Merkle tree
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
 
-    /// test only: line coeffs
-    pub test_only_line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>>,
+    /// Precomputed tree Merkle proofs.
+    pub precomputed_merkle_proofs: Vec<PrecomputedMerkleTreeProof>,
+
+    /// test only: circle point indices
+    pub test_only_circle_point: Vec<M31>,
+
+    /// test only: twiddle factors
+    pub test_only_twiddle_factors: Vec<M31>,
 }
 
 impl Pushable for VerifierHints {
@@ -115,14 +120,15 @@ impl Pushable for VerifierHints {
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        for batch in self.test_only_line_coeffs.iter().rev() {
-            for (a, b, c) in batch.iter().rev() {
-                builder = b.1.bitcoin_script_push(builder);
-                builder = a.1.bitcoin_script_push(builder);
-                builder = c.1.bitcoin_script_push(builder);
-            }
+        for proof in self.precomputed_merkle_proofs.iter() {
+            builder = proof.bitcoin_script_push(builder);
         }
-
+        for elem in self.test_only_circle_point.iter() {
+            builder = elem.bitcoin_script_push(builder);
+        }
+        for elem in self.test_only_twiddle_factors.iter().rev() {
+            builder = elem.bitcoin_script_push(builder);
+        }
         builder
     }
 }
@@ -392,26 +398,6 @@ pub fn verify_with_hints(
     let colume_sample_batches =
         ColumnSampleBatch::new_vec(&samples.iter().collect::<Vec<&Vec<PointSample>>>());
 
-    let expected_line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>> = {
-        colume_sample_batches
-            .iter()
-            .map(|sample_batch| {
-                sample_batch
-                    .columns_and_values
-                    .iter()
-                    .map(|(_, sampled_value)| {
-                        let sample = PointSample {
-                            point: sample_batch.point,
-                            value: *sampled_value,
-                        };
-                        // defer the applying of alpha for the composition to a later step
-                        complex_conjugate_line_coeffs(&sample, SecureField::one())
-                    })
-                    .collect()
-            })
-            .collect()
-    };
-
     let expected_batch_random_coeffs =
         { batch_random_coeffs(&colume_sample_batches, random_coeff) };
     assert_eq!(expected_batch_random_coeffs[0], random_coeff);
@@ -422,46 +408,10 @@ pub fn verify_with_hints(
         random_coeff.square().square()
     );
 
-    println!(
-        "{:?}",
-        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
-            .circle_domain()
-            .at(bit_reverse_index(
-                query_domain.1.domains[0].coset_index << 1,
-                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
-            ))
+    let precomputed_merkle_tree = PrecomputedMerkleTree::new(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor - 1) as usize,
     );
-    println!(
-        "{:?}",
-        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
-            .circle_domain()
-            .at(bit_reverse_index(
-                (query_domain.1.domains[0].coset_index << 1) + 1,
-                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
-            ))
-    );
-    println!(
-        "{:?}",
-        query_domain.1.domains[0]
-            .to_circle_domain(
-                &CanonicCoset::new(
-                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
-                )
-                .circle_domain()
-            )
-            .at(0)
-    );
-    println!(
-        "{:?}",
-        query_domain.1.domains[0]
-            .to_circle_domain(
-                &CanonicCoset::new(
-                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
-                )
-                .circle_domain()
-            )
-            .at(1)
-    );
+    let first_proof = precomputed_merkle_tree.query(query_domain.1.domains[0].coset_index << 1);
 
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
@@ -491,7 +441,9 @@ pub fn verify_with_hints(
         queries_hints,
         merkle_proofs_traces,
         merkle_proofs_compositions,
-        test_only_line_coeffs: expected_line_coeffs,
+        precomputed_merkle_proofs: vec![first_proof.clone()],
+        test_only_circle_point: vec![first_proof.circle_point.x, first_proof.circle_point.y],
+        test_only_twiddle_factors: first_proof.twiddles_elements,
     })
 }
 

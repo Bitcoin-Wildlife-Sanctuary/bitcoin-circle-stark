@@ -6,10 +6,12 @@ use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::merkle_tree::MerkleTreeTwinGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
+use crate::precomputed_merkle_tree::{
+    get_precomputed_merkle_tree_roots, PrecomputedMerkleTreeGadget, PRECOMPUTED_MERKLE_TREE_ROOTS,
+};
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_drop, cm31_equalverify, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
-    qm31_from_bottom, qm31_over, qm31_roll,
+    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -26,6 +28,9 @@ pub struct FibonacciVerifierGadget;
 impl FibonacciVerifierGadget {
     /// Run the verifier in the Bitcoin script.
     pub fn run_verifier(channel: &BWSSha256Channel) -> Script {
+        let precomputed_merkle_tree_roots =
+            PRECOMPUTED_MERKLE_TREE_ROOTS.get_or_init(get_precomputed_merkle_tree_roots);
+
         script! {
             // push the initial channel
             { channel.digest }
@@ -338,26 +343,37 @@ impl FibonacciVerifierGadget {
             }
             { ConstraintsGadget::column_line_coeffs(4) }
 
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
+            //    c, (a, b), (a, b), (a, b), (a, b) for composition ((1 + 4 * 2) * 2 = 18)
+
+            // resolve the first point and obtain its twiddle factors
+            { 18 + 18 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
+            { PrecomputedMerkleTreeGadget::query_and_verify(*precomputed_merkle_tree_roots.get(&(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR)).unwrap(), (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+
+            // test-only: check the queried result
+            OP_SWAP OP_HINT OP_EQUALVERIFY OP_HINT OP_EQUALVERIFY
+            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
+                OP_HINT OP_EQUALVERIFY
+            }
+
             // test-only: clean up the stack
-            for _ in 0..3 {
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_drop
+            for _ in 0..36 {
+                OP_DROP
             }
-            OP_HINT OP_HINT cm31_equalverify
-            OP_HINT OP_HINT cm31_equalverify
-            OP_HINT OP_HINT cm31_equalverify
-            // test only: drop the composition results
-            for _ in 0..3 {
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                // test only: drop the trace results
-            }
+            { CirclePointGadget::drop() } // drop oods point
             for _ in 0..3 {
                 { CirclePointGadget::drop() } // drop masked points
             }
-            { CirclePointGadget::drop() } // drop oods point
             for _ in 0..N_QUERIES {
                 OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
             }
