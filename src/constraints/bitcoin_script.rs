@@ -1,8 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_fromaltstack, cm31_mul, cm31_mul_m31,
-    cm31_neg, cm31_over, cm31_sub, cm31_swap, cm31_toaltstack, m31_add, qm31_add,
-    qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
+    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_dup, cm31_fromaltstack, cm31_mul,
+    cm31_mul_m31, cm31_neg, cm31_over, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack, m31_add,
+    qm31_add, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -139,13 +139,13 @@ impl ConstraintsGadget {
         script! {
             // copy exclude0.y.1
             5 OP_PICK 5 OP_PICK
-            // copy p.x
+            // copy z.x
             3 OP_ROLL
             cm31_mul_m31
 
             // copy exclude0.x.1
             10 OP_PICK 10 OP_PICK
-            // copy p.y
+            // copy z.y
             4 OP_ROLL
             cm31_mul_m31
 
@@ -157,11 +157,76 @@ impl ConstraintsGadget {
             { 0 } { 0 }
         }
     }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Input:
+    /// - exclude0
+    ///   * exclude0.x.1 (2 elements)
+    ///   * exclude0.x.0 (2 elements)
+    ///   * exclude0.y.1 (2 elements)
+    ///   * exclude0.y.0 (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - qm31 for z
+    /// - qm31 for conjugated z
+    ///
+    pub fn fast_twin_pair_vanishing() -> Script {
+        script! {
+            // copy exclude0.y.1
+            5 OP_PICK 5 OP_PICK
+            // copy z.x
+            3 OP_ROLL
+            cm31_mul_m31 cm31_toaltstack
+
+            // copy exclude0.x.1
+            8 OP_PICK 8 OP_PICK
+            // copy z.y
+            2 OP_ROLL
+            cm31_mul_m31 cm31_toaltstack
+
+            // compute the cross term
+            cm31_toaltstack cm31_mul cm31_swap cm31_fromaltstack cm31_mul
+            cm31_swap cm31_sub
+
+            // stack:
+            // - exclude0.x.1 * exclude0.y.0 - exclude0.x.0 *  exclude0.y.1 (2 elements)
+            //
+            // altstack:
+            // - e0.y.1 * p.x (2 elements)
+            // - e0.x.1 * p.y (2 elements)
+
+            cm31_fromaltstack cm31_fromaltstack cm31_rot cm31_add
+
+            // stack:
+            // - e0.x.1 * p.y (2 elements)
+            // - term1 + term3 (2 elements)
+
+            // stack:
+            // - e0.x.1 * p.y (2 elements)
+            // - term1 + term3 (2 elements)
+            // - term1 + term3 (2 elements)
+
+            cm31_dup { cm31_copy(2) } cm31_sub cm31_double cm31_toaltstack
+            cm31_add cm31_double cm31_fromaltstack cm31_swap
+
+            // stack:
+            // - cm31 for z
+            // - cm31 for conjugated z
+
+            { 0 } { 0 }
+            cm31_swap
+            { 0 } { 0 }
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::constraints::fast_pair_vanishing;
+    use crate::constraints::{fast_pair_vanishing, fast_twin_pair_vanishing};
     use crate::utils::get_rand_qm31;
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
@@ -275,6 +340,41 @@ mod test {
                 { p.y }
                 { pair_vanishing_script.clone() }
                 { res }
+                qm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_fast_twin_pair_vanishing() {
+        for seed in 0..20 {
+            let mut prng = ChaCha20Rng::seed_from_u64(seed);
+
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let res = fast_twin_pair_vanishing(e0, p);
+
+            let pair_vanishing_script = ConstraintsGadget::fast_twin_pair_vanishing();
+            if seed == 0 {
+                report_bitcoin_script_size(
+                    "Constraints",
+                    "fast_twin_pair_vanishing",
+                    pair_vanishing_script.len(),
+                );
+            }
+
+            let script = script! {
+                { e0 }
+                { p.x }
+                { p.y }
+                { pair_vanishing_script.clone() }
+                { res.1 }
+                qm31_equalverify
+                { res.0 }
                 qm31_equalverify
                 OP_TRUE
             };

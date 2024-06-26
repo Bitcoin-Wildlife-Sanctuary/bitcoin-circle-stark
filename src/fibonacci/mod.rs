@@ -12,6 +12,7 @@ use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
+use crate::utils::bit_reverse_index;
 use stwo_prover::core::air::{Air, AirExt};
 use stwo_prover::core::backend::cpu::quotients::batch_random_coeffs;
 use stwo_prover::core::backend::CpuBackend;
@@ -26,7 +27,7 @@ use stwo_prover::core::fri::{
 };
 use stwo_prover::core::pcs::quotients::{ColumnSampleBatch, PointSample};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
-use stwo_prover::core::poly::circle::SecureCirclePoly;
+use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
 use stwo_prover::core::poly::line::LineDomain;
 use stwo_prover::core::proof_of_work::ProofOfWork;
 use stwo_prover::core::prover::{
@@ -307,6 +308,7 @@ pub fn verify_with_hints(
         *query_domain.0,
         max_column_bound.log_degree_bound + fri_config.log_blowup_factor
     );
+
     let queries_parents: Vec<usize> = query_domain
         .1
         .iter()
@@ -418,6 +420,47 @@ pub fn verify_with_hints(
     assert_eq!(
         expected_batch_random_coeffs[3],
         random_coeff.square().square()
+    );
+
+    println!(
+        "{:?}",
+        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
+            .circle_domain()
+            .at(bit_reverse_index(
+                query_domain.1.domains[0].coset_index << 1,
+                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
+            ))
+    );
+    println!(
+        "{:?}",
+        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
+            .circle_domain()
+            .at(bit_reverse_index(
+                (query_domain.1.domains[0].coset_index << 1) + 1,
+                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
+            ))
+    );
+    println!(
+        "{:?}",
+        query_domain.1.domains[0]
+            .to_circle_domain(
+                &CanonicCoset::new(
+                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+                )
+                .circle_domain()
+            )
+            .at(0)
+    );
+    println!(
+        "{:?}",
+        query_domain.1.domains[0]
+            .to_circle_domain(
+                &CanonicCoset::new(
+                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+                )
+                .circle_domain()
+            )
+            .at(1)
     );
 
     let _ = last_layer_domain;
