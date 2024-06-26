@@ -1,7 +1,7 @@
-use crate::utils::num_to_bytes;
+use crate::treepp::pushable::*;
 use crate::utils::{bit_reverse_index, get_twiddles};
+use crate::utils::{hash_m31_vec, num_to_bytes};
 use sha2::{Digest, Sha256};
-use std::ops::Neg;
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
@@ -11,13 +11,12 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 mod constants;
-use crate::treepp::pushable::{Builder, Pushable};
 pub use constants::*;
 
 /// A precomputed data Merkle tree.
 pub struct PrecomputedMerkleTree {
-    /// The twin children's point coordinates
-    pub twin_points: Vec<(CirclePoint<M31>, CirclePoint<M31>)>,
+    /// The twin children's point coordinates (only keep the left child)
+    pub twin_points: Vec<CirclePoint<M31>>,
     /// The inverse of the twiddle factors.
     pub twiddles_inverse: Vec<Vec<M31>>,
     /// Layers, which are compressed through hashes of (left || twiddle factor || right).
@@ -34,10 +33,10 @@ impl PrecomputedMerkleTree {
             .half_coset
             .iter();
 
-        let mut twin_points = vec![(CirclePoint::zero(), CirclePoint::zero()); 1 << logn];
+        let mut twin_points = vec![CirclePoint::zero(); 1 << logn];
         for i in 0..(1 << logn) {
             let point = domain_iter.next().unwrap();
-            twin_points[bit_reverse_index(i, logn)] = (point, point.neg());
+            twin_points[bit_reverse_index(i, logn)] = point;
         }
 
         let mut twiddles = get_twiddles(logn + 1).to_vec();
@@ -49,13 +48,9 @@ impl PrecomputedMerkleTree {
         let mut layers = vec![];
 
         let mut leaf_hashes: Vec<[u8; 32]> = Vec::with_capacity(1 << logn);
-        for i in 0..(1 << logn) {
+        for (twin_point, twiddle) in twin_points.iter().zip(twiddles[0].iter()) {
             let mut bytes = [0u8; 32];
-            let hash = {
-                let mut sha256 = Sha256::new();
-                Digest::update(&mut sha256, num_to_bytes(twiddles[0][i]));
-                sha256.finalize()
-            };
+            let hash = hash_m31_vec(&[twin_point.x, twin_point.y, *twiddle]);
             bytes.copy_from_slice(&hash);
             leaf_hashes.push(bytes);
         }
@@ -112,8 +107,10 @@ impl PrecomputedMerkleTree {
     }
 
     /// Query the twiddle Merkle tree and generate a proof.
-    pub fn query(&self, mut pos: usize) -> TwiddleMerkleTreeProof {
+    pub fn query(&self, mut pos: usize) -> PrecomputedMerkleTreeProof {
         let logn = self.layers.len();
+
+        let circle_point = self.twin_points[pos >> 1];
 
         let mut elements = vec![];
         let mut siblings = Vec::with_capacity(logn);
@@ -127,26 +124,30 @@ impl PrecomputedMerkleTree {
 
         elements.reverse();
 
-        TwiddleMerkleTreeProof { elements, siblings }
+        PrecomputedMerkleTreeProof {
+            circle_point,
+            twiddles_elements: elements,
+            siblings,
+        }
     }
 
     /// Verify a twiddle Merkle tree proof.
     pub fn verify(
         root_hash: [u8; 32],
         logn: usize,
-        proof: &TwiddleMerkleTreeProof,
+        proof: &PrecomputedMerkleTreeProof,
         mut query: usize,
     ) -> bool {
-        assert_eq!(proof.elements.len(), logn);
+        assert_eq!(proof.twiddles_elements.len(), logn);
         assert_eq!(proof.siblings.len(), logn);
 
         query >>= 1;
 
-        let bytes = {
-            let mut sha256 = Sha256::new();
-            Digest::update(&mut sha256, num_to_bytes(proof.elements[logn - 1]));
-            sha256.finalize().to_vec()
-        };
+        let bytes = hash_m31_vec(&[
+            proof.circle_point.x,
+            proof.circle_point.y,
+            proof.twiddles_elements[logn - 1],
+        ]);
 
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&bytes);
@@ -161,7 +162,10 @@ impl PrecomputedMerkleTree {
             let mut hasher = Sha256::new();
             Digest::update(&mut hasher, f0);
             if i != logn - 1 {
-                Digest::update(&mut hasher, num_to_bytes(proof.elements[logn - 2 - i]));
+                Digest::update(
+                    &mut hasher,
+                    num_to_bytes(proof.twiddles_elements[logn - 2 - i]),
+                );
             }
             Digest::update(&mut hasher, f1);
             hash.copy_from_slice(hasher.finalize().as_slice());
@@ -175,23 +179,37 @@ impl PrecomputedMerkleTree {
 
 /// A Merkle path proof for twiddle tree.
 #[derive(Debug, Clone)]
-pub struct TwiddleMerkleTreeProof {
+pub struct PrecomputedMerkleTreeProof {
+    /// Circle point.
+    pub circle_point: CirclePoint<M31>,
     /// Leaf and intermediate nodes, which totals to (logn -1) inverse twiddle factors.
-    pub elements: Vec<M31>,
+    pub twiddles_elements: Vec<M31>,
     /// Sibling elements (in hashes).
     pub siblings: Vec<[u8; 32]>,
 }
 
-impl Pushable for TwiddleMerkleTreeProof {
+impl Pushable for PrecomputedMerkleTreeProof {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
         (&self).bitcoin_script_push(builder)
     }
 }
 
-impl Pushable for &TwiddleMerkleTreeProof {
+impl Pushable for &PrecomputedMerkleTreeProof {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = self.elements.last().unwrap().bitcoin_script_push(builder);
-        for (element, sibling) in self.elements.iter().rev().skip(1).zip(self.siblings.iter()) {
+        builder = self.circle_point.x.bitcoin_script_push(builder);
+        builder = self.circle_point.y.bitcoin_script_push(builder);
+        builder = self
+            .twiddles_elements
+            .last()
+            .unwrap()
+            .bitcoin_script_push(builder);
+        for (element, sibling) in self
+            .twiddles_elements
+            .iter()
+            .rev()
+            .skip(1)
+            .zip(self.siblings.iter())
+        {
             builder = element.bitcoin_script_push(builder);
             builder = sibling.to_vec().bitcoin_script_push(builder);
         }
@@ -213,7 +231,7 @@ mod test {
     use stwo_prover::core::poly::circle::CanonicCoset;
 
     #[test]
-    fn test_twiddle_merkle_tree() {
+    fn test_precomputed_merkle_tree() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let precomputed_merkle_tree = PrecomputedMerkleTree::new(20);
@@ -247,8 +265,8 @@ mod test {
             .at(bit_reverse_index(((coset_index << 1) + 1) as usize, 21));
 
         let result = precomptued_merkle_tree.twin_points[coset_index as usize];
-        assert_eq!(expected_left, result.0);
-        assert_eq!(expected_right, result.1);
+        assert_eq!(expected_left, result);
+        assert_eq!(expected_right, result.neg());
         assert_eq!(expected_left, expected_right.neg());
     }
 }

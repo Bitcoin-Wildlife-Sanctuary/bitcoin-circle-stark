@@ -5,7 +5,6 @@ pub use bitcoin_script::*;
 use num_traits::Zero;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use std::cmp::min;
 use stwo_prover::core::circle::CirclePointIndex;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
@@ -47,126 +46,37 @@ pub fn permute_eval(evaluation: Vec<QM31>) -> Vec<QM31> {
     layer
 }
 
-/// Compute the Bitcoin-friendly hash of a single QM31 element.
-pub fn hash_qm31(v: &QM31) -> [u8; 32] {
+/// Compute the Bitcoin-friendly hash of a few M31 elements.
+pub fn hash_m31_vec(v: &[M31]) -> [u8; 32] {
     let mut res = [0u8; 32];
 
-    let mut hasher = Sha256::new();
-    Digest::update(&mut hasher, &num_to_bytes(v.0 .0));
-    res.copy_from_slice(hasher.finalize().as_slice());
+    if v.is_empty() {
+        let hasher = Sha256::new();
+        res.copy_from_slice(hasher.finalize().as_slice());
+    } else {
+        let mut hasher = Sha256::new();
+        Digest::update(&mut hasher, &num_to_bytes(v[0]));
+        res.copy_from_slice(hasher.finalize().as_slice());
 
-    let mut hasher = Sha256::new();
-    Digest::update(&mut hasher, num_to_bytes(v.0 .1));
-    Digest::update(&mut hasher, res);
-    res.copy_from_slice(hasher.finalize().as_slice());
-
-    let mut hasher = Sha256::new();
-    Digest::update(&mut hasher, num_to_bytes(v.1 .0));
-    Digest::update(&mut hasher, res);
-    res.copy_from_slice(hasher.finalize().as_slice());
-
-    let mut hasher = Sha256::new();
-    Digest::update(&mut hasher, num_to_bytes(v.1 .1));
-    Digest::update(&mut hasher, res);
-    res.copy_from_slice(hasher.finalize().as_slice());
+        for elem in v.iter().skip(1) {
+            let mut hasher = Sha256::new();
+            Digest::update(&mut hasher, &num_to_bytes(*elem));
+            Digest::update(&mut hasher, res);
+            res.copy_from_slice(hasher.finalize().as_slice());
+        }
+    }
 
     res
+}
+
+/// Compute the Bitcoin-friendly hash of a single QM31 element.
+pub fn hash_qm31(v: &QM31) -> [u8; 32] {
+    hash_m31_vec(&[v.1 .1, v.1 .0, v.0 .1, v.0 .0])
 }
 
 /// Trim a m31 element to have only logn bits.
 pub fn trim_m31(v: u32, logn: usize) -> u32 {
     v & ((1 << logn) - 1)
-}
-
-// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
-// due to inability to reconcile the dependency issues between BitVM and stwo.
-fn limb_to_be_bits_common(num_bits: u32) -> Script {
-    let min_i = min(22, num_bits - 1);
-    script! {
-        OP_TOALTSTACK
-
-        // Push the powers of 2 onto the stack
-        // First, all powers of 2 that we can push as 3-byte numbers
-        for i in 0..min_i  {
-            { 2 << i }
-        }
-        // Then, we double powers of 2 to generate the 4-byte numbers
-        for _ in min_i..num_bits - 1 {
-            OP_DUP
-            OP_DUP
-            OP_ADD
-        }
-
-        OP_FROMALTSTACK
-
-        for _ in 0..num_bits - 2 {
-            OP_2DUP OP_LESSTHANOREQUAL
-            OP_IF
-                OP_SWAP OP_SUB 1
-            OP_ELSE
-                OP_NIP 0
-            OP_ENDIF
-            OP_TOALTSTACK
-        }
-
-        OP_2DUP OP_LESSTHANOREQUAL
-        OP_IF
-            OP_SWAP OP_SUB 1
-        OP_ELSE
-            OP_NIP 0
-        OP_ENDIF
-    }
-}
-
-// Convert a limb to low-endian bits
-// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
-// due to inability to reconcile the dependency issues between BitVM and stwo.
-fn limb_to_le_bits_common(num_bits: u32) -> Script {
-    let min_i = min(22, num_bits - 1);
-    script! {
-        // Push the powers of 2 onto the stack
-        // First, all powers of 2 that we can push as 3-byte numbers
-        for i in 0..min_i - 1  {
-            { 2 << i } OP_TOALTSTACK
-        }
-        { 2 << (min_i - 1) }
-        if num_bits - 1 > min_i {
-            OP_DUP OP_TOALTSTACK
-
-            // Then, we double powers of 2 to generate the 4-byte numbers
-            for _ in min_i..num_bits - 2 {
-                OP_DUP
-                OP_ADD
-                OP_DUP OP_TOALTSTACK
-            }
-
-            OP_DUP
-            OP_ADD OP_TOALTSTACK
-        } else {
-            OP_TOALTSTACK
-        }
-
-        for _ in 0..num_bits - 2 {
-            OP_FROMALTSTACK
-            OP_2DUP OP_GREATERTHANOREQUAL
-            OP_IF
-                OP_SUB 1
-            OP_ELSE
-                OP_DROP 0
-            OP_ENDIF
-            OP_SWAP
-        }
-
-        OP_FROMALTSTACK
-        OP_2DUP OP_GREATERTHANOREQUAL
-        OP_IF
-            OP_SUB 1
-        OP_ELSE
-            OP_DROP 0
-        OP_ENDIF
-
-        OP_SWAP
-    }
 }
 
 /// Convert a limb to low-endian bits
