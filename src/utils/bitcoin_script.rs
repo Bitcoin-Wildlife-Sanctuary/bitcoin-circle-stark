@@ -287,7 +287,6 @@ mod test {
                 { hash.to_vec() }
                 OP_EQUAL
             };
-            println!("{}", i);
             let exec_result = execute_script(script);
             assert!(exec_result.success);
             v.push(M31::reduce(prng.next_u64()));
