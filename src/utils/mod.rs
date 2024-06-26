@@ -74,19 +74,6 @@ pub fn limb_to_le_bits(num_bits: u32) -> Script {
     limb_to_le_bits_common(num_bits)
 }
 
-/// Convert a limb to big-endian bits
-/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
-/// due to inability to reconcile the dependency issues between BitVM and stwo.
-pub fn limb_to_be_bits(num_bits: u32) -> Script {
-    assert!(num_bits >= 2);
-    script! {
-        { limb_to_be_bits_common(num_bits) }
-        for _ in 0..num_bits - 2 {
-            OP_FROMALTSTACK
-        }
-    }
-}
-
 /// Convert a limb to big-endian bits but store them in the altstack for now
 /// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
 /// due to inability to reconcile the dependency issues between BitVM and stwo.
