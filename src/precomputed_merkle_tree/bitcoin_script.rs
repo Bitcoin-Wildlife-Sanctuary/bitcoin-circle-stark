@@ -1,5 +1,6 @@
 use crate::treepp::*;
 use crate::utils::limb_to_le_bits;
+use crate::OP_HINT;
 
 /// Gadget for verifying a Merkle tree path in a precomputed data tree.
 pub struct PrecomputedMerkleTreeGadget;
@@ -8,7 +9,7 @@ impl PrecomputedMerkleTreeGadget {
     /// Query the twiddle tree on a point and verify the Merkle tree proof (as a hint).
     ///
     /// hint:
-    ///   merkle path consisting of entries of the form (mid-element, sibling)
+    ///   merkle tree proof
     ///
     /// input:
     ///   root_hash
@@ -16,6 +17,7 @@ impl PrecomputedMerkleTreeGadget {
     ///
     /// output:
     ///   v (m31 -- [num_layer] elements)
+    ///   circle point (x, y; 2 elements)
     pub fn query_and_verify(logn: usize) -> Script {
         let num_layer = logn - 1;
         script! {
@@ -23,12 +25,18 @@ impl PrecomputedMerkleTreeGadget {
             { limb_to_le_bits(logn as u32) }
             OP_DROP
 
+            // obtain the circle point x and y
+            OP_HINT
+            OP_DUP OP_TOALTSTACK
+            OP_HINT
+            OP_DUP OP_TOALTSTACK
+
             // obtain the leaf element v
-            OP_DEPTH OP_1SUB OP_ROLL
+            OP_HINT
             OP_DUP OP_TOALTSTACK
 
             // compute the current element's hash
-            OP_SHA256
+            OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
 
             // stack: root_hash, <bits>, leaf-hash
             // altstack: leaf
@@ -36,14 +44,14 @@ impl PrecomputedMerkleTreeGadget {
             // for every layer
             for _ in 0..num_layer - 1 {
                 // pull the middle element and copy to the altstack
-                OP_DEPTH OP_1SUB OP_ROLL
+                OP_HINT
                 OP_DUP OP_TOALTSTACK
 
                 // stack: root_hash, <bits>, leaf-hash, middle-element
                 // altstack: leaf, middle-element
 
                 // pull the sibling
-                OP_DEPTH OP_1SUB OP_ROLL
+                OP_HINT
 
                 // stack: root_hash, <bits>, leaf-hash, middle-element, sibling
                 // altstack: leaf, middle-element
@@ -58,7 +66,7 @@ impl PrecomputedMerkleTreeGadget {
             }
 
             // pull the sibling
-            OP_DEPTH OP_1SUB OP_ROLL
+            OP_HINT
 
             // stack: root_hash, <bit>, leaf-hash, sibling
 
@@ -74,6 +82,7 @@ impl PrecomputedMerkleTreeGadget {
             for _ in 0..num_layer {
                 OP_FROMALTSTACK
             }
+            OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP
         }
     }
 }
@@ -86,12 +95,12 @@ mod test {
     use rand_chacha::ChaCha20Rng;
 
     #[test]
-    fn test_twiddle_merkle_tree() {
+    fn test_precomputed_merkle_tree() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for logn in 12..=20 {
             let verify_script = PrecomputedMerkleTreeGadget::query_and_verify(logn);
-            println!("TMT.verify(2^{}) = {} bytes", logn, verify_script.len());
+            println!("PMT.verify(2^{}) = {} bytes", logn, verify_script.len());
 
             let n_layers = logn - 1;
 
@@ -107,8 +116,12 @@ mod test {
                 { twiddle_merkle_tree.root_hash.to_vec() }
                 { pos }
                 { verify_script.clone() }
+                { twiddle_proof.circle_point.y }
+                OP_EQUALVERIFY
+                { twiddle_proof.circle_point.x }
+                OP_EQUALVERIFY
                 for i in 0..n_layers {
-                    { twiddle_proof.elements[n_layers - 1 - i] }
+                    { twiddle_proof.twiddles_elements[n_layers - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE
