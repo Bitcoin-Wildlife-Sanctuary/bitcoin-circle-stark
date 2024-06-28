@@ -1,8 +1,9 @@
+use crate::constraints::INVERSE_OF_J;
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_dup, cm31_fromaltstack, cm31_mul,
-    cm31_mul_m31, cm31_neg, cm31_over, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack, m31_add,
-    qm31_add, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
+    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_dup, cm31_equalverify, cm31_from_bottom,
+    cm31_fromaltstack, cm31_mul, cm31_mul_m31, cm31_neg, cm31_over, cm31_rot, cm31_sub, cm31_swap,
+    cm31_toaltstack, m31_add, qm31_add, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -133,7 +134,7 @@ impl ConstraintsGadget {
     /// - z.y (1 element)
     ///
     /// Output:
-    /// - qm31
+    /// - cm31
     ///
     pub fn fast_pair_vanishing() -> Script {
         script! {
@@ -153,8 +154,6 @@ impl ConstraintsGadget {
 
             cm31_toaltstack cm31_mul cm31_swap cm31_fromaltstack cm31_mul
             cm31_swap cm31_sub cm31_fromaltstack cm31_add cm31_double
-
-            { 0 } { 0 }
         }
     }
 
@@ -171,8 +170,8 @@ impl ConstraintsGadget {
     /// - z.y (1 element)
     ///
     /// Output:
-    /// - qm31 for z
-    /// - qm31 for conjugated z
+    /// - cm31 for z
+    /// - cm31 for conjugated z
     ///
     pub fn fast_twin_pair_vanishing() -> Script {
         script! {
@@ -216,21 +215,59 @@ impl ConstraintsGadget {
             // stack:
             // - cm31 for z
             // - cm31 for conjugated z
+        }
+    }
 
-            { 0 } { 0 }
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Hint:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    /// Input:
+    /// - exclude0
+    ///   * exclude0.x.1 (2 elements)
+    ///   * exclude0.x.0 (2 elements)
+    ///   * exclude0.y.1 (2 elements)
+    ///   * exclude0.y.0 (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    pub fn denominator_inverse() -> Script {
+        script! {
+            { Self::fast_twin_pair_vanishing() }
+            cm31_toaltstack
+            cm31_from_bottom
             cm31_swap
-            { 0 } { 0 }
+            cm31_over
+            cm31_mul
+            { INVERSE_OF_J } cm31_equalverify
+
+            cm31_fromaltstack
+            cm31_from_bottom
+            cm31_swap cm31_over
+            cm31_mul
+            { INVERSE_OF_J } cm31_equalverify
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::constraints::{fast_pair_vanishing, fast_twin_pair_vanishing};
+    use crate::constraints::{
+        fast_pair_vanishing, fast_twin_pair_vanishing, DenominatorInverseHint,
+    };
     use crate::utils::get_rand_qm31;
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
+    use bitcoin_scriptexec::execute_script_with_witness;
+    use num_traits::Zero;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::{cm31_equalverify, qm31_equalverify};
@@ -239,8 +276,9 @@ mod test {
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
+    use stwo_prover::core::fields::cm31::CM31;
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::ComplexConjugate;
+    use stwo_prover::core::fields::{ComplexConjugate, FieldExpOps};
 
     #[test]
     fn test_coset_vanishing() {
@@ -324,6 +362,7 @@ mod test {
             let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
             let res = fast_pair_vanishing(e0, p);
+            assert_eq!(res.0, CM31::zero());
 
             let pair_vanishing_script = ConstraintsGadget::fast_pair_vanishing();
             if seed == 0 {
@@ -339,8 +378,8 @@ mod test {
                 { p.x }
                 { p.y }
                 { pair_vanishing_script.clone() }
-                { res }
-                qm31_equalverify
+                { res.1 }
+                cm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
@@ -357,6 +396,8 @@ mod test {
             let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
             let res = fast_twin_pair_vanishing(e0, p);
+            assert_eq!(res.0 .0, CM31::zero());
+            assert_eq!(res.1 .0, CM31::zero());
 
             let pair_vanishing_script = ConstraintsGadget::fast_twin_pair_vanishing();
             if seed == 0 {
@@ -372,13 +413,52 @@ mod test {
                 { p.x }
                 { p.y }
                 { pair_vanishing_script.clone() }
-                { res.1 }
-                qm31_equalverify
-                { res.0 }
-                qm31_equalverify
+                { res.1.1 }
+                cm31_equalverify
+                { res.0.1 }
+                cm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_denominator_inverse() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let res = fast_twin_pair_vanishing(e0, p);
+            assert_eq!(res.0 .0, CM31::zero());
+            assert_eq!(res.1 .0, CM31::zero());
+
+            let inverse = (res.0.inverse(), res.1.inverse());
+            assert_eq!(inverse.0 .0, CM31::zero());
+            assert_eq!(inverse.1 .0, CM31::zero());
+
+            let hint = DenominatorInverseHint::new(e0, p);
+
+            let denominator_inverse_script = ConstraintsGadget::denominator_inverse();
+
+            let script = script! {
+                { e0 }
+                { p.x }
+                { p.y }
+                { denominator_inverse_script.clone() }
+                { inverse.1.1 }
+                cm31_equalverify
+                { inverse.0.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script_with_witness(
+                script,
+                convert_to_witness(script! { { hint }}).unwrap(),
+            );
             assert!(exec_result.success);
         }
     }

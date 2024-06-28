@@ -1,5 +1,6 @@
 mod bitcoin_script;
 
+use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 use num_traits::Zero;
 use std::ops::Neg;
@@ -7,7 +8,50 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::Field;
+use stwo_prover::core::fields::{Field, FieldExpOps};
+
+/// The inverse of j, which is `(2 - i) / 5`.
+pub const INVERSE_OF_J: CM31 = CM31::from_u32_unchecked(1717986918, 1288490188);
+
+/// Inverse of a QM31 element of the form a + bj where a = 0 (i.e., only having the imaginary part)
+///
+/// Note that `j^-1 = [(2 - i) / 5]j` because:
+///   `j^2 [(2 - i) / 5] = (2 + i) (2 - i) / 5 = 1`
+///
+/// Therefore, the inverse of `bj` is `b^{-1} * [(2 - i) / 5] j`, which also only has the imaginary part.
+///
+/// To verify, note that `b * (b^{-1}) * [(2 - i) / 5] = (2 - i) / 5`.
+pub struct DenominatorInverseHint {
+    /// The inverse of this point, which has only the imaginary part.
+    pub inverse: CM31,
+    /// The inverse of the sibling.
+    pub sibling_inverse: CM31,
+}
+
+impl Pushable for &DenominatorInverseHint {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        builder = self.inverse.bitcoin_script_push(builder);
+        builder = self.sibling_inverse.bitcoin_script_push(builder);
+        builder
+    }
+}
+
+impl Pushable for DenominatorInverseHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
+
+impl DenominatorInverseHint {
+    /// Compute the hint for denominator inverse.
+    pub fn new(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> Self {
+        let res = fast_twin_pair_vanishing(e0, p);
+        Self {
+            inverse: res.0.inverse().1,
+            sibling_inverse: res.1.inverse().1,
+        }
+    }
+}
 
 /// Pair vanishing over e0, e0's conjugated point, and p that is over M31.
 pub fn fast_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> QM31 {
@@ -68,18 +112,19 @@ pub fn fast_column_line_coeffs(point_y: &SecureField, value: &SecureField) -> (C
 #[cfg(test)]
 mod test {
     use crate::constraints::{
-        fast_column_line_coeffs, fast_pair_vanishing, fast_twin_pair_vanishing,
+        fast_column_line_coeffs, fast_pair_vanishing, fast_twin_pair_vanishing, INVERSE_OF_J,
     };
     use crate::utils::get_rand_qm31;
-    use num_traits::Zero;
-    use rand::{Rng, SeedableRng};
+    use num_traits::{One, Zero};
+    use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use std::ops::Neg;
     use stwo_prover::core::circle::{CirclePoint, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER};
     use stwo_prover::core::constraints::pair_vanishing;
     use stwo_prover::core::fields::cm31::CM31;
+    use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::ComplexConjugate;
+    use stwo_prover::core::fields::{ComplexConjugate, FieldExpOps};
 
     #[test]
     fn test_fast_pair_vanishing() {
@@ -129,5 +174,30 @@ mod test {
         assert_eq!(expected.0, QM31(CM31::zero(), result.0));
         assert_eq!(expected.1, QM31(CM31::zero(), result.1));
         assert_eq!(expected.2, QM31(CM31::zero(), result.2));
+    }
+
+    #[test]
+    fn test_imag_only_inverse() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let j_inverse = QM31(CM31::zero(), CM31::one()).inverse();
+        assert_eq!(j_inverse.0, CM31::zero());
+        assert_eq!(
+            j_inverse.1 .0,
+            M31::from_u32_unchecked(2) * M31::from_u32_unchecked(5).inverse()
+        );
+        assert_eq!(j_inverse.1 .1, M31::from_u32_unchecked(5).inverse().neg());
+
+        assert_eq!(j_inverse.1, INVERSE_OF_J);
+
+        let qm31 = QM31(
+            CM31::zero(),
+            CM31::from_m31(M31::reduce(prng.next_u64()), M31::reduce(prng.next_u64())),
+        );
+
+        let qm31_inverse = qm31.inverse();
+
+        assert_eq!(qm31_inverse.0, CM31::zero());
+        assert_eq!(qm31_inverse.1, j_inverse.1 * qm31.1.inverse());
     }
 }
