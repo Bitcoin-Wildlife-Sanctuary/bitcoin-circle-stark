@@ -53,8 +53,37 @@ impl DenominatorInverseHint {
     }
 }
 
+/// The prepared point on the circle curve over QM31, for pair vanishing.
+///
+/// Suitable for points that would be used to compute multiple pair vanishing, which is the case in
+/// FRI where the same point is evaluated over different sample points.
+pub struct PreparedPairVanishing {
+    /// The doubled imaginary part of the x coordinate.
+    pub x_imag_dbl: CM31,
+    /// The doubled imaginary part of the y coordinate.
+    pub y_imag_dbl: CM31,
+    /// The doubled cross term, `e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1`.
+    pub cross_term_dbl: CM31,
+}
+
+impl From<CirclePoint<QM31>> for PreparedPairVanishing {
+    fn from(e0: CirclePoint<QM31>) -> Self {
+        Self {
+            x_imag_dbl: e0.x.1.double(),
+            y_imag_dbl: e0.y.1.double(),
+            cross_term_dbl: (e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1).double(),
+        }
+    }
+}
+
 /// Pair vanishing over e0, e0's conjugated point, and p that is over M31.
 pub fn fast_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> QM31 {
+    let e0 = PreparedPairVanishing::from(e0);
+    fast_pair_vanishing_from_prepared(e0, p)
+}
+
+/// Pair vanishing over e0 and e0's conjugated point (in the prepared form) and p that is over M31.
+pub fn fast_pair_vanishing_from_prepared(e0: PreparedPairVanishing, p: CirclePoint<M31>) -> QM31 {
     // The original algorithm check computes the area of the triangle formed by the
     // 3 points. This is done using the determinant of:
     // | p.x  p.y  1 |
@@ -65,30 +94,33 @@ pub fn fast_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> QM31 {
 
     // We are now handling a special case where e1 = complex_conjugate(e0) and p.x, p.y are M31.
 
-    let term1 = e0.y.1 * p.x;
-    let term2 = e0.x.1 * p.y;
-    let term3 = e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1;
+    let term1 = e0.y_imag_dbl * p.x;
+    let term2 = e0.x_imag_dbl * p.y;
+    let term3 = e0.cross_term_dbl;
 
-    QM31(CM31::zero(), (term1 - term2 + term3).double())
+    QM31(CM31::zero(), term1 - term2 + term3)
 }
 
 /// Pair vanishing over a circle point and its conjugated point as well.
 pub fn fast_twin_pair_vanishing(e0: CirclePoint<QM31>, p: CirclePoint<M31>) -> (QM31, QM31) {
+    let e0 = PreparedPairVanishing::from(e0);
+    fast_twin_pair_vanishing_from_prepared(e0, p)
+}
+
+/// Pair vanishing over a circle point (in the prepared form) and its conjugated point as well.
+pub fn fast_twin_pair_vanishing_from_prepared(
+    e0: PreparedPairVanishing,
+    p: CirclePoint<M31>,
+) -> (QM31, QM31) {
     // Extending from `fast_pair_vanishing`, but it computes it for p and its conjugated point.
 
-    let term1 = e0.y.1 * p.x;
-    let term3 = e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1;
-
-    let term13 = term1 + term3;
-    let term2 = e0.x.1 * p.y;
+    let term13 = e0.y_imag_dbl * p.x + e0.cross_term_dbl;
+    let term2 = e0.x_imag_dbl * p.y;
 
     let first = term13 - term2;
     let second = term13 + term2;
 
-    (
-        QM31(CM31::zero(), first.double()),
-        QM31(CM31::zero(), second.double()),
-    )
+    (QM31(CM31::zero(), first), QM31(CM31::zero(), second))
 }
 
 /// Compute column line coeffs without involving alpha and obtain the imaginary part of the result.

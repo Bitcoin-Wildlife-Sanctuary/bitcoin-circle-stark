@@ -121,6 +121,48 @@ impl ConstraintsGadget {
         }
     }
 
+    /// Prepare for pair vanishing.
+    ///
+    /// Input:
+    /// - exclude0
+    ///   * exclude0.x.1 (2 elements)
+    ///   * exclude0.x.0 (2 elements)
+    ///   * exclude0.y.1 (2 elements)
+    ///   * exclude0.y.0 (2 elements)
+    ///
+    /// Output:
+    /// - x_imag_dbl (2 elements)
+    /// - y_imag_dbl (2 elements)
+    /// - cross_term_dbl (2 elements)
+    pub fn prepare_pair_vanishing() -> Script {
+        script! {
+            // copy exclude0.x.1
+            { cm31_copy(3) }
+            cm31_double
+            cm31_toaltstack
+
+            // copy exclude0.x.1
+            { cm31_copy(1) }
+            cm31_double
+            cm31_toaltstack
+
+            // compute the cross term
+            cm31_toaltstack
+            cm31_mul
+            cm31_swap
+            cm31_fromaltstack
+            cm31_mul
+            cm31_swap
+            cm31_sub
+            cm31_double
+
+            cm31_fromaltstack
+            cm31_fromaltstack
+            cm31_swap
+            cm31_rot
+        }
+    }
+
     /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
     /// z.x and z.y are both M31 elements.
     ///
@@ -261,6 +303,7 @@ impl ConstraintsGadget {
 mod test {
     use crate::constraints::{
         fast_pair_vanishing, fast_twin_pair_vanishing, DenominatorInverseHint,
+        PreparedPairVanishing,
     };
     use crate::utils::get_rand_qm31;
     use crate::{
@@ -459,6 +502,33 @@ mod test {
                 script,
                 convert_to_witness(script! { { hint }}).unwrap(),
             );
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_prepare_pair_vanishing() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+
+            let res = PreparedPairVanishing::from(e0);
+
+            let prepare_script = ConstraintsGadget::prepare_pair_vanishing();
+
+            let script = script! {
+                { e0 }
+                { prepare_script.clone() }
+                { res.cross_term_dbl }
+                cm31_equalverify
+                { res.y_imag_dbl }
+                cm31_equalverify
+                { res.x_imag_dbl }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
             assert!(exec_result.success);
         }
     }
