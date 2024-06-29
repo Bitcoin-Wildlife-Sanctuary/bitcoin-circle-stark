@@ -59,7 +59,7 @@ impl DenominatorInverseHint {
 /// FRI where the same point is evaluated over different sample points.
 pub struct PreparedPairVanishing {
     /// The doubled imaginary part of the x coordinate.
-    pub x_imag_dbl: CM31,
+    pub neg_x_imag_dbl: CM31,
     /// The doubled imaginary part of the y coordinate.
     pub y_imag_dbl: CM31,
     /// The doubled cross term, `e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1`.
@@ -69,7 +69,7 @@ pub struct PreparedPairVanishing {
 impl From<CirclePoint<QM31>> for PreparedPairVanishing {
     fn from(e0: CirclePoint<QM31>) -> Self {
         Self {
-            x_imag_dbl: e0.x.1.double(),
+            neg_x_imag_dbl: e0.x.1.double(),
             y_imag_dbl: e0.y.1.double(),
             cross_term_dbl: (e0.x.1 * e0.y.0 - e0.x.0 * e0.y.1).double(),
         }
@@ -95,7 +95,7 @@ pub fn fast_pair_vanishing_from_prepared(e0: PreparedPairVanishing, p: CirclePoi
     // We are now handling a special case where e1 = complex_conjugate(e0) and p.x, p.y are M31.
 
     let term1 = e0.y_imag_dbl * p.x;
-    let term2 = e0.x_imag_dbl * p.y;
+    let term2 = e0.neg_x_imag_dbl * p.y;
     let term3 = e0.cross_term_dbl;
 
     QM31(CM31::zero(), term1 - term2 + term3)
@@ -115,7 +115,7 @@ pub fn fast_twin_pair_vanishing_from_prepared(
     // Extending from `fast_pair_vanishing`, but it computes it for p and its conjugated point.
 
     let term13 = e0.y_imag_dbl * p.x + e0.cross_term_dbl;
-    let term2 = e0.x_imag_dbl * p.y;
+    let term2 = e0.neg_x_imag_dbl * p.y;
 
     let first = term13 - term2;
     let second = term13 + term2;

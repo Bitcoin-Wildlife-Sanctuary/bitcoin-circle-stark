@@ -203,6 +203,34 @@ impl ConstraintsGadget {
     /// z.x and z.y are both M31 elements.
     ///
     /// Input:
+    /// - x_imag_dbl (2 elements)
+    /// - y_imag_dbl (2 elements)
+    /// - cross_term_dbl (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - cm31
+    ///
+    pub fn fast_pair_vanishing_from_prepared() -> Script {
+        script! {
+            OP_TOALTSTACK OP_TOALTSTACK
+
+            cm31_swap
+
+            OP_FROMALTSTACK cm31_mul_m31
+
+            cm31_rot
+            OP_FROMALTSTACK cm31_mul_m31
+
+            cm31_sub cm31_add
+        }
+    }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Input:
     /// - exclude0
     ///   * exclude0.x.1 (2 elements)
     ///   * exclude0.x.0 (2 elements)
@@ -257,6 +285,47 @@ impl ConstraintsGadget {
             // stack:
             // - cm31 for z
             // - cm31 for conjugated z
+        }
+    }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Input:
+    /// - x_imag_dbl (2 elements)
+    /// - y_imag_dbl (2 elements)
+    /// - cross_term_dbl (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - cm31 for z
+    /// - cm31 for conjugated z
+    ///
+    pub fn fast_twin_pair_vanishing_from_prepared() -> Script {
+        script! {
+            OP_TOALTSTACK OP_TOALTSTACK
+            cm31_swap
+            OP_FROMALTSTACK cm31_mul_m31
+            cm31_rot
+            OP_FROMALTSTACK cm31_mul_m31
+
+            // stack:
+            // - cross_term_dbl
+            // - y_imag_dbl * z.x
+            // - x_imag_dbl * z.y
+
+            cm31_toaltstack
+            cm31_add
+            cm31_fromaltstack
+
+            // stack:
+            // - cross_term_dbl + y_imag_dbl * z.x
+            // - x_imag_dbl * z.y
+
+            cm31_over cm31_over
+            cm31_add cm31_toaltstack
+            cm31_sub cm31_fromaltstack
         }
     }
 
@@ -431,6 +500,32 @@ mod test {
     }
 
     #[test]
+    fn test_fast_pair_vanishing_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let res = fast_pair_vanishing(e0, p);
+            assert_eq!(res.0, CM31::zero());
+
+            let script = script! {
+                { e0 }
+                { ConstraintsGadget::prepare_pair_vanishing() }
+                { p.x }
+                { p.y }
+                { ConstraintsGadget::fast_pair_vanishing_from_prepared() }
+                { res.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
     fn test_fast_twin_pair_vanishing() {
         for seed in 0..20 {
             let mut prng = ChaCha20Rng::seed_from_u64(seed);
@@ -456,6 +551,35 @@ mod test {
                 { p.x }
                 { p.y }
                 { pair_vanishing_script.clone() }
+                { res.1.1 }
+                cm31_equalverify
+                { res.0.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_fast_twin_pair_vanishing_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let res = fast_twin_pair_vanishing(e0, p);
+            assert_eq!(res.0 .0, CM31::zero());
+            assert_eq!(res.1 .0, CM31::zero());
+
+            let script = script! {
+                { e0 }
+                { ConstraintsGadget::prepare_pair_vanishing() }
+                { p.x }
+                { p.y }
+                { ConstraintsGadget::fast_twin_pair_vanishing_from_prepared() }
                 { res.1.1 }
                 cm31_equalverify
                 { res.0.1 }
@@ -524,7 +648,7 @@ mod test {
                 cm31_equalverify
                 { res.y_imag_dbl }
                 cm31_equalverify
-                { res.x_imag_dbl }
+                { res.neg_x_imag_dbl }
                 cm31_equalverify
                 OP_TRUE
             };
