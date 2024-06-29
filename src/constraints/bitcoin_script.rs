@@ -366,6 +366,42 @@ impl ConstraintsGadget {
             { INVERSE_OF_J } cm31_equalverify
         }
     }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Hint:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    /// Input:
+    /// - x_imag_dbl (2 elements)
+    /// - y_imag_dbl (2 elements)
+    /// - cross_term_dbl (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    pub fn denominator_inverse_from_prepared() -> Script {
+        script! {
+            { Self::fast_twin_pair_vanishing_from_prepared() }
+            cm31_toaltstack
+            cm31_from_bottom
+            cm31_swap
+            cm31_over
+            cm31_mul
+            { INVERSE_OF_J } cm31_equalverify
+
+            cm31_fromaltstack
+            cm31_from_bottom
+            cm31_swap cm31_over
+            cm31_mul
+            { INVERSE_OF_J } cm31_equalverify
+        }
+    }
 }
 
 #[cfg(test)]
@@ -631,6 +667,47 @@ mod test {
     }
 
     #[test]
+    fn test_denominator_inverse_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let prepared_e0 = PreparedPairVanishing::from(e0);
+
+            let res = fast_twin_pair_vanishing(e0, p);
+            assert_eq!(res.0 .0, CM31::zero());
+            assert_eq!(res.1 .0, CM31::zero());
+
+            let inverse = (res.0.inverse(), res.1.inverse());
+            assert_eq!(inverse.0 .0, CM31::zero());
+            assert_eq!(inverse.1 .0, CM31::zero());
+
+            let hint = DenominatorInverseHint::new(e0, p);
+
+            let denominator_inverse_script = ConstraintsGadget::denominator_inverse_from_prepared();
+
+            let script = script! {
+                { prepared_e0 }
+                { p.x }
+                { p.y }
+                { denominator_inverse_script.clone() }
+                { inverse.1.1 }
+                cm31_equalverify
+                { inverse.0.1 }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script_with_witness(
+                script,
+                convert_to_witness(script! { { hint }}).unwrap(),
+            );
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
     fn test_prepare_pair_vanishing() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
@@ -648,7 +725,7 @@ mod test {
                 cm31_equalverify
                 { res.y_imag_dbl }
                 cm31_equalverify
-                { res.neg_x_imag_dbl }
+                { res.x_imag_dbl }
                 cm31_equalverify
                 OP_TRUE
             };

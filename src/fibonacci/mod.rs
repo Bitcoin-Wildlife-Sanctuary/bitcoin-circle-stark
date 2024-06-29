@@ -6,6 +6,7 @@ use std::iter::zip;
 
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
+use crate::constraints::DenominatorInverseHint;
 use crate::fri::QueriesWithHint;
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
@@ -13,11 +14,11 @@ use crate::pow::PoWHint;
 use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::{Air, AirExt};
-use stwo_prover::core::backend::cpu::quotients::batch_random_coeffs;
+use stwo_prover::core::backend::cpu::quotients::{batch_random_coeffs, denominator_inverses};
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{
@@ -26,7 +27,7 @@ use stwo_prover::core::fri::{
 };
 use stwo_prover::core::pcs::quotients::{ColumnSampleBatch, PointSample};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
-use stwo_prover::core::poly::circle::SecureCirclePoly;
+use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
 use stwo_prover::core::poly::line::LineDomain;
 use stwo_prover::core::proof_of_work::ProofOfWork;
 use stwo_prover::core::prover::{
@@ -85,11 +86,11 @@ pub struct VerifierHints {
     /// Precomputed tree Merkle proofs.
     pub precomputed_merkle_proofs: Vec<PrecomputedMerkleTreeProof>,
 
-    /// test only: circle point indices
-    pub test_only_circle_point: Vec<M31>,
+    /// Denominator inverse hints.
+    pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 
-    /// test only: twiddle factors
-    pub test_only_twiddle_factors: Vec<M31>,
+    /// test-only: the denominator inverse of the first point.
+    pub test_only_denominator_inverses: Vec<CM31>,
 }
 
 impl Pushable for VerifierHints {
@@ -123,10 +124,10 @@ impl Pushable for VerifierHints {
         for proof in self.precomputed_merkle_proofs.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        for elem in self.test_only_circle_point.iter() {
-            builder = elem.bitcoin_script_push(builder);
+        for hint in self.denominator_inverse_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
         }
-        for elem in self.test_only_twiddle_factors.iter().rev() {
+        for elem in self.test_only_denominator_inverses.iter() {
             builder = elem.bitcoin_script_push(builder);
         }
         builder
@@ -413,6 +414,32 @@ pub fn verify_with_hints(
     );
     let first_proof = precomputed_merkle_tree.query(query_domain.1.domains[0].coset_index << 1);
 
+    let commitment_domain =
+        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
+            .circle_domain();
+
+    let denominator_inverses_expected = query_domain
+        .1
+        .iter()
+        .map(|subdomain| {
+            let domain = subdomain.to_circle_domain(&commitment_domain);
+            denominator_inverses(&colume_sample_batches, domain)
+        })
+        .collect::<Vec<_>>();
+
+    let denominator_inverse_hint =
+        DenominatorInverseHint::new(samples[0][0].point, first_proof.circle_point);
+
+    assert_eq!(denominator_inverses_expected.len(), N_QUERIES);
+    println!("{:?}", denominator_inverses_expected[0]);
+    println!("{:?}", denominator_inverse_hint);
+
+    let denominator_inverse_hints = vec![denominator_inverse_hint];
+    let test_only_denominator_inverses = vec![
+        denominator_inverses_expected[0][0][0].1,
+        denominator_inverses_expected[0][0][1].1,
+    ];
+
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
@@ -442,8 +469,8 @@ pub fn verify_with_hints(
         merkle_proofs_traces,
         merkle_proofs_compositions,
         precomputed_merkle_proofs: vec![first_proof.clone()],
-        test_only_circle_point: vec![first_proof.circle_point.x, first_proof.circle_point.y],
-        test_only_twiddle_factors: first_proof.twiddles_elements,
+        denominator_inverse_hints,
+        test_only_denominator_inverses,
     })
 }
 

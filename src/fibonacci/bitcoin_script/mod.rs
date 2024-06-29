@@ -11,7 +11,8 @@ use crate::precomputed_merkle_tree::{
 };
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
+    cm31_equalverify, cm31_from_bottom, cm31_rot, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
+    qm31_from_bottom, qm31_over, qm31_roll,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -356,20 +357,74 @@ impl FibonacciVerifierGadget {
             //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
             //    c, (a, b), (a, b), (a, b), (a, b) for composition ((1 + 4 * 2) * 2 = 18)
 
+            // prepare masked points and oods point for pair vanishing
+            for i in 0..4 {
+                for _ in 0..8 {
+                    { 18 + 18 + 6 * i + (8 + 24) - 8 * i - 1 } OP_PICK
+                }
+                { ConstraintsGadget::prepare_pair_vanishing() }
+            }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
+            //    c, (a, b), (a, b), (a, b), (a, b) for composition ((1 + 4 * 2) * 2 = 18)
+            //    prepared masked points (3 * 6 = 18)
+            //    prepared oods point (6)
+
             // resolve the first point and obtain its twiddle factors
-            { 18 + 18 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
+            { 6 + 18 + 18 + 18 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
             { PrecomputedMerkleTreeGadget::query_and_verify(*precomputed_merkle_tree_roots.get(&(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR)).unwrap(), (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
 
-            // test-only: check the queried result
-            OP_SWAP OP_HINT OP_EQUALVERIFY OP_HINT OP_EQUALVERIFY
-            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
-                OP_HINT OP_EQUALVERIFY
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
+            //    c, (a, b), (a, b), (a, b), (a, b) for composition ((1 + 4 * 2) * 2 = 18)
+            //    prepared masked points (3 * 6 = 18)
+            //    prepared oods point (6)
+            //    twiddle factors (15)
+            //    x, y (2)
+
+            // compute the denominator inverse
+            for _ in 0..6 {
+                { 2 + 15 + 6 + 18 - 1 } OP_PICK // the first prepared masked point
             }
+            7 OP_PICK 7 OP_PICK // x, y
+            { ConstraintsGadget::denominator_inverse_from_prepared() }
+
+            // test-only: check the inverse
+            cm31_from_bottom
+            cm31_from_bottom
+            cm31_rot cm31_equalverify
+            cm31_equalverify
 
             // test-only: clean up the stack
+            OP_DROP OP_DROP // drop the x, y
+            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
+                OP_DROP
+            } // drop the twiddle factors
+            for _ in 0..24 {
+                OP_DROP
+            } // drop the prepared points
             for _ in 0..36 {
                 OP_DROP
-            }
+            } // drop the column line coeffs
             { CirclePointGadget::drop() } // drop oods point
             for _ in 0..3 {
                 { CirclePointGadget::drop() } // drop masked points
