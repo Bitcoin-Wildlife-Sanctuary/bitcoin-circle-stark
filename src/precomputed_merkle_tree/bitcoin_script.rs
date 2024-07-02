@@ -12,13 +12,12 @@ impl PrecomputedMerkleTreeGadget {
     ///   merkle tree proof
     ///
     /// input:
-    ///   root_hash
     ///   pos
     ///
     /// output:
     ///   v (m31 -- [num_layer] elements)
     ///   circle point (x, y; 2 elements)
-    pub fn query_and_verify(logn: usize) -> Script {
+    pub fn query_and_verify(root: [u8; 32], logn: usize) -> Script {
         let num_layer = logn - 1;
         script! {
             // convert pos into bits and drop the LSB
@@ -77,6 +76,7 @@ impl PrecomputedMerkleTreeGadget {
             OP_CAT
             OP_SHA256
 
+            { root.to_vec() }
             OP_EQUALVERIFY
 
             for _ in 0..num_layer {
@@ -99,29 +99,27 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for logn in 12..=20 {
-            let verify_script = PrecomputedMerkleTreeGadget::query_and_verify(logn);
-            println!("PMT.verify(2^{}) = {} bytes", logn, verify_script.len());
-
             let n_layers = logn - 1;
+            let tree = PrecomputedMerkleTree::new(n_layers);
 
-            let twiddle_merkle_tree = PrecomputedMerkleTree::new(n_layers);
+            let verify_script = PrecomputedMerkleTreeGadget::query_and_verify(tree.root_hash, logn);
+            println!("PMT.verify(2^{}) = {} bytes", logn, verify_script.len());
 
             let mut pos: u32 = prng.gen();
             pos &= (1 << logn) - 1;
 
-            let twiddle_proof = twiddle_merkle_tree.query(pos as usize);
+            let proof = tree.query(pos as usize);
 
             let script = script! {
-                { twiddle_proof.clone() }
-                { twiddle_merkle_tree.root_hash.to_vec() }
+                { proof.clone() }
                 { pos }
                 { verify_script.clone() }
-                { twiddle_proof.circle_point.y }
+                { proof.circle_point.y }
                 OP_EQUALVERIFY
-                { twiddle_proof.circle_point.x }
+                { proof.circle_point.x }
                 OP_EQUALVERIFY
                 for i in 0..n_layers {
-                    { twiddle_proof.twiddles_elements[n_layers - 1 - i] }
+                    { proof.twiddles_elements[n_layers - 1 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_TRUE

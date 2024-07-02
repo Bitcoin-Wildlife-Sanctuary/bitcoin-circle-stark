@@ -6,9 +6,12 @@ use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
 use crate::merkle_tree::MerkleTreeTwinGadget;
 use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
+use crate::precomputed_merkle_tree::{
+    get_precomputed_merkle_tree_roots, PrecomputedMerkleTreeGadget, PRECOMPUTED_MERKLE_TREE_ROOTS,
+};
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_drop, cm31_equalverify, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
+    cm31_equalverify, cm31_from_bottom, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
     qm31_from_bottom, qm31_over, qm31_roll,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
@@ -26,6 +29,9 @@ pub struct FibonacciVerifierGadget;
 impl FibonacciVerifierGadget {
     /// Run the verifier in the Bitcoin script.
     pub fn run_verifier(channel: &BWSSha256Channel) -> Script {
+        let precomputed_merkle_tree_roots =
+            PRECOMPUTED_MERKLE_TREE_ROOTS.get_or_init(get_precomputed_merkle_tree_roots);
+
         script! {
             // push the initial channel
             { channel.digest }
@@ -301,16 +307,16 @@ impl FibonacciVerifierGadget {
 
             // prepare to compute points for trace:
             // - input: p.y, f1(p)
-            // - output: c, a1, b1
+            // - output: a1, b1
 
             for i in 0..3 {
                 for _ in 0..4 {
-                    { i * 6 + 8 + (16 - 8 * i) + 4 - 1 } OP_PICK
+                    { i * 4 + 8 + (16 - 8 * i) + 4 - 1 } OP_PICK
                 }
                 for _ in 0..4 {
-                    { i * 6 + 4 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + (8 - 4 * i) + 4 - 1 } OP_ROLL
+                    { i * 4 + 4 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + (8 - 4 * i) + 4 - 1 } OP_ROLL
                 }
-                { ConstraintsGadget::column_line_coeffs(1) }
+                { ConstraintsGadget::column_line_coeffs_with_hint(1) }
             }
 
             // stack:
@@ -324,40 +330,109 @@ impl FibonacciVerifierGadget {
             //    composition queries (8 * N_QUERIES)
             //    masked points (3 * 8 = 24)
             //    oods point (8)
-            //    (c, a, b), (c, a, b), (c, a, b) for trace (3 * 3 * 2 = 18)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
 
             // prepare to compute points for composition:
             // - input: p.y, f1(p), f2(p), f3(p), f4(p)
-            // - output: c, a1, b1, a2, b2, a3, b3, a4, b4
+            // - output: a1, b1, a2, b2, a3, b3, a4, b4
 
             for _ in 0..4 {
-                { 18 + 4 - 1 } OP_PICK
+                { 12 + 4 - 1 } OP_PICK
             }
             for _ in 0..16 {
-                { 4 + 18 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 - 1 } OP_ROLL
+                { 4 + 12 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 - 1 } OP_ROLL
             }
-            { ConstraintsGadget::column_line_coeffs(4) }
+            { ConstraintsGadget::column_line_coeffs_with_hint(4) }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+
+            // prepare masked points and oods point for pair vanishing
+            for i in 0..4 {
+                for _ in 0..8 {
+                    { 16 + 12 + 4 * i + (8 + 24) - 8 * i - 1 } OP_PICK
+                }
+                { ConstraintsGadget::prepare_pair_vanishing_with_hint() }
+            }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+
+            // resolve the first point and obtain its twiddle factors
+            { 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
+            { PrecomputedMerkleTreeGadget::query_and_verify(*precomputed_merkle_tree_roots.get(&(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR)).unwrap(), (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    twiddle factors (15)
+            //    x, y (2)
+
+            // compute the denominator inverses
+            for i in 0..4 {
+                for _ in 0..4 {
+                    { 4 * i + 2 + 15 + (4 + 12) - 4 * i - 1 } OP_PICK // the prepared masked point
+                }
+                { 4 + 4 * i + 1 } OP_PICK { 4 + 4 * i + 1 } OP_PICK // x, y
+                { ConstraintsGadget::denominator_inverse_from_prepared() }
+            }
+
+            // test-only: check the inverses
+            for _ in 0..4 {
+                for _ in 0..2 {
+                    cm31_from_bottom
+                    cm31_equalverify
+                }
+            }
 
             // test-only: clean up the stack
-            for _ in 0..3 {
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_drop
-            }
-            OP_HINT OP_HINT cm31_equalverify
-            OP_HINT OP_HINT cm31_equalverify
-            OP_HINT OP_HINT cm31_equalverify
-            // test only: drop the composition results
-            for _ in 0..3 {
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                OP_HINT OP_HINT cm31_equalverify
-                // test only: drop the trace results
-            }
+            OP_DROP OP_DROP // drop the x, y
+            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
+                OP_DROP
+            } // drop the twiddle factors
+            for _ in 0..16 {
+                OP_DROP
+            } // drop the prepared points
+            for _ in 0..28 {
+                OP_DROP
+            } // drop the column line coeffs
+            { CirclePointGadget::drop() } // drop oods point
             for _ in 0..3 {
                 { CirclePointGadget::drop() } // drop masked points
             }
-            { CirclePointGadget::drop() } // drop oods point
             for _ in 0..N_QUERIES {
                 OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
             }

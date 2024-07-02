@@ -2,23 +2,24 @@ mod bitcoin_script;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
-use num_traits::One;
 use std::iter::zip;
 
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
+use crate::constraints::{ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint};
 use crate::fri::QueriesWithHint;
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
+use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
-use crate::utils::bit_reverse_index;
 use stwo_prover::core::air::{Air, AirExt};
-use stwo_prover::core::backend::cpu::quotients::batch_random_coeffs;
+use stwo_prover::core::backend::cpu::quotients::{batch_random_coeffs, denominator_inverses};
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::constraints::complex_conjugate_line_coeffs;
+use stwo_prover::core::constraints::complex_conjugate_line_coeffs_normalized;
+use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{
@@ -83,8 +84,20 @@ pub struct VerifierHints {
     /// Merkle proofs for the composition Merkle tree
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
 
-    /// test only: line coeffs
-    pub test_only_line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>>,
+    /// Column line coeff hints.
+    pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
+
+    /// Prepared pair vanishing hints.
+    pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
+
+    /// Precomputed tree Merkle proofs.
+    pub precomputed_merkle_proofs: Vec<PrecomputedMerkleTreeProof>,
+
+    /// Denominator inverse hints.
+    pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
+
+    /// test-only: the denominator inverse of the first point.
+    pub test_only_denominator_inverses: Vec<CM31>,
 }
 
 impl Pushable for VerifierHints {
@@ -115,14 +128,21 @@ impl Pushable for VerifierHints {
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        for batch in self.test_only_line_coeffs.iter().rev() {
-            for (a, b, c) in batch.iter().rev() {
-                builder = b.1.bitcoin_script_push(builder);
-                builder = a.1.bitcoin_script_push(builder);
-                builder = c.1.bitcoin_script_push(builder);
-            }
+        for hint in self.column_line_coeffs_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
         }
-
+        for hint in self.prepared_pair_vanishing_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
+        }
+        for proof in self.precomputed_merkle_proofs.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
+        for hint in self.denominator_inverse_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
+        }
+        for elem in self.test_only_denominator_inverses.iter().rev() {
+            builder = elem.bitcoin_script_push(builder);
+        }
         builder
     }
 }
@@ -392,7 +412,21 @@ pub fn verify_with_hints(
     let colume_sample_batches =
         ColumnSampleBatch::new_vec(&samples.iter().collect::<Vec<&Vec<PointSample>>>());
 
-    let expected_line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>> = {
+    let column_line_coeffs_hints = vec![
+        ColumnLineCoeffsHint::from(samples[0][0].point),
+        ColumnLineCoeffsHint::from(samples[0][1].point),
+        ColumnLineCoeffsHint::from(samples[0][2].point),
+        ColumnLineCoeffsHint::from(samples[1][0].point),
+    ];
+
+    let prepared_pair_vanishing_hints = vec![
+        PreparedPairVanishingHint::from(samples[0][0].point),
+        PreparedPairVanishingHint::from(samples[0][1].point),
+        PreparedPairVanishingHint::from(samples[0][2].point),
+        PreparedPairVanishingHint::from(samples[1][0].point),
+    ];
+
+    let expected_line_coeffs: Vec<Vec<(CM31, CM31)>> = {
         colume_sample_batches
             .iter()
             .map(|sample_batch| {
@@ -405,7 +439,7 @@ pub fn verify_with_hints(
                             value: *sampled_value,
                         };
                         // defer the applying of alpha for the composition to a later step
-                        complex_conjugate_line_coeffs(&sample, SecureField::one())
+                        complex_conjugate_line_coeffs_normalized(&sample)
                     })
                     .collect()
             })
@@ -422,47 +456,43 @@ pub fn verify_with_hints(
         random_coeff.square().square()
     );
 
-    println!(
-        "{:?}",
-        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
-            .circle_domain()
-            .at(bit_reverse_index(
-                query_domain.1.domains[0].coset_index << 1,
-                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
-            ))
+    let precomputed_merkle_tree = PrecomputedMerkleTree::new(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor - 1) as usize,
     );
-    println!(
-        "{:?}",
-        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
-            .circle_domain()
-            .at(bit_reverse_index(
-                (query_domain.1.domains[0].coset_index << 1) + 1,
-                (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize
-            ))
-    );
-    println!(
-        "{:?}",
-        query_domain.1.domains[0]
-            .to_circle_domain(
-                &CanonicCoset::new(
-                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
-                )
-                .circle_domain()
-            )
-            .at(0)
-    );
-    println!(
-        "{:?}",
-        query_domain.1.domains[0]
-            .to_circle_domain(
-                &CanonicCoset::new(
-                    max_column_bound.log_degree_bound + fri_config.log_blowup_factor
-                )
-                .circle_domain()
-            )
-            .at(1)
-    );
+    let first_proof = precomputed_merkle_tree.query(query_domain.1.domains[0].coset_index << 1);
 
+    let commitment_domain =
+        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
+            .circle_domain();
+
+    let denominator_inverses_expected = query_domain
+        .1
+        .iter()
+        .map(|subdomain| {
+            let domain = subdomain.to_circle_domain(&commitment_domain);
+            denominator_inverses(&colume_sample_batches, domain)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(denominator_inverses_expected.len(), N_QUERIES);
+
+    let denominator_inverse_hints = vec![
+        DenominatorInverseHint::new(samples[0][0].point, first_proof.circle_point),
+        DenominatorInverseHint::new(samples[0][1].point, first_proof.circle_point),
+        DenominatorInverseHint::new(samples[0][2].point, first_proof.circle_point),
+        DenominatorInverseHint::new(samples[1][0].point, first_proof.circle_point),
+    ];
+    let test_only_denominator_inverses = vec![
+        denominator_inverses_expected[0][0][0],
+        denominator_inverses_expected[0][0][1],
+        denominator_inverses_expected[0][1][0],
+        denominator_inverses_expected[0][1][1],
+        denominator_inverses_expected[0][2][0],
+        denominator_inverses_expected[0][2][1],
+        denominator_inverses_expected[0][3][0],
+        denominator_inverses_expected[0][3][1],
+    ];
+
+    let _ = expected_line_coeffs;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
@@ -491,7 +521,11 @@ pub fn verify_with_hints(
         queries_hints,
         merkle_proofs_traces,
         merkle_proofs_compositions,
-        test_only_line_coeffs: expected_line_coeffs,
+        column_line_coeffs_hints,
+        prepared_pair_vanishing_hints,
+        precomputed_merkle_proofs: vec![first_proof.clone()],
+        denominator_inverse_hints,
+        test_only_denominator_inverses,
     })
 }
 

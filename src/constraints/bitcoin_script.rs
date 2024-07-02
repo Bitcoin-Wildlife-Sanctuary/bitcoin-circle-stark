@@ -1,8 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_copy, cm31_double, cm31_drop, cm31_dup, cm31_fromaltstack, cm31_mul,
-    cm31_mul_m31, cm31_neg, cm31_over, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack, m31_add,
-    qm31_add, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
+    cm31_add, cm31_copy, cm31_dup, cm31_equalverify, cm31_from_bottom, cm31_fromaltstack, cm31_mul,
+    cm31_mul_m31, cm31_over, cm31_roll, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack, m31_add,
+    push_cm31_one, qm31_add, qm31_drop, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -16,58 +16,65 @@ pub struct ConstraintsGadget;
 impl ConstraintsGadget {
     /// Compute the parameters of `column_line_coeffs` without applying alpha.
     ///
+    /// Hint:
+    /// - `y_imag_inv`
+    ///
     /// Input:
-    /// - `p.y, f1(p), f2(p), ..., fn(p)`
+    /// - `p.y, f1(p), f2(p), ..., fn(p)`, all of which are QM31
     ///
     /// Output:
-    /// - `c, (a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
-    /// where all of them are cm31 (and it represents the imaginary part rather than the real part).
-    /// where:
-    /// - `ai = conjugate(fi(p)) - fi(p) = -2yi`, aka double-neg of the imaginary part (which is a cm31)
-    /// - `bi = fi(p) * c - a * p.y
-    ///       = fi(p) * (conjugate(p.y) - p.y) - (conjugate(fi(p)) - fi(p)) * p.y
-    ///       = fi(p) * conjugate(p.y) - conjugate(fi(p)) * p.y
-    ///       = (x + yi) * (u - vi) - (x - yi) * (u + vi)
-    ///       = 2(yu - xv)i`, which is also cm31.
-    /// - `c = conjugate(p.y) - p.y = -2vi`, aka double-neg of the imaginary part (which is a cm31)
+    /// - `(a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
+    /// where all of them are cm31.
+    /// - `ai = Im(f(P)) / Im(p.y)`
+    /// - `bi = Re(f(P)) - Im(f(P))/ Im(p.y) Re(p.y)`
     ///
-    pub fn column_line_coeffs(num_columns: usize) -> Script {
+    pub fn column_line_coeffs_with_hint(num_columns: usize) -> Script {
         assert!(num_columns > 0);
         script! {
+            // compute 1 / Im(p.y) first
+
             // roll p.y
             { qm31_roll(num_columns) }
+            cm31_swap
+
+            // stack:
+            // - f1(p), f2(p), ..., fn(p)
+            // - p.y.0, p.y.1
+
+            cm31_from_bottom
+            cm31_dup cm31_rot
+            cm31_mul push_cm31_one cm31_equalverify
+
+            // stack:
+            // - f1(p), f2(p), ..., fn(p)
+            // - p.y.0, y_imag_inv
 
             // process each column
             for _ in 0..num_columns {
-                qm31_swap
-                // top of the stack:
-                //   c: v cm31
-                //   c: u cm31
-                //   fn(p): y cm31
-                //   fn(p): x cm31
+                // pull the f(p)
+                { qm31_roll(num_columns) } // treating (p.y.0, y_imag_inv) as a qm31
 
-                { cm31_copy(3) }
+                // local stack:
+                // - p.y.0
+                // - y_imag_inv
+                // - f1(p).1
+                // - f1(p).0
 
-                cm31_mul cm31_toaltstack
-                cm31_over cm31_over cm31_mul
-                cm31_fromaltstack cm31_sub cm31_double
                 cm31_toaltstack
+                cm31_over
+                cm31_mul
 
-                cm31_double cm31_neg cm31_toaltstack
+                { cm31_copy(2) }
+                cm31_over
+                cm31_mul
+
+                cm31_fromaltstack
+                cm31_swap cm31_sub
+
+                qm31_swap
             }
 
-            // stack:
-            //   c
-            //
-            // altstack:
-            //   bn, an, ..., ..., b1, a1
-            cm31_drop
-            cm31_double cm31_neg
-
-            for _ in 0..num_columns {
-                cm31_fromaltstack
-                cm31_fromaltstack
-            }
+            qm31_drop
         }
     }
 
@@ -120,8 +127,10 @@ impl ConstraintsGadget {
         }
     }
 
-    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
-    /// z.x and z.y are both M31 elements.
+    /// Prepare for pair vanishing.
+    ///
+    /// Hint:
+    /// - x_imag_div_y_imag
     ///
     /// Input:
     /// - exclude0
@@ -129,32 +138,36 @@ impl ConstraintsGadget {
     ///   * exclude0.x.0 (2 elements)
     ///   * exclude0.y.1 (2 elements)
     ///   * exclude0.y.0 (2 elements)
-    /// - z.x (1 element)
-    /// - z.y (1 element)
     ///
     /// Output:
-    /// - qm31
-    ///
-    pub fn fast_pair_vanishing() -> Script {
+    /// - x_imag_div_y_imag (2 elements)
+    /// - cross_term (2 elements)
+    pub fn prepare_pair_vanishing_with_hint() -> Script {
         script! {
-            // copy exclude0.y.1
-            5 OP_PICK 5 OP_PICK
-            // copy z.x
-            3 OP_ROLL
-            cm31_mul_m31
+            // pull exclude0.x.1
+            { cm31_roll(3) }
 
-            // copy exclude0.x.1
-            10 OP_PICK 10 OP_PICK
-            // copy z.y
-            4 OP_ROLL
-            cm31_mul_m31
+            // pull exclude0.y.1
+            { cm31_roll(2) }
 
-            cm31_sub cm31_toaltstack
+            // pull x_imag_div_y_imag
+            cm31_from_bottom
+            cm31_dup cm31_toaltstack
 
-            cm31_toaltstack cm31_mul cm31_swap cm31_fromaltstack cm31_mul
-            cm31_swap cm31_sub cm31_fromaltstack cm31_add cm31_double
+            // check x_imag_div_y_imag * exclude0.y.1 = exclude0.x.1
+            cm31_mul
+            cm31_equalverify
 
-            { 0 } { 0 }
+            // recover x_imag_div_y_imag
+            cm31_fromaltstack
+
+            // stack:
+            // - exclude0.x.0
+            // - exclude0.y.0
+            // - x_imag_div_y_imag
+
+            cm31_dup cm31_rot cm31_mul
+            cm31_rot cm31_sub
         }
     }
 
@@ -162,85 +175,131 @@ impl ConstraintsGadget {
     /// z.x and z.y are both M31 elements.
     ///
     /// Input:
-    /// - exclude0
-    ///   * exclude0.x.1 (2 elements)
-    ///   * exclude0.x.0 (2 elements)
-    ///   * exclude0.y.1 (2 elements)
-    ///   * exclude0.y.0 (2 elements)
+    /// - x_imag_div_y_imag (2 elements)
+    /// - cross_term (2 elements)
     /// - z.x (1 element)
     /// - z.y (1 element)
     ///
     /// Output:
-    /// - qm31 for z
-    /// - qm31 for conjugated z
+    /// - cm31 = z.x - z.y * x_imag_div_y_imag + cross_term
     ///
-    pub fn fast_twin_pair_vanishing() -> Script {
+    pub fn fast_pair_vanishing_from_prepared() -> Script {
         script! {
-            // copy exclude0.y.1
-            5 OP_PICK 5 OP_PICK
-            // copy z.x
-            3 OP_ROLL
-            cm31_mul_m31 cm31_toaltstack
-
-            // copy exclude0.x.1
-            8 OP_PICK 8 OP_PICK
-            // copy z.y
-            2 OP_ROLL
-            cm31_mul_m31 cm31_toaltstack
-
-            // compute the cross term
-            cm31_toaltstack cm31_mul cm31_swap cm31_fromaltstack cm31_mul
-            cm31_swap cm31_sub
+            OP_SWAP OP_TOALTSTACK OP_TOALTSTACK
+            cm31_swap OP_FROMALTSTACK
 
             // stack:
-            // - exclude0.x.1 * exclude0.y.0 - exclude0.x.0 *  exclude0.y.1 (2 elements)
+            // - cross_term
+            // - x_imag_div_y_imag
+            // - z.y
             //
             // altstack:
-            // - e0.y.1 * p.x (2 elements)
-            // - e0.x.1 * p.y (2 elements)
+            // - z.x
 
-            cm31_fromaltstack cm31_fromaltstack cm31_rot cm31_add
-
-            // stack:
-            // - e0.x.1 * p.y (2 elements)
-            // - term1 + term3 (2 elements)
+            cm31_mul_m31
+            cm31_sub
 
             // stack:
-            // - e0.x.1 * p.y (2 elements)
-            // - term1 + term3 (2 elements)
-            // - term1 + term3 (2 elements)
+            // - cross_term - z.y * x_imag_div_y_imag
+            //
+            // altstack:
+            // - z.x
 
-            cm31_dup { cm31_copy(2) } cm31_sub cm31_double cm31_toaltstack
-            cm31_add cm31_double cm31_fromaltstack cm31_swap
+            OP_FROMALTSTACK
+            m31_add
+        }
+    }
 
-            // stack:
-            // - cm31 for z
-            // - cm31 for conjugated z
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Input:
+    /// - x_imag_div_y_imag (2 elements)
+    /// - cross_term (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - cm31 for z
+    /// - cm31 for conjugated z
+    ///
+    pub fn fast_twin_pair_vanishing_from_prepared() -> Script {
+        script! {
+            OP_TOALTSTACK
+            m31_add // add z.x to cross_term
 
-            { 0 } { 0 }
             cm31_swap
-            { 0 } { 0 }
+            OP_FROMALTSTACK
+            cm31_mul_m31 // compute x_imag_div_y_imag * z.y
+
+            // stack:
+            // - cross_term + z.x
+            // - x_imag_div_y_imag * z.y
+
+            cm31_over cm31_over
+            cm31_add cm31_toaltstack
+            cm31_sub cm31_fromaltstack
+        }
+    }
+
+    /// Evaluate a fast pair vanishing polynomial where exclude1 = complex_conjugate(exclude0) and
+    /// z.x and z.y are both M31 elements.
+    ///
+    /// Hint:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    /// Input:
+    /// - x_imag_div_y_imag (2 elements)
+    /// - cross_term (2 elements)
+    /// - z.x (1 element)
+    /// - z.y (1 element)
+    ///
+    /// Output:
+    /// - inverse cm31 for z
+    /// - inverse cm31 for conjugated z
+    ///
+    pub fn denominator_inverse_from_prepared() -> Script {
+        script! {
+            { Self::fast_twin_pair_vanishing_from_prepared() }
+            cm31_toaltstack
+            cm31_from_bottom
+            cm31_swap
+            cm31_over
+            cm31_mul
+            push_cm31_one
+            cm31_equalverify
+
+            cm31_fromaltstack
+            cm31_from_bottom
+            cm31_swap cm31_over
+            cm31_mul
+            push_cm31_one
+            cm31_equalverify
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::constraints::{fast_pair_vanishing, fast_twin_pair_vanishing};
+    use crate::constraints::{
+        fast_pair_vanishing, fast_twin_pair_vanishing, ColumnLineCoeffs, ColumnLineCoeffsHint,
+        DenominatorInverseHint, PreparedPairVanishing, PreparedPairVanishingHint,
+    };
     use crate::utils::get_rand_qm31;
     use crate::{
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
+    use bitcoin_scriptexec::execute_script_with_witness;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::{cm31_equalverify, qm31_equalverify};
-    use std::ops::{Mul, Sub};
     use stwo_prover::core::circle::{
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
     use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::ComplexConjugate;
+    use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
     fn test_coset_vanishing() {
@@ -316,31 +375,25 @@ mod test {
     }
 
     #[test]
-    fn test_fast_pair_vanishing() {
-        for seed in 0..20 {
-            let mut prng = ChaCha20Rng::seed_from_u64(seed);
+    fn test_fast_pair_vanishing_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
 
+        for _ in 0..10 {
             let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
             let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
             let res = fast_pair_vanishing(e0, p);
-
-            let pair_vanishing_script = ConstraintsGadget::fast_pair_vanishing();
-            if seed == 0 {
-                report_bitcoin_script_size(
-                    "Constraints",
-                    "fast_pair_vanishing",
-                    pair_vanishing_script.len(),
-                );
-            }
+            let h = PreparedPairVanishingHint::from(e0);
 
             let script = script! {
+                { h }
                 { e0 }
+                { ConstraintsGadget::prepare_pair_vanishing_with_hint() }
                 { p.x }
                 { p.y }
-                { pair_vanishing_script.clone() }
+                { ConstraintsGadget::fast_pair_vanishing_from_prepared() }
                 { res }
-                qm31_equalverify
+                cm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
@@ -349,33 +402,91 @@ mod test {
     }
 
     #[test]
-    fn test_fast_twin_pair_vanishing() {
-        for seed in 0..20 {
-            let mut prng = ChaCha20Rng::seed_from_u64(seed);
+    fn test_fast_twin_pair_vanishing_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
 
+        for _ in 0..10 {
             let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
             let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
 
             let res = fast_twin_pair_vanishing(e0, p);
-
-            let pair_vanishing_script = ConstraintsGadget::fast_twin_pair_vanishing();
-            if seed == 0 {
-                report_bitcoin_script_size(
-                    "Constraints",
-                    "fast_twin_pair_vanishing",
-                    pair_vanishing_script.len(),
-                );
-            }
+            let h = PreparedPairVanishingHint::from(e0);
 
             let script = script! {
+                { h }
                 { e0 }
+                { ConstraintsGadget::prepare_pair_vanishing_with_hint() }
                 { p.x }
                 { p.y }
-                { pair_vanishing_script.clone() }
+                { ConstraintsGadget::fast_twin_pair_vanishing_from_prepared() }
                 { res.1 }
-                qm31_equalverify
+                cm31_equalverify
                 { res.0 }
-                qm31_equalverify
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_denominator_inverse_from_prepared() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let p = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+
+            let prepared_e0 = PreparedPairVanishing::from(e0);
+
+            let res = fast_twin_pair_vanishing(e0, p);
+
+            let inverse = (res.0.inverse(), res.1.inverse());
+
+            let hint = DenominatorInverseHint::new(e0, p);
+
+            let denominator_inverse_script = ConstraintsGadget::denominator_inverse_from_prepared();
+
+            let script = script! {
+                { prepared_e0 }
+                { p.x }
+                { p.y }
+                { denominator_inverse_script.clone() }
+                { inverse.1 }
+                cm31_equalverify
+                { inverse.0 }
+                cm31_equalverify
+                OP_TRUE
+            };
+            let exec_result = execute_script_with_witness(
+                script,
+                convert_to_witness(script! { { hint }}).unwrap(),
+            );
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_prepare_pair_vanishing() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let e0 = CirclePoint::<QM31>::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+
+            let res = PreparedPairVanishing::from(e0);
+            let h = PreparedPairVanishingHint::from(e0);
+
+            let prepare_script = ConstraintsGadget::prepare_pair_vanishing_with_hint();
+
+            let script = script! {
+                { h }
+                { e0 }
+                { prepare_script.clone() }
+                { res.cross_term }
+                cm31_equalverify
+                { res.x_imag_div_y_imag }
+                cm31_equalverify
                 OP_TRUE
             };
             let exec_result = execute_script(script);
@@ -394,7 +505,10 @@ mod test {
                 values.push(get_rand_qm31(&mut prng));
             }
 
-            let column_line_coeffs_script = ConstraintsGadget::column_line_coeffs(column_len);
+            let h = ColumnLineCoeffsHint::from(point);
+
+            let column_line_coeffs_script =
+                ConstraintsGadget::column_line_coeffs_with_hint(column_len);
 
             report_bitcoin_script_size(
                 "Constraints",
@@ -402,32 +516,21 @@ mod test {
                 column_line_coeffs_script.len(),
             );
 
-            let expected = {
-                let mut res = vec![];
-                for value in values.iter() {
-                    let a = value.complex_conjugate().sub(*value);
-                    let c = point.complex_conjugate().y - point.y;
-                    let b = value.mul(c) - a * point.y;
-
-                    res.push((a, b, c));
-                }
-                res
-            };
+            let expected = ColumnLineCoeffs::from_values_and_point(&values, point);
 
             let script = script! {
+                { h }
                 { point.y }
                 for value in values.iter() {
                     { value }
                 }
                 { column_line_coeffs_script.clone() }
-                for elems in expected.iter().rev() {
-                    { elems.1.1 }
+                for (fp_imag_div_y_imag, cross_term) in expected.fp_imag_div_y_imag.iter().zip(expected.cross_term.iter()).rev() {
+                    { cross_term }
                     cm31_equalverify
-                    { elems.0.1 }
+                    { fp_imag_div_y_imag }
                     cm31_equalverify
                 }
-                { expected[0].2.1 }
-                cm31_equalverify
                 OP_TRUE
             };
 
