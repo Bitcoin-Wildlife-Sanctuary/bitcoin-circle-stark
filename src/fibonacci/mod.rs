@@ -542,8 +542,8 @@ pub fn verify_with_hints(
     }
 
     let mut nominators = vec![];
-    for i in 0..3 {
-        nominators.push(column_line_coeffs[i].apply_twin(
+    for column_line_coeff in column_line_coeffs.iter().take(3) {
+        nominators.push(column_line_coeff.apply_twin(
             first_proof.circle_point,
             &[queried_values_left[0][0]],
             &[queried_values_right[0][0]],

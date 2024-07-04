@@ -431,7 +431,7 @@ impl FibonacciVerifierGadget {
             //    denominator inverses (4 * 4 = 16)
 
             // compute the nominator (before alpha)
-            for _ in 0..1 * 2 {
+            for _ in 0..2 {
                 (16 + 2 + 15 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES - 1) OP_ROLL // roll the trace queries
             }
             for _ in 0..4 * 2 {
