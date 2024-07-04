@@ -1,8 +1,8 @@
 use crate::{circle::CirclePointGadget, treepp::*};
 use rust_bitcoin_m31::{
     cm31_add, cm31_copy, cm31_dup, cm31_equalverify, cm31_from_bottom, cm31_fromaltstack, cm31_mul,
-    cm31_mul_m31, cm31_over, cm31_roll, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack, m31_add,
-    push_cm31_one, qm31_add, qm31_drop, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
+    cm31_mul_m31, cm31_neg, cm31_over, cm31_roll, cm31_rot, cm31_sub, cm31_swap, cm31_toaltstack,
+    m31_add, push_cm31_one, qm31_add, qm31_drop, qm31_mul_m31_by_constant, qm31_roll, qm31_swap,
 };
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
@@ -26,7 +26,7 @@ impl ConstraintsGadget {
     /// - `(a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
     /// where all of them are cm31.
     /// - `ai = Im(f(P)) / Im(p.y)`
-    /// - `bi = Re(f(P)) - Im(f(P))/ Im(p.y) Re(p.y)`
+    /// - `bi = Im(f(P))/ Im(p.y) Re(p.y) - Re(f(P))`
     ///
     pub fn column_line_coeffs_with_hint(num_columns: usize) -> Script {
         assert!(num_columns > 0);
@@ -278,6 +278,51 @@ impl ConstraintsGadget {
             cm31_equalverify
         }
     }
+
+    /// Apply the column line coeffs to twin evaluations and the point.
+    ///
+    /// Input:
+    /// - z.y (1 element)
+    /// - queried value for z (1 element)
+    /// - queried value for conjugated (1 element)
+    /// - (a, b)  (2 * 2 = 4 elements, each is a CM31)
+    ///
+    /// Output:
+    /// - cm31 nominator for z
+    /// - cm31 nominator for conjugated z (aka -y)
+    pub fn apply_twin() -> Script {
+        script! {
+            cm31_neg
+            cm31_swap
+            6 OP_ROLL
+            cm31_mul_m31
+
+            // stack:
+            // - queried value for z (1 element)
+            // - queried value for conjugated (1 element)
+            // - -b (2 elements)
+            // - a * z.y (2 elements)
+
+            cm31_over cm31_over
+            cm31_add cm31_toaltstack
+            cm31_sub
+
+            // stack:
+            // - queried value for z (1 element)
+            // - queried value for conjugated (1 element)
+            // - -b - a * z.y (2 elements)
+            //
+            // altstack:
+            // - -b + a * z.y (2 elements)
+
+            3 OP_ROLL
+            m31_add
+
+            cm31_fromaltstack
+            4 OP_ROLL
+            m31_add
+        }
+    }
 }
 
 #[cfg(test)]
@@ -291,13 +336,14 @@ mod test {
         constraints::ConstraintsGadget, tests_utils::report::report_bitcoin_script_size, treepp::*,
     };
     use bitcoin_scriptexec::execute_script_with_witness;
-    use rand::{Rng, SeedableRng};
+    use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::{cm31_equalverify, qm31_equalverify};
     use stwo_prover::core::circle::{
         CirclePoint, Coset, M31_CIRCLE_GEN, SECURE_FIELD_CIRCLE_ORDER,
     };
     use stwo_prover::core::constraints::{coset_vanishing, pair_vanishing};
+    use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
 
@@ -531,6 +577,50 @@ mod test {
                     { fp_imag_div_y_imag }
                     cm31_equalverify
                 }
+                OP_TRUE
+            };
+
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+    }
+
+    #[test]
+    fn test_apply_twin() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for _ in 0..10 {
+            let sample_point =
+                CirclePoint::get_point(prng.gen::<u128>() % SECURE_FIELD_CIRCLE_ORDER);
+            let sample_value = get_rand_qm31(&mut prng);
+
+            let coeffs = ColumnLineCoeffs::from_values_and_point(&[sample_value], sample_point);
+
+            let query_point = M31_CIRCLE_GEN.mul(prng.gen::<u128>());
+            let query_value_left = M31::reduce(prng.next_u64());
+            let query_value_right = M31::reduce(prng.next_u64());
+
+            let (expected_left, expected_right) =
+                coeffs.apply_twin(query_point, &[query_value_left], &[query_value_right]);
+            assert_eq!(expected_left.len(), 1);
+            assert_eq!(expected_right.len(), 1);
+
+            let apply_twin_script = ConstraintsGadget::apply_twin();
+            println!(
+                "Constraints.coset_vanishing = {} bytes",
+                apply_twin_script.len()
+            );
+
+            let script = script! {
+                { query_point.y }
+                { query_value_left }
+                { query_value_right }
+                { coeffs }
+                { apply_twin_script }
+                { expected_right[0] }
+                cm31_equalverify
+                { expected_left[0] }
+                cm31_equalverify
                 OP_TRUE
             };
 
