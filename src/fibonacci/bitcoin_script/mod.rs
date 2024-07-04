@@ -505,6 +505,16 @@ impl FibonacciVerifierGadget {
             //    composition queries (8)
             //    nominators (7 * 2 * 2 = 28)
 
+            // remove the trace queries and composition queries (unused)
+            for _ in 0..(2 + 8) {
+                28 OP_ROLL OP_DROP
+            }
+
+            // remove x, y (unused)
+            for _ in 0..2 {
+                { 28 + 16 } OP_ROLL OP_DROP
+            }
+
             // test-only: verify the nominators
             for _ in 0..7 * 2 {
                 cm31_from_bottom
@@ -527,21 +537,14 @@ impl FibonacciVerifierGadget {
             //    prepared oods point (4)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
-            //    x, y (2)
             //    denominator inverses (4 * 4 = 16)
-            //    trace queries (2)
-            //    composition queries (8)
 
             // test-only: clean up the stack
-            for _ in 0..(2 + 8) {
-                OP_DROP  // drop the queries
-            }
             for _ in 0..4 {
                 for _ in 0..2 {
                     cm31_drop
                 }
             } // drop the denominator inverses
-            OP_DROP OP_DROP // drop the x, y
             for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
                 OP_DROP
             } // drop the twiddle factors
