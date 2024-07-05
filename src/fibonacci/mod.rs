@@ -97,9 +97,6 @@ pub struct VerifierHints {
 
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
-
-    /// test-only: the nominators of the first point.
-    pub test_only_nominators: Vec<CM31>,
 }
 
 impl Pushable for VerifierHints {
@@ -141,9 +138,6 @@ impl Pushable for VerifierHints {
         }
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
-        }
-        for elem in self.test_only_nominators.iter().rev() {
-            builder = elem.bitcoin_script_push(builder);
         }
         builder
     }
@@ -619,7 +613,7 @@ pub fn verify_with_hints(
         fri_answers[0].subcircle_evals[0].values[1]
     );
 
-    let test_only_nominators = vec![
+    let _test_only_nominators = [
         nominators[0].0[0],
         nominators[0].1[0],
         nominators[1].0[0],
@@ -669,7 +663,6 @@ pub fn verify_with_hints(
         prepared_pair_vanishing_hints,
         precomputed_merkle_proofs: vec![first_proof.clone()],
         denominator_inverse_hints,
-        test_only_nominators,
     })
 }
 

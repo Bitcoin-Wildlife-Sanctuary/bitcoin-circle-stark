@@ -11,9 +11,9 @@ use crate::precomputed_merkle_tree::{
 };
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_drop, cm31_equalverify, cm31_from_bottom, qm31_copy, qm31_drop, qm31_dup,
-    qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul, qm31_over, qm31_roll,
-    qm31_square, qm31_toaltstack,
+    cm31_add, cm31_drop, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add,
+    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack,
+    qm31_mul, qm31_mul_cm31, qm31_over, qm31_roll, qm31_square, qm31_toaltstack,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -542,17 +542,148 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
-            //    coeff^6, coeff^5, ..., coeff (24)
+            //    coeff^6, coeff^5, ..., coeff (6 * 4 = 24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    denominator inverses (4 * 2 * 2 = 16)
             //    nominators (7 * 2 * 2 = 28)
 
-            // test-only: verify the nominators
-            for _ in 0..7 * 2 {
-                cm31_from_bottom
-                cm31_equalverify
+            // u1, u2, u3:
+            //   nominator[0, 1, 2].left * denominator_inverses[0].left
+
+            // local stack:
+            //    denominator inverses (8 cm31): u1, v1, u2, v2, u3, v3, u4, v4
+            //    nominators (14 cm31):
+            //      a1, b1, a2, b2, a3, b3, c1, d1, c2, d2, c3, d3, c4, d4
+
+            { cm31_roll(14 + 8 - 1) } // u1
+            { cm31_roll(1 + 14 - 1) } // a1
+            cm31_mul cm31_toaltstack // u1 * a1
+
+            { cm31_roll(13 + 8 - 3) } // u2
+            { cm31_roll(1 + 14 - 3) } // a2
+            cm31_mul cm31_toaltstack // u2 * a2
+
+            { cm31_roll(12 + 8 - 5) } // u3
+            { cm31_roll(1 + 14 - 5) } // a3
+            cm31_mul cm31_toaltstack // u3 * a3
+
+            // local stack:
+            //    denominator inverses (5 cm31): v1, v2, v3, u4, v4
+            //    nominators (11 cm31):
+            //      b1, b2, b3, c1, d1, c2, d2, c3, d3, c4, d4
+            //
+            // local altstack:
+            //      u1 * a1 (cm31), u2 * a2 (cm31), u3 * a3 (cm31)
+
+            { cm31_roll(11 + 5 - 1) } // v1
+            { cm31_roll(1 + 11 - 1) } // b1
+            cm31_mul cm31_toaltstack // v1 * b1
+
+            { cm31_roll(10 + 5 - 2) } // v2
+            { cm31_roll(1 + 11 - 2) } // b2
+            cm31_mul cm31_toaltstack // v2 * b2
+
+            { cm31_roll(9 + 5 - 3) } // v3
+            { cm31_roll(1 + 11 - 3) } // b3
+            cm31_mul cm31_toaltstack // v3 * b3
+
+            // local stack:
+            //    denominator inverses (2 cm31): u4, v4
+            //    nominators (8 cm31):
+            //      c1, d1, c2, d2, c3, d3, c4, d4
+            //
+            // local altstack:
+            //      u1 * a1 (cm31), u2 * a2 (cm31), u3 * a3 (cm31)
+            //      v1 * b1 (cm31), v2 * b2 (cm31), v3 * b3 (cm31)
+
+            for _ in 0..4 {
+                { (8 + 2) * 2 + 15 + 12 - 1 } OP_PICK
+            } // copy coeff^3
+            { cm31_roll(2 + 8 - 1) } // c1
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { (7 + 2) * 2 + 15 + 8 - 1 } OP_PICK
+            } // copy coeff^2
+            { cm31_roll(2 + 6 - 1) } // c2
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { (6 + 2) * 2 + 15 + 8 - 1 } OP_PICK
+            } // copy coeff
+            { cm31_roll(2 + 4 - 1) } // c3
+            qm31_mul_cm31
+
+            qm31_fromaltstack qm31_add
+            qm31_fromaltstack qm31_add
+            { cm31_roll(2 + 1) } // c4
+            cm31_add
+
+            { cm31_roll(2 + 4 + 1) } // u4
+            qm31_mul_cm31
+            qm31_toaltstack
+
+            // local stack:
+            //    denominator inverse: v4
+            //    nominators (4 cm31):
+            //      d1, d2, d3, d4
+            //
+            // local altstack:
+            //      u1 * a1 (cm31), u2 * a2 (cm31), u3 * a3 (cm31)
+            //      v1 * b1 (cm31), v2 * b2 (cm31), v3 * b3 (cm31)
+            //      (coeff^3 * c1 + coeff^2 * c2 + coeff * c3 + c4) * u4 (qm31)
+
+            for _ in 0..4 {
+                { (4 + 1) * 2 + 15 + 12 - 1 } OP_PICK
+            } // copy coeff^3
+            { cm31_roll(2 + 4 - 1) } // d1
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { (3 + 1) * 2 + 15 + 8 - 1 } OP_PICK
+            } // copy coeff^2
+            { cm31_roll(2 + 3 - 1) } // d2
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { (2 + 1) * 2 + 15 + 8 - 1 } OP_PICK
+            } // copy coeff
+            { cm31_roll(2 + 2 - 1) } // d3
+            qm31_mul_cm31
+
+            qm31_fromaltstack qm31_add
+            qm31_fromaltstack qm31_add
+            { cm31_roll(2) } // d4
+            cm31_add
+
+            { cm31_roll(2) } // v4
+            qm31_mul_cm31
+            qm31_toaltstack
+
+            // local stack:
+            // local altstack:
+            //      u1 * a1 (cm31), u2 * a2 (cm31), u3 * a3 (cm31)
+            //      v1 * b1 (cm31), v2 * b2 (cm31), v3 * b3 (cm31)
+            //      (coeff^3 * c1 + coeff^2 * c2 + coeff * c3 + c4) * u4 (qm31)
+            //      (coeff^3 * d1 + coeff^2 * d2 + coeff * d3 + d4) * v4 (qm31)
+
+            qm31_fromaltstack qm31_fromaltstack
+            for _ in 0..6 {
+                cm31_fromaltstack
             }
+
+            // local stack:
+            //      (coeff^3 * d1 + coeff^2 * d2 + coeff * d3 + d4) * v4 (qm31)
+            //      (coeff^3 * c1 + coeff^2 * c2 + coeff * c3 + c4) * u4 (qm31)
+            //      v3 * b3 (cm31), v2 * b2 (cm31), v1 * b1 (cm31),
+            //      u3 * a3 (cm31), u2 * a2 (cm31), u1 * a1 (cm31)
+
+            // drop the result
+            for _ in 0..6 {
+                cm31_drop
+            }
+            qm31_drop qm31_drop
 
             // stack:
             //    circle_poly_alpha (4)
@@ -570,14 +701,8 @@ impl FibonacciVerifierGadget {
             //    random_coeff2 (4)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
-            //    denominator inverses (4 * 4 = 16)
 
             // test-only: clean up the stack
-            for _ in 0..4 {
-                for _ in 0..2 {
-                    cm31_drop
-                }
-            } // drop the denominator inverses
             for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
                 OP_DROP
             } // drop the twiddle factors
