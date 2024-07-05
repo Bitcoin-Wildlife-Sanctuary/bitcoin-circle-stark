@@ -28,7 +28,7 @@ use stwo_prover::core::fri::{
     get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
     FriVerificationError, FOLD_STEP,
 };
-use stwo_prover::core::pcs::quotients::{ColumnSampleBatch, PointSample};
+use stwo_prover::core::pcs::quotients::{fri_answers, ColumnSampleBatch, PointSample};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
 use stwo_prover::core::poly::line::LineDomain;
@@ -497,7 +497,7 @@ pub fn verify_with_hints(
     let precomputed_merkle_tree = PrecomputedMerkleTree::new(
         (max_column_bound.log_degree_bound + fri_config.log_blowup_factor - 1) as usize,
     );
-    let first_proof = precomputed_merkle_tree.query(query_domain.1.domains[0].coset_index << 1);
+    let first_proof = precomputed_merkle_tree.query(queries_parents[0] << 1);
 
     let commitment_domain =
         CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
@@ -541,6 +541,26 @@ pub fn verify_with_hints(
         queried_values_right.push(right_vec);
     }
 
+    let mut flatten_values = vec![vec![]; 5];
+    for (l, r) in queried_values_left.iter().zip(queried_values_right.iter()) {
+        for ((flatten, &ll), &rr) in flatten_values.iter_mut().zip_eq(l.iter()).zip_eq(r.iter()) {
+            flatten.push(ll);
+            flatten.push(rr);
+        }
+    }
+
+    let fri_answers = fri_answers(
+        commitment_scheme
+            .column_log_sizes()
+            .flatten()
+            .into_iter()
+            .collect(),
+        &samples,
+        random_coeff,
+        fri_query_domains,
+        &flatten_values,
+    )?;
+
     let mut nominators = vec![];
     for column_line_coeff in column_line_coeffs.iter().take(3) {
         nominators.push(column_line_coeff.apply_twin(
@@ -564,6 +584,40 @@ pub fn verify_with_hints(
             queried_values_right[0][4],
         ],
     ));
+
+    let expected_eval_left = random_coeff.pow(6)
+        * QM31::from(nominators[0].0[0] * denominator_inverses_expected[0][0][0])
+        + random_coeff.pow(5)
+            * QM31::from(nominators[1].0[0] * denominator_inverses_expected[0][1][0])
+        + random_coeff.pow(4)
+            * QM31::from(nominators[2].0[0] * denominator_inverses_expected[0][2][0])
+        + (random_coeff.pow(3) * QM31::from(nominators[3].0[0])
+            + random_coeff.pow(2) * QM31::from(nominators[3].0[1])
+            + random_coeff * QM31::from(nominators[3].0[2])
+            + QM31::from(nominators[3].0[3]))
+            * QM31::from(denominator_inverses_expected[0][3][0]);
+
+    assert_eq!(
+        expected_eval_left,
+        fri_answers[0].subcircle_evals[0].values[0]
+    );
+
+    let expected_eval_right = random_coeff.pow(6)
+        * QM31::from(nominators[0].1[0] * denominator_inverses_expected[0][0][1])
+        + random_coeff.pow(5)
+            * QM31::from(nominators[1].1[0] * denominator_inverses_expected[0][1][1])
+        + random_coeff.pow(4)
+            * QM31::from(nominators[2].1[0] * denominator_inverses_expected[0][2][1])
+        + (random_coeff.pow(3) * QM31::from(nominators[3].1[0])
+            + random_coeff.pow(2) * QM31::from(nominators[3].1[1])
+            + random_coeff * QM31::from(nominators[3].1[2])
+            + QM31::from(nominators[3].1[3]))
+            * QM31::from(denominator_inverses_expected[0][3][1]);
+
+    assert_eq!(
+        expected_eval_right,
+        fri_answers[0].subcircle_evals[0].values[1]
+    );
 
     let test_only_nominators = vec![
         nominators[0].0[0],
