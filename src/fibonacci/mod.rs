@@ -98,11 +98,8 @@ pub struct VerifierHints {
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 
-    /// Test-only: six cm31 during the calculation of the FRI answer.
-    pub test_only_fri_answer_small_parts: Vec<CM31>,
-
-    /// Test-only: qm31 during the calculation of the FRI answer.
-    pub test_only_fri_answer_big_parts: Vec<QM31>,
+    /// Test-only: the FRI answer.
+    pub test_only_fri_answer: Vec<QM31>,
 }
 
 impl Pushable for VerifierHints {
@@ -145,10 +142,7 @@ impl Pushable for VerifierHints {
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
-        for elem in self.test_only_fri_answer_small_parts.iter() {
-            builder = elem.bitcoin_script_push(builder);
-        }
-        for elem in self.test_only_fri_answer_big_parts.iter() {
+        for elem in self.test_only_fri_answer.iter().rev() {
             builder = elem.bitcoin_script_push(builder);
         }
         builder
@@ -625,35 +619,7 @@ pub fn verify_with_hints(
         fri_answers[0].subcircle_evals[0].values[1]
     );
 
-    let mut test_only_fri_answer_small_parts = vec![];
-    for (nominator, denominator_inverse) in nominators
-        .iter()
-        .zip(denominator_inverses_expected[0].iter())
-        .take(3)
-    {
-        test_only_fri_answer_small_parts.push(nominator.0[0] * denominator_inverse[0]);
-    }
-
-    for (nominator, denominator_inverse) in nominators
-        .iter()
-        .zip(denominator_inverses_expected[0].iter())
-        .take(3)
-    {
-        test_only_fri_answer_small_parts.push(nominator.1[0] * denominator_inverse[1]);
-    }
-
-    let test_only_fri_answer_big_parts = vec![
-        (random_coeff.pow(3) * QM31::from(nominators[3].0[0])
-            + random_coeff.pow(2) * QM31::from(nominators[3].0[1])
-            + random_coeff * QM31::from(nominators[3].0[2])
-            + QM31::from(nominators[3].0[3]))
-            * QM31::from(denominator_inverses_expected[0][3][0]),
-        (random_coeff.pow(3) * QM31::from(nominators[3].1[0])
-            + random_coeff.pow(2) * QM31::from(nominators[3].1[1])
-            + random_coeff * QM31::from(nominators[3].1[2])
-            + QM31::from(nominators[3].1[3]))
-            * QM31::from(denominator_inverses_expected[0][3][1]),
-    ];
+    let test_only_fri_answer = vec![expected_eval_left, expected_eval_right];
 
     let _ = expected_line_coeffs;
     let _ = last_layer_domain;
@@ -688,8 +654,7 @@ pub fn verify_with_hints(
         prepared_pair_vanishing_hints,
         precomputed_merkle_proofs: vec![first_proof.clone()],
         denominator_inverse_hints,
-        test_only_fri_answer_small_parts,
-        test_only_fri_answer_big_parts,
+        test_only_fri_answer,
     })
 }
 

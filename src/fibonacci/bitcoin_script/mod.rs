@@ -11,9 +11,9 @@ use crate::precomputed_merkle_tree::{
 };
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_equalverify, cm31_from_bottom, cm31_fromaltstack, cm31_mul, cm31_roll,
-    cm31_toaltstack, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom,
-    qm31_fromaltstack, qm31_mul, qm31_mul_cm31, qm31_over, qm31_roll, qm31_square, qm31_toaltstack,
+    cm31_add, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add, qm31_copy,
+    qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul,
+    qm31_mul_cm31, qm31_over, qm31_roll, qm31_rot, qm31_square, qm31_swap, qm31_toaltstack,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -673,19 +673,62 @@ impl FibonacciVerifierGadget {
                 cm31_fromaltstack
             }
 
-            // local stack:
+            // local stack (6 * 2 + 2 * 4 = 20 elements):
             //      (coeff^3 * d1 + coeff^2 * d2 + coeff * d3 + d4) * v4 (qm31)
             //      (coeff^3 * c1 + coeff^2 * c2 + coeff * c3 + c4) * u4 (qm31)
             //      v3 * b3 (cm31), v2 * b2 (cm31), v1 * b1 (cm31),
             //      u3 * a3 (cm31), u2 * a2 (cm31), u1 * a1 (cm31)
 
-            // 0x00f23568 0x5848d543 0x63469c7f 0x3c3e6327
-            // 0xd8c2ed03 0xdb7baf65 0x025e2d6e 0xa771db65
+            for _ in 0..4 {
+                { 20 + 15 + 24 - 1 } OP_PICK
+            } // copy coeff^6
+            { cm31_roll(2) } // u1 * a1
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { 18 + 15 + 20 - 1 } OP_PICK
+            } // copy coeff^5
+            { cm31_roll(2) } // u2 * a2
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { 16 + 15 + 16 - 1 } OP_PICK
+            } // copy coeff^4
+            { cm31_roll(2) } // u3 * a3
+            qm31_mul_cm31
+
+            qm31_fromaltstack qm31_add qm31_fromaltstack qm31_add
+            qm31_toaltstack
+
+            for _ in 0..4 {
+                { 14 + 15 + 24 - 1 } OP_PICK
+            } // copy coeff^6
+            { cm31_roll(2) } // v1 * b1
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { 12 + 15 + 20 - 1 } OP_PICK
+            } // copy coeff^5
+            { cm31_roll(2) } // v2 * b2
+            qm31_mul_cm31 qm31_toaltstack
+
+            for _ in 0..4 {
+                { 10 + 15 + 16 - 1 } OP_PICK
+            } // copy coeff^4
+            { cm31_roll(2) } // v3 * b3
+            qm31_mul_cm31
+
+            qm31_fromaltstack qm31_add qm31_fromaltstack qm31_add
+            qm31_fromaltstack
+
+            qm31_rot qm31_add
+            qm31_toaltstack qm31_add qm31_fromaltstack qm31_swap
+
+            // local stack (4 elements):
+            //      answer_1 (qm31)
+            //      answer_2 (qm31)
 
             // test only: check the result consistency
-            for _ in 0..6 {
-                cm31_from_bottom cm31_equalverify
-            }
             qm31_from_bottom qm31_equalverify
             qm31_from_bottom qm31_equalverify
 
