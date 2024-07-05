@@ -1,7 +1,10 @@
 use crate::channel::{ChannelWithHint, DrawHints};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::queries::Queries;
 
 mod bitcoin_script;
+use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 
 /// A trait for generating the queries with hints.
@@ -28,5 +31,31 @@ impl QueriesWithHint for Queries {
             },
             res.1,
         )
+    }
+}
+
+/// Hint for inverting a field element.
+pub struct FieldInversionHint {
+    /// The computed inverse.
+    pub inverse: M31,
+}
+
+impl From<M31> for FieldInversionHint {
+    fn from(value: M31) -> Self {
+        Self {
+            inverse: value.inverse(),
+        }
+    }
+}
+
+impl Pushable for &FieldInversionHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        self.inverse.bitcoin_script_push(builder)
+    }
+}
+
+impl Pushable for FieldInversionHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
     }
 }
