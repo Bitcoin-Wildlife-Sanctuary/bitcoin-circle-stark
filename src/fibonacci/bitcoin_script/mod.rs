@@ -12,7 +12,8 @@ use crate::precomputed_merkle_tree::{
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
     cm31_drop, cm31_equalverify, cm31_from_bottom, qm31_copy, qm31_drop, qm31_dup,
-    qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
+    qm31_equalverify, qm31_from_bottom, qm31_fromaltstack, qm31_mul, qm31_over, qm31_roll,
+    qm31_square, qm31_toaltstack,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -365,8 +366,20 @@ impl FibonacciVerifierGadget {
                 { ConstraintsGadget::prepare_pair_vanishing_with_hint() }
             }
 
+            // move random_coeffs2 closer
+            for _ in 0..4 {
+                { 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 - 1 } OP_ROLL
+            }
+
+            // compute coeff^6, coeff^5, coeff^4, coeff^3, coeff^2, coeff
+            qm31_dup qm31_toaltstack
+            qm31_dup qm31_square qm31_dup qm31_toaltstack
+            qm31_over qm31_mul qm31_dup qm31_toaltstack
+            qm31_over qm31_mul qm31_dup qm31_toaltstack
+            qm31_over qm31_mul qm31_dup qm31_toaltstack
+            qm31_mul qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack
+
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -379,13 +392,13 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
 
             // resolve the first point and obtain its twiddle factors
-            { 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
+            { 24 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES + (N_QUERIES - 1) } OP_PICK
             { PrecomputedMerkleTreeGadget::query_and_verify(*precomputed_merkle_tree_roots.get(&(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR)).unwrap(), (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
 
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -398,6 +411,7 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    x, y (2)
@@ -405,14 +419,13 @@ impl FibonacciVerifierGadget {
             // compute the denominator inverses
             for i in 0..4 {
                 for _ in 0..4 {
-                    { 4 * i + 2 + 15 + (4 + 12) - 4 * i - 1 } OP_PICK // the prepared masked point
+                    { 4 * i + 2 + 15 + (24 + 4 + 12) - 4 * i - 1 } OP_PICK // the prepared masked point
                 }
                 { 4 + 4 * i + 1 } OP_PICK { 4 + 4 * i + 1 } OP_PICK // x, y
                 { ConstraintsGadget::denominator_inverse_from_prepared() }
             }
 
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -425,6 +438,7 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    x, y (2)
@@ -432,14 +446,13 @@ impl FibonacciVerifierGadget {
 
             // compute the nominator (before alpha)
             for _ in 0..2 {
-                (16 + 2 + 15 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES - 1) OP_ROLL // roll the trace queries
+                (16 + 2 + 15 + 24 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES - 1) OP_ROLL // roll the trace queries
             }
             for _ in 0..4 * 2 {
-                (2 + 16 + 2 + 15 + 4 + 12 + 16 + 12 + 8 + 24 + 8 * N_QUERIES - 1) OP_ROLL // roll the composition queries
+                (2 + 16 + 2 + 15 + 24 + 4 + 12 + 16 + 12 + 8 + 24 + 8 * N_QUERIES - 1) OP_ROLL // roll the composition queries
             }
 
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -452,6 +465,7 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    x, y (2)
@@ -464,7 +478,7 @@ impl FibonacciVerifierGadget {
                 { 1 + 4 * i + 8 + 2 - 1 } OP_PICK { 1 + 4 * i + 8 + 2 - 1 } OP_PICK // copy trace queries
 
                 for _ in 0..4 {
-                    { 3 + 4 * i + 8 + 2 + 16 + 2 + 15 + 4 + 12 + 16 + (12 - 4 * i) - 1 } OP_PICK // copy (a, b)
+                    { 3 + 4 * i + 8 + 2 + 16 + 2 + 15 + 24 + 4 + 12 + 16 + (12 - 4 * i) - 1 } OP_PICK // copy (a, b)
                 }
 
                 { ConstraintsGadget::apply_twin() }
@@ -477,14 +491,13 @@ impl FibonacciVerifierGadget {
                 // copy composition queries
 
                 for _ in 0..4 {
-                    { 3 + 4 * i + 12 + 8 + 2 + 16 + 2 + 15 + 4 + 12 + (16 - 4 * i) - 1 } OP_PICK
+                    { 3 + 4 * i + 12 + 8 + 2 + 16 + 2 + 15 + 24 + 4 + 12 + (16 - 4 * i) - 1 } OP_PICK
                 } // copy (a, b)
 
                 { ConstraintsGadget::apply_twin() }
             }
 
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -497,6 +510,7 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    x, y (2)
@@ -515,14 +529,7 @@ impl FibonacciVerifierGadget {
                 { 28 + 16 } OP_ROLL OP_DROP
             }
 
-            // test-only: verify the nominators
-            for _ in 0..7 * 2 {
-                cm31_from_bottom
-                cm31_equalverify
-            }
-
             // stack:
-            //    random_coeff2 (4)
             //    circle_poly_alpha (4)
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
@@ -535,6 +542,32 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
+            //    ---------------------------- per query ----------------------------
+            //    twiddle factors (15)
+            //    denominator inverses (4 * 2 * 2 = 16)
+            //    nominators (7 * 2 * 2 = 28)
+
+            // test-only: verify the nominators
+            for _ in 0..7 * 2 {
+                cm31_from_bottom
+                cm31_equalverify
+            }
+
+            // stack:
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES - 2 * 1)
+            //    composition queries (8 * N_QUERIES - 8 * 1)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    random_coeff2 (4)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    denominator inverses (4 * 4 = 16)
@@ -548,6 +581,9 @@ impl FibonacciVerifierGadget {
             for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
                 OP_DROP
             } // drop the twiddle factors
+            for _ in 0..6 {
+                qm31_drop
+            } // drop coeff^6, coeff^5, ..., coeff
             for _ in 0..16 {
                 OP_DROP
             } // drop the prepared points
@@ -573,7 +609,6 @@ impl FibonacciVerifierGadget {
                 OP_DROP // drop the commitment
             }
             qm31_drop // drop circle_poly_alpha
-            qm31_drop // drop random_coeff2
         }
     }
 }
