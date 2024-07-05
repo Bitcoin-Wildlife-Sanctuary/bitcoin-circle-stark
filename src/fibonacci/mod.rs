@@ -655,23 +655,6 @@ pub fn verify_with_hints(
             * QM31::from(denominator_inverses_expected[0][3][1]),
     ];
 
-    let _test_only_nominators = [
-        nominators[0].0[0],
-        nominators[0].1[0],
-        nominators[1].0[0],
-        nominators[1].1[0],
-        nominators[2].0[0],
-        nominators[2].1[0],
-        nominators[3].0[0],
-        nominators[3].1[0],
-        nominators[3].0[1],
-        nominators[3].1[1],
-        nominators[3].0[2],
-        nominators[3].1[2],
-        nominators[3].0[3],
-        nominators[3].1[3],
-    ];
-
     let _ = expected_line_coeffs;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
