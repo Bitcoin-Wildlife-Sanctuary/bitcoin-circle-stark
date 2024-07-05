@@ -11,9 +11,9 @@ use crate::precomputed_merkle_tree::{
 };
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_add, cm31_drop, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add,
-    qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_fromaltstack,
-    qm31_mul, qm31_mul_cm31, qm31_over, qm31_roll, qm31_square, qm31_toaltstack,
+    cm31_add, cm31_equalverify, cm31_from_bottom, cm31_fromaltstack, cm31_mul, cm31_roll,
+    cm31_toaltstack, qm31_add, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify, qm31_from_bottom,
+    qm31_fromaltstack, qm31_mul, qm31_mul_cm31, qm31_over, qm31_roll, qm31_square, qm31_toaltstack,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -610,7 +610,7 @@ impl FibonacciVerifierGadget {
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (6 + 2) * 2 + 15 + 8 - 1 } OP_PICK
+                { (6 + 2) * 2 + 15 + 4 - 1 } OP_PICK
             } // copy coeff
             { cm31_roll(2 + 4 - 1) } // c3
             qm31_mul_cm31
@@ -647,7 +647,7 @@ impl FibonacciVerifierGadget {
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (2 + 1) * 2 + 15 + 8 - 1 } OP_PICK
+                { (2 + 1) * 2 + 15 + 4 - 1 } OP_PICK
             } // copy coeff
             { cm31_roll(2 + 2 - 1) } // d3
             qm31_mul_cm31
@@ -679,11 +679,15 @@ impl FibonacciVerifierGadget {
             //      v3 * b3 (cm31), v2 * b2 (cm31), v1 * b1 (cm31),
             //      u3 * a3 (cm31), u2 * a2 (cm31), u1 * a1 (cm31)
 
-            // drop the result
+            // 0x00f23568 0x5848d543 0x63469c7f 0x3c3e6327
+            // 0xd8c2ed03 0xdb7baf65 0x025e2d6e 0xa771db65
+
+            // test only: check the result consistency
             for _ in 0..6 {
-                cm31_drop
+                cm31_from_bottom cm31_equalverify
             }
-            qm31_drop qm31_drop
+            qm31_from_bottom qm31_equalverify
+            qm31_from_bottom qm31_equalverify
 
             // stack:
             //    circle_poly_alpha (4)
