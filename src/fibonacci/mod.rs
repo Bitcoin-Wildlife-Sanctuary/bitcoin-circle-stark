@@ -6,7 +6,9 @@ use std::iter::zip;
 
 use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
-use crate::constraints::{ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint};
+use crate::constraints::{
+    ColumnLineCoeffs, ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint,
+};
 use crate::fri::QueriesWithHint;
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
 use crate::oods::{OODSHint, OODS};
@@ -96,8 +98,8 @@ pub struct VerifierHints {
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 
-    /// test-only: the denominator inverse of the first point.
-    pub test_only_denominator_inverses: Vec<CM31>,
+    /// test-only: the nominators of the first point.
+    pub test_only_nominators: Vec<CM31>,
 }
 
 impl Pushable for VerifierHints {
@@ -140,7 +142,7 @@ impl Pushable for VerifierHints {
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
-        for elem in self.test_only_denominator_inverses.iter().rev() {
+        for elem in self.test_only_nominators.iter().rev() {
             builder = elem.bitcoin_script_push(builder);
         }
         builder
@@ -412,20 +414,6 @@ pub fn verify_with_hints(
     let colume_sample_batches =
         ColumnSampleBatch::new_vec(&samples.iter().collect::<Vec<&Vec<PointSample>>>());
 
-    let column_line_coeffs_hints = vec![
-        ColumnLineCoeffsHint::from(samples[0][0].point),
-        ColumnLineCoeffsHint::from(samples[0][1].point),
-        ColumnLineCoeffsHint::from(samples[0][2].point),
-        ColumnLineCoeffsHint::from(samples[1][0].point),
-    ];
-
-    let prepared_pair_vanishing_hints = vec![
-        PreparedPairVanishingHint::from(samples[0][0].point),
-        PreparedPairVanishingHint::from(samples[0][1].point),
-        PreparedPairVanishingHint::from(samples[0][2].point),
-        PreparedPairVanishingHint::from(samples[1][0].point),
-    ];
-
     let expected_line_coeffs: Vec<Vec<(CM31, CM31)>> = {
         colume_sample_batches
             .iter()
@@ -445,6 +433,56 @@ pub fn verify_with_hints(
             })
             .collect()
     };
+
+    let column_line_coeffs = vec![
+        ColumnLineCoeffs::from_values_and_point(&[samples[0][0].value], samples[0][0].point),
+        ColumnLineCoeffs::from_values_and_point(&[samples[0][1].value], samples[0][1].point),
+        ColumnLineCoeffs::from_values_and_point(&[samples[0][2].value], samples[0][2].point),
+        ColumnLineCoeffs::from_values_and_point(
+            &[
+                sample_values[1][0][0],
+                sample_values[1][1][0],
+                sample_values[1][2][0],
+                sample_values[1][3][0],
+            ],
+            samples[1][0].point,
+        ),
+    ];
+
+    for i in 0..3 {
+        assert_eq!(
+            expected_line_coeffs[i][0].0,
+            column_line_coeffs[i].fp_imag_div_y_imag[0]
+        );
+        assert_eq!(
+            expected_line_coeffs[i][0].1,
+            column_line_coeffs[i].cross_term[0]
+        );
+    }
+    for j in 0..4 {
+        assert_eq!(
+            expected_line_coeffs[3][j].0,
+            column_line_coeffs[3].fp_imag_div_y_imag[j]
+        );
+        assert_eq!(
+            expected_line_coeffs[3][j].1,
+            column_line_coeffs[3].cross_term[j]
+        );
+    }
+
+    let column_line_coeffs_hints = vec![
+        ColumnLineCoeffsHint::from(samples[0][0].point),
+        ColumnLineCoeffsHint::from(samples[0][1].point),
+        ColumnLineCoeffsHint::from(samples[0][2].point),
+        ColumnLineCoeffsHint::from(samples[1][0].point),
+    ];
+
+    let prepared_pair_vanishing_hints = vec![
+        PreparedPairVanishingHint::from(samples[0][0].point),
+        PreparedPairVanishingHint::from(samples[0][1].point),
+        PreparedPairVanishingHint::from(samples[0][2].point),
+        PreparedPairVanishingHint::from(samples[1][0].point),
+    ];
 
     let expected_batch_random_coeffs =
         { batch_random_coeffs(&colume_sample_batches, random_coeff) };
@@ -481,15 +519,67 @@ pub fn verify_with_hints(
         DenominatorInverseHint::new(samples[0][2].point, first_proof.circle_point),
         DenominatorInverseHint::new(samples[1][0].point, first_proof.circle_point),
     ];
-    let test_only_denominator_inverses = vec![
-        denominator_inverses_expected[0][0][0],
-        denominator_inverses_expected[0][0][1],
-        denominator_inverses_expected[0][1][0],
-        denominator_inverses_expected[0][1][1],
-        denominator_inverses_expected[0][2][0],
-        denominator_inverses_expected[0][2][1],
-        denominator_inverses_expected[0][3][0],
-        denominator_inverses_expected[0][3][1],
+
+    let mut queried_values_left = vec![];
+    let mut queried_values_right = vec![];
+    for (trace, composition) in merkle_proofs_traces
+        .iter()
+        .zip(merkle_proofs_compositions.iter())
+    {
+        let mut left_vec = vec![];
+        let mut right_vec = vec![];
+        for (&left, &right) in trace
+            .left
+            .iter()
+            .zip(trace.right.iter())
+            .chain(composition.left.iter().zip(composition.right.iter()))
+        {
+            left_vec.push(left);
+            right_vec.push(right);
+        }
+        queried_values_left.push(left_vec);
+        queried_values_right.push(right_vec);
+    }
+
+    let mut nominators = vec![];
+    for column_line_coeff in column_line_coeffs.iter().take(3) {
+        nominators.push(column_line_coeff.apply_twin(
+            first_proof.circle_point,
+            &[queried_values_left[0][0]],
+            &[queried_values_right[0][0]],
+        ));
+    }
+    nominators.push(column_line_coeffs[3].apply_twin(
+        first_proof.circle_point,
+        &[
+            queried_values_left[0][1],
+            queried_values_left[0][2],
+            queried_values_left[0][3],
+            queried_values_left[0][4],
+        ],
+        &[
+            queried_values_right[0][1],
+            queried_values_right[0][2],
+            queried_values_right[0][3],
+            queried_values_right[0][4],
+        ],
+    ));
+
+    let test_only_nominators = vec![
+        nominators[0].0[0],
+        nominators[0].1[0],
+        nominators[1].0[0],
+        nominators[1].1[0],
+        nominators[2].0[0],
+        nominators[2].1[0],
+        nominators[3].0[0],
+        nominators[3].1[0],
+        nominators[3].0[1],
+        nominators[3].1[1],
+        nominators[3].0[2],
+        nominators[3].1[2],
+        nominators[3].0[3],
+        nominators[3].1[3],
     ];
 
     let _ = expected_line_coeffs;
@@ -525,7 +615,7 @@ pub fn verify_with_hints(
         prepared_pair_vanishing_hints,
         precomputed_merkle_proofs: vec![first_proof.clone()],
         denominator_inverse_hints,
-        test_only_denominator_inverses,
+        test_only_nominators,
     })
 }
 

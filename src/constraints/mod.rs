@@ -154,7 +154,7 @@ pub fn fast_twin_pair_vanishing_from_prepared(
 pub struct ColumnLineCoeffs {
     /// The coefficient before `-X.y`, which is `Im(f(P)) / Im(P.y)`.
     pub fp_imag_div_y_imag: Vec<CM31>,
-    /// The cross term, which is `Re(f(P)) - Im(f(P)) / Im(P.y) * Re(P.y)`.
+    /// The cross term, which is `Im(f(P)) / Im(P.y) * Re(P.y) - Re(f(P)) `.
     pub cross_term: Vec<CM31>,
 }
 
@@ -177,6 +177,52 @@ impl ColumnLineCoeffs {
             fp_imag_div_y_imag,
             cross_term,
         }
+    }
+
+    /// Apply the column line coeffs onto a point and its evaluation.
+    pub fn apply_twin(
+        &self,
+        point: CirclePoint<M31>,
+        evals_left: &[M31],
+        evals_right: &[M31],
+    ) -> (Vec<CM31>, Vec<CM31>) {
+        assert_eq!(evals_left.len(), self.fp_imag_div_y_imag.len());
+        assert_eq!(evals_left.len(), self.cross_term.len());
+        assert_eq!(evals_left.len(), evals_right.len());
+
+        let mut res_left = vec![];
+        let mut res_right = vec![];
+        for (((&fp_imag_div_y_imag, &cross_term), &eval_left), &eval_right) in self
+            .fp_imag_div_y_imag
+            .iter()
+            .zip(self.cross_term.iter())
+            .zip(evals_left.iter())
+            .zip(evals_right.iter())
+        {
+            let mut tmp = fp_imag_div_y_imag;
+            tmp *= point.y;
+            res_left.push(eval_left - (cross_term + tmp));
+            res_right.push(eval_right - (cross_term - tmp));
+        }
+        (res_left, res_right)
+    }
+}
+
+impl Pushable for &ColumnLineCoeffs {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        for (fp_imag_div_y_imag, cross_term) in
+            self.fp_imag_div_y_imag.iter().zip(self.cross_term.iter())
+        {
+            builder = fp_imag_div_y_imag.bitcoin_script_push(builder);
+            builder = cross_term.bitcoin_script_push(builder);
+        }
+        builder
+    }
+}
+
+impl Pushable for ColumnLineCoeffs {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
     }
 }
 

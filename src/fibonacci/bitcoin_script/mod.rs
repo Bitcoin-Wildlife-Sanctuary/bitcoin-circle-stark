@@ -11,8 +11,8 @@ use crate::precomputed_merkle_tree::{
 };
 use crate::{treepp::*, OP_HINT};
 use rust_bitcoin_m31::{
-    cm31_equalverify, cm31_from_bottom, qm31_copy, qm31_drop, qm31_dup, qm31_equalverify,
-    qm31_from_bottom, qm31_over, qm31_roll,
+    cm31_drop, cm31_equalverify, cm31_from_bottom, qm31_copy, qm31_drop, qm31_dup,
+    qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
 };
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::fields::m31::M31;
@@ -398,6 +398,7 @@ impl FibonacciVerifierGadget {
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
+            //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
             //    x, y (2)
 
@@ -410,16 +411,140 @@ impl FibonacciVerifierGadget {
                 { ConstraintsGadget::denominator_inverse_from_prepared() }
             }
 
-            // test-only: check the inverses
-            for _ in 0..4 {
-                for _ in 0..2 {
-                    cm31_from_bottom
-                    cm31_equalverify
-                }
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    ---------------------------- per query ----------------------------
+            //    twiddle factors (15)
+            //    x, y (2)
+            //    denominator inverses (4 * 4 = 16)
+
+            // compute the nominator (before alpha)
+            for _ in 0..2 {
+                (16 + 2 + 15 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES - 1) OP_ROLL // roll the trace queries
+            }
+            for _ in 0..4 * 2 {
+                (2 + 16 + 2 + 15 + 4 + 12 + 16 + 12 + 8 + 24 + 8 * N_QUERIES - 1) OP_ROLL // roll the composition queries
             }
 
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES - 2 * 1)
+            //    composition queries (8 * N_QUERIES - 8 * 1)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    ---------------------------- per query ----------------------------
+            //    twiddle factors (15)
+            //    x, y (2)
+            //    denominator inverses (4 * 4 = 16)
+            //    trace queries (2)
+            //    composition queries (8)
+
+            for i in 0..3 {
+                { 4 * i + 8 + 2 + 16 } OP_PICK // copy y
+                { 1 + 4 * i + 8 + 2 - 1 } OP_PICK { 1 + 4 * i + 8 + 2 - 1 } OP_PICK // copy trace queries
+
+                for _ in 0..4 {
+                    { 3 + 4 * i + 8 + 2 + 16 + 2 + 15 + 4 + 12 + 16 + (12 - 4 * i) - 1 } OP_PICK // copy (a, b)
+                }
+
+                { ConstraintsGadget::apply_twin() }
+            }
+
+            for i in 0..4 {
+                { 4 * i + 12 + 8 + 2 + 16 } OP_PICK // copy y
+                { 1 + 4 * i + 12 + (8 - i) - 1 } OP_PICK
+                { 1 + 1 + 4 * i + 12 + (4 - i) - 1 } OP_PICK
+                // copy composition queries
+
+                for _ in 0..4 {
+                    { 3 + 4 * i + 12 + 8 + 2 + 16 + 2 + 15 + 4 + 12 + (16 - 4 * i) - 1 } OP_PICK
+                } // copy (a, b)
+
+                { ConstraintsGadget::apply_twin() }
+            }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES - 2 * 1)
+            //    composition queries (8 * N_QUERIES - 8 * 1)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    ---------------------------- per query ----------------------------
+            //    twiddle factors (15)
+            //    x, y (2)
+            //    denominator inverses (4 * 2 * 2 = 16)
+            //    trace queries (2)
+            //    composition queries (8)
+            //    nominators (7 * 2 * 2 = 28)
+
+            // remove the trace queries and composition queries (unused)
+            for _ in 0..(2 + 8) {
+                28 OP_ROLL OP_DROP
+            }
+
+            // remove x, y (unused)
+            for _ in 0..2 {
+                { 28 + 16 } OP_ROLL OP_DROP
+            }
+
+            // test-only: verify the nominators
+            for _ in 0..7 * 2 {
+                cm31_from_bottom
+                cm31_equalverify
+            }
+
+            // stack:
+            //    random_coeff2 (4)
+            //    circle_poly_alpha (4)
+            //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
+            //    last layer (4)
+            //    queries (N_QUERIES)
+            //    trace queries (2 * N_QUERIES - 2 * 1)
+            //    composition queries (8 * N_QUERIES - 8 * 1)
+            //    masked points (3 * 8 = 24)
+            //    oods point (8)
+            //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
+            //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
+            //    prepared masked points (3 * 4 = 12)
+            //    prepared oods point (4)
+            //    ---------------------------- per query ----------------------------
+            //    twiddle factors (15)
+            //    denominator inverses (4 * 4 = 16)
+
             // test-only: clean up the stack
-            OP_DROP OP_DROP // drop the x, y
+            for _ in 0..4 {
+                for _ in 0..2 {
+                    cm31_drop
+                }
+            } // drop the denominator inverses
             for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
                 OP_DROP
             } // drop the twiddle factors
@@ -433,10 +558,10 @@ impl FibonacciVerifierGadget {
             for _ in 0..3 {
                 { CirclePointGadget::drop() } // drop masked points
             }
-            for _ in 0..N_QUERIES {
+            for _ in 0..(N_QUERIES - 1)  {
                 OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
             }
-            for _ in 0..N_QUERIES {
+            for _ in 0..(N_QUERIES - 1) {
                 OP_2DROP // drop the queried values for trace
             }
             for _ in 0..N_QUERIES {
