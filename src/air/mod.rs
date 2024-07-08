@@ -11,11 +11,17 @@ pub struct CompositionHint {
     pub constraint_eval_quotients_by_mask: Vec<SecureField>,
 }
 
-impl Pushable for CompositionHint {
+impl Pushable for &CompositionHint {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
         for elem in self.constraint_eval_quotients_by_mask.iter() {
             builder = elem.bitcoin_script_push(builder);
         }
         builder
+    }
+}
+
+impl Pushable for CompositionHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
     }
 }
