@@ -1,47 +1,37 @@
 mod bitcoin_script;
 
 mod fiat_shamir;
+mod utils;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
 use std::iter::zip;
 
-use crate::air::CompositionHint;
-use crate::channel::ChannelWithHint;
 use crate::constraints::{
     ColumnLineCoeffs, ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint,
 };
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
-use crate::fri::{FieldInversionHint, QueriesWithHint};
+use crate::fri::FieldInversionHint;
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
-use crate::oods::OODS;
-use crate::pow::PoWHint;
 use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
-use stwo_prover::core::air::{Air, AirExt};
+use stwo_prover::core::air::Air;
 use stwo_prover::core::backend::cpu::quotients::{batch_random_coeffs, denominator_inverses};
 use stwo_prover::core::backend::CpuBackend;
-use stwo_prover::core::channel::{BWSSha256Channel, Channel};
-use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::channel::BWSSha256Channel;
+use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::constraints::complex_conjugate_line_coeffs_normalized;
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::FieldExpOps;
-use stwo_prover::core::fri::{
-    get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
-    FriVerificationError, FOLD_STEP,
-};
+use stwo_prover::core::fri::get_opening_positions;
 use stwo_prover::core::pcs::quotients::{fri_answers, ColumnSampleBatch, PointSample};
-use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
+use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
-use stwo_prover::core::poly::line::LineDomain;
-use stwo_prover::core::proof_of_work::ProofOfWork;
 use stwo_prover::core::prover::{
-    InvalidOodsSampleStructure, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
-    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
+    InvalidOodsSampleStructure, StarkProof, VerificationError, N_QUERIES,
 };
-use stwo_prover::core::queries::Queries;
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
@@ -137,180 +127,18 @@ pub fn verify_with_hints(
     air: &FibonacciAir,
     channel: &mut BWSSha256Channel,
 ) -> Result<VerifierHints, VerificationError> {
-    // Read trace commitment.
-    let mut commitment_scheme = CommitmentSchemeVerifier::new();
-    commitment_scheme.commit(proof.commitments[0], air.column_log_sizes(), channel);
-    let (random_coeff, random_coeff_hint) = channel.draw_felt_and_hints();
+    let fs_output = utils::generate_fs_hints(proof.clone(), channel, air).unwrap();
 
-    // Read composition polynomial commitment.
-    commitment_scheme.commit(
-        proof.commitments[1],
-        vec![air.composition_log_degree_bound(); 4],
-        channel,
+    let fri_query_domains = get_opening_positions(
+        &fs_output.fri_input.queries,
+        &fs_output.fri_input.column_log_sizes,
     );
-
-    // Draw OODS point.
-    let (oods_point, oods_hint) = CirclePoint::<SecureField>::get_random_point_with_hint(channel);
-
-    // Get mask sample points relative to oods point.
-    let trace_sample_points = air.mask_points(oods_point);
-    let masked_points = trace_sample_points.clone();
-
-    // TODO(spapini): Change when we support multiple interactions.
-    // First tree - trace.
-    let mut sampled_points = TreeVec::new(vec![trace_sample_points.flatten()]);
-    // Second tree - composition polynomial.
-    sampled_points.push(vec![vec![oods_point]; 4]);
-
-    // this step is just a reorganization of the data
-    assert_eq!(sampled_points.0[0][0][0], masked_points[0][0][0]);
-    assert_eq!(sampled_points.0[0][0][1], masked_points[0][0][1]);
-    assert_eq!(sampled_points.0[0][0][2], masked_points[0][0][2]);
-
-    assert_eq!(sampled_points.0[1][0][0], oods_point);
-    assert_eq!(sampled_points.0[1][1][0], oods_point);
-    assert_eq!(sampled_points.0[1][2][0], oods_point);
-    assert_eq!(sampled_points.0[1][3][0], oods_point);
-
-    // TODO(spapini): Save clone.
-    let (trace_oods_values, composition_oods_value) = sampled_values_to_mask(
-        air,
-        proof.commitment_scheme_proof.sampled_values.clone(),
-    )
-    .map_err(|_| {
-        VerificationError::InvalidStructure("Unexpected sampled_values structure".to_string())
-    })?;
-
-    if composition_oods_value
-        != air.eval_composition_polynomial_at_point(oods_point, &trace_oods_values, random_coeff)
-    {
-        return Err(VerificationError::OodsNotMatching);
-    }
-
-    let composition_hint = CompositionHint {
-        constraint_eval_quotients_by_mask: vec![
-            air.component.boundary_constraint_eval_quotient_by_mask(
-                oods_point,
-                trace_oods_values[0][0][..1].try_into().unwrap(),
-            ),
-            air.component.step_constraint_eval_quotient_by_mask(
-                oods_point,
-                trace_oods_values[0][0][..].try_into().unwrap(),
-            ),
-        ],
-    };
-
-    let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
-
-    channel.mix_felts(
-        &proof
-            .commitment_scheme_proof
-            .sampled_values
-            .clone()
-            .flatten_cols(),
-    );
-    let (random_coeff, random_coeff_hint2) = channel.draw_felt_and_hints();
-
-    let bounds = commitment_scheme
-        .column_log_sizes()
-        .zip_cols(&sampled_points)
-        .map_cols(|(log_size, sampled_points)| {
-            vec![CirclePolyDegreeBound::new(log_size - LOG_BLOWUP_FACTOR); sampled_points.len()]
-        })
-        .flatten_cols()
-        .into_iter()
-        .sorted()
-        .rev()
-        .dedup()
-        .collect_vec();
-
-    // FRI commitment phase on OODS quotients.
-    let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, LOG_BLOWUP_FACTOR, N_QUERIES);
-
-    // from fri-verifier
-    let max_column_bound = bounds[0];
-    let _ = max_column_bound.log_degree_bound + fri_config.log_blowup_factor;
-
-    // Circle polynomials can all be folded with the same alpha.
-    let (circle_poly_alpha, circle_poly_alpha_hint) = channel.draw_felt_and_hints();
-
-    let mut inner_layers = Vec::new();
-    let mut layer_bound = max_column_bound.fold_to_line();
-    let mut layer_domain = LineDomain::new(Coset::half_odds(
-        layer_bound.log_degree_bound + fri_config.log_blowup_factor,
-    ));
-
-    let mut fri_commitment_and_folding_hints = vec![];
-
-    for (layer_index, proof) in proof
-        .commitment_scheme_proof
-        .fri_proof
-        .inner_layers
-        .into_iter()
-        .enumerate()
-    {
-        channel.mix_digest(proof.commitment);
-
-        let (folding_alpha, folding_alpha_hint) = channel.draw_felt_and_hints();
-
-        fri_commitment_and_folding_hints.push((proof.commitment, folding_alpha_hint));
-
-        inner_layers.push(FriLayerVerifier {
-            degree_bound: layer_bound,
-            domain: layer_domain,
-            folding_alpha,
-            layer_index,
-            proof,
-        });
-
-        layer_bound = layer_bound
-            .fold(FOLD_STEP)
-            .ok_or(FriVerificationError::InvalidNumFriLayers)?;
-        layer_domain = layer_domain.double();
-    }
-
-    if layer_bound.log_degree_bound != fri_config.log_last_layer_degree_bound {
-        return Err(VerificationError::Fri(
-            FriVerificationError::InvalidNumFriLayers,
-        ));
-    }
-
-    let last_layer_domain = layer_domain;
-    let last_layer_poly = proof.commitment_scheme_proof.fri_proof.last_layer_poly;
-
-    if last_layer_poly.len() > (1 << fri_config.log_last_layer_degree_bound) {
-        return Err(VerificationError::Fri(
-            FriVerificationError::LastLayerDegreeInvalid,
-        ));
-    }
-
-    channel.mix_felts(&last_layer_poly);
-
-    let pow_hint = PoWHint::new(
-        channel.digest,
-        proof.commitment_scheme_proof.proof_of_work.nonce,
-        PROOF_OF_WORK_BITS,
-    );
-
-    // Verify proof of work.
-    ProofOfWork::new(PROOF_OF_WORK_BITS)
-        .verify(channel, &proof.commitment_scheme_proof.proof_of_work)?;
-
-    let column_log_sizes = bounds
-        .iter()
-        .dedup()
-        .map(|b| b.log_degree_bound + fri_config.log_blowup_factor)
-        .collect_vec();
-
-    let (queries, queries_hints) =
-        Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
-    let fri_query_domains = get_opening_positions(&queries, &column_log_sizes);
 
     assert_eq!(fri_query_domains.len(), 1);
     let query_domain = fri_query_domains.first_key_value().unwrap();
     assert_eq!(
         *query_domain.0,
-        max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor
     );
 
     let queries_parents: Vec<usize> = query_domain
@@ -323,13 +151,15 @@ pub fn verify_with_hints(
         .collect();
 
     let merkle_proofs_traces = MerkleTreeTwinProof::from_stwo_proof(
-        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        (fs_output.fri_input.max_column_log_degree_bound
+            + fs_output.fri_input.fri_log_blowup_factor) as usize,
         &queries_parents,
         &proof.commitment_scheme_proof.queried_values[0],
         &proof.commitment_scheme_proof.decommitments[0],
     );
     let merkle_proofs_compositions = MerkleTreeTwinProof::from_stwo_proof(
-        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        (fs_output.fri_input.max_column_log_degree_bound
+            + fs_output.fri_input.fri_log_blowup_factor) as usize,
         &queries_parents,
         &proof.commitment_scheme_proof.queried_values[1],
         &proof.commitment_scheme_proof.decommitments[1],
@@ -338,7 +168,8 @@ pub fn verify_with_hints(
     for (&query, twin_proof) in queries_parents.iter().zip(merkle_proofs_traces.iter()) {
         assert!(MerkleTree::verify_twin(
             &proof.commitments[0],
-            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            (fs_output.fri_input.max_column_log_degree_bound
+                + fs_output.fri_input.fri_log_blowup_factor) as usize,
             twin_proof,
             query << 1
         ));
@@ -350,14 +181,17 @@ pub fn verify_with_hints(
     {
         assert!(MerkleTree::verify_twin(
             &proof.commitments[1],
-            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            (fs_output.fri_input.max_column_log_degree_bound
+                + fs_output.fri_input.fri_log_blowup_factor) as usize,
             twin_proof,
             query << 1
         ));
     }
 
-    let column_size: Vec<u32> = commitment_scheme
-        .column_log_sizes()
+    let column_size: Vec<u32> = fs_output
+        .fri_input
+        .commitment_scheme_column_log_sizes
+        .clone()
         .flatten()
         .into_iter()
         .dedup()
@@ -365,7 +199,7 @@ pub fn verify_with_hints(
     assert_eq!(column_size.len(), 1);
     assert_eq!(
         column_size[0],
-        max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor
     );
 
     // trace polynomials are evaluated on oods, oods+1, oods+2
@@ -384,7 +218,9 @@ pub fn verify_with_hints(
 
     // construct the list of samples
     // Answer FRI queries.
-    let samples = sampled_points
+    let samples = fs_output
+        .fri_input
+        .sampled_points
         .zip_cols(&proof.commitment_scheme_proof.sampled_values)
         .map_cols(|(sampled_points, sampled_values)| {
             zip(sampled_points, sampled_values)
@@ -422,10 +258,10 @@ pub fn verify_with_hints(
         ColumnLineCoeffs::from_values_and_point(&[samples[0][2].value], samples[0][2].point),
         ColumnLineCoeffs::from_values_and_point(
             &[
-                sample_values[1][0][0],
-                sample_values[1][1][0],
-                sample_values[1][2][0],
-                sample_values[1][3][0],
+                fs_output.fri_input.sample_values[1][0][0],
+                fs_output.fri_input.sample_values[1][1][0],
+                fs_output.fri_input.sample_values[1][2][0],
+                fs_output.fri_input.sample_values[1][3][0],
             ],
             samples[1][0].point,
         ),
@@ -467,23 +303,35 @@ pub fn verify_with_hints(
     ];
 
     let expected_batch_random_coeffs =
-        { batch_random_coeffs(&colume_sample_batches, random_coeff) };
-    assert_eq!(expected_batch_random_coeffs[0], random_coeff);
-    assert_eq!(expected_batch_random_coeffs[1], random_coeff);
-    assert_eq!(expected_batch_random_coeffs[2], random_coeff);
+        { batch_random_coeffs(&colume_sample_batches, fs_output.fri_input.random_coeff) };
+    assert_eq!(
+        expected_batch_random_coeffs[0],
+        fs_output.fri_input.random_coeff
+    );
+    assert_eq!(
+        expected_batch_random_coeffs[1],
+        fs_output.fri_input.random_coeff
+    );
+    assert_eq!(
+        expected_batch_random_coeffs[2],
+        fs_output.fri_input.random_coeff
+    );
     assert_eq!(
         expected_batch_random_coeffs[3],
-        random_coeff.square().square()
+        fs_output.fri_input.random_coeff.square().square()
     );
 
     let precomputed_merkle_tree = PrecomputedMerkleTree::new(
-        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor - 1) as usize,
+        (fs_output.fri_input.max_column_log_degree_bound
+            + fs_output.fri_input.fri_log_blowup_factor
+            - 1) as usize,
     );
     let first_proof = precomputed_merkle_tree.query(queries_parents[0] << 1);
 
-    let commitment_domain =
-        CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
-            .circle_domain();
+    let commitment_domain = CanonicCoset::new(
+        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor,
+    )
+    .circle_domain();
 
     let denominator_inverses_expected = query_domain
         .1
@@ -532,13 +380,14 @@ pub fn verify_with_hints(
     }
 
     let fri_answers = fri_answers(
-        commitment_scheme
-            .column_log_sizes()
+        fs_output
+            .fri_input
+            .commitment_scheme_column_log_sizes
             .flatten()
             .into_iter()
             .collect(),
         &samples,
-        random_coeff,
+        fs_output.fri_input.random_coeff,
         fri_query_domains,
         &flatten_values,
     )?;
@@ -567,15 +416,15 @@ pub fn verify_with_hints(
         ],
     ));
 
-    let expected_eval_left = random_coeff.pow(6)
+    let expected_eval_left = fs_output.fri_input.random_coeff.pow(6)
         * QM31::from(nominators[0].0[0] * denominator_inverses_expected[0][0][0])
-        + random_coeff.pow(5)
+        + fs_output.fri_input.random_coeff.pow(5)
             * QM31::from(nominators[1].0[0] * denominator_inverses_expected[0][1][0])
-        + random_coeff.pow(4)
+        + fs_output.fri_input.random_coeff.pow(4)
             * QM31::from(nominators[2].0[0] * denominator_inverses_expected[0][2][0])
-        + (random_coeff.pow(3) * QM31::from(nominators[3].0[0])
-            + random_coeff.pow(2) * QM31::from(nominators[3].0[1])
-            + random_coeff * QM31::from(nominators[3].0[2])
+        + (fs_output.fri_input.random_coeff.pow(3) * QM31::from(nominators[3].0[0])
+            + fs_output.fri_input.random_coeff.pow(2) * QM31::from(nominators[3].0[1])
+            + fs_output.fri_input.random_coeff * QM31::from(nominators[3].0[2])
             + QM31::from(nominators[3].0[3]))
             * QM31::from(denominator_inverses_expected[0][3][0]);
 
@@ -584,15 +433,15 @@ pub fn verify_with_hints(
         fri_answers[0].subcircle_evals[0].values[0]
     );
 
-    let expected_eval_right = random_coeff.pow(6)
+    let expected_eval_right = fs_output.fri_input.random_coeff.pow(6)
         * QM31::from(nominators[0].1[0] * denominator_inverses_expected[0][0][1])
-        + random_coeff.pow(5)
+        + fs_output.fri_input.random_coeff.pow(5)
             * QM31::from(nominators[1].1[0] * denominator_inverses_expected[0][1][1])
-        + random_coeff.pow(4)
+        + fs_output.fri_input.random_coeff.pow(4)
             * QM31::from(nominators[2].1[0] * denominator_inverses_expected[0][2][1])
-        + (random_coeff.pow(3) * QM31::from(nominators[3].1[0])
-            + random_coeff.pow(2) * QM31::from(nominators[3].1[1])
-            + random_coeff * QM31::from(nominators[3].1[2])
+        + (fs_output.fri_input.random_coeff.pow(3) * QM31::from(nominators[3].1[0])
+            + fs_output.fri_input.random_coeff.pow(2) * QM31::from(nominators[3].1[1])
+            + fs_output.fri_input.random_coeff * QM31::from(nominators[3].1[2])
             + QM31::from(nominators[3].1[3]))
             * QM31::from(denominator_inverses_expected[0][3][1]);
 
@@ -616,37 +465,14 @@ pub fn verify_with_hints(
         vec![f0_px, f1_px]
     };
 
-    let first_fold = circle_poly_alpha * test_only_fri_answer[1] + test_only_fri_answer[0];
+    let first_fold =
+        fs_output.fri_input.circle_poly_alpha * test_only_fri_answer[1] + test_only_fri_answer[0];
 
     let _ = first_fold;
     let _ = expected_line_coeffs;
-    let _ = last_layer_domain;
-    let _ = circle_poly_alpha;
-    let _ = random_coeff;
-
-    let fiat_shamir_hints = FiatShamirHints {
-        commitments: [proof.commitments[0], proof.commitments[1]],
-        random_coeff_hint,
-        oods_hint,
-        trace_oods_values: [
-            sample_values[0][0][0],
-            sample_values[0][0][1],
-            sample_values[0][0][2],
-        ],
-        composition_oods_values: [
-            sample_values[1][0][0],
-            sample_values[1][1][0],
-            sample_values[1][2][0],
-            sample_values[1][3][0],
-        ],
-        composition_hint,
-        random_coeff_hint2,
-        circle_poly_alpha_hint,
-        fri_commitment_and_folding_hints,
-        last_layer: last_layer_poly.to_vec()[0],
-        pow_hint,
-        queries_hints,
-    };
+    let _ = fs_output.fri_input.last_layer_domain;
+    let _ = fs_output.fri_input.circle_poly_alpha;
+    let _ = fs_output.fri_input.random_coeff;
 
     let first_query_hint = PerQueryHint {
         prepared_pair_vanishing_hints,
@@ -657,7 +483,7 @@ pub fn verify_with_hints(
     };
 
     Ok(VerifierHints {
-        fiat_shamir_hints,
+        fiat_shamir_hints: fs_output.fiat_shamir_hints,
         merkle_proofs_traces,
         merkle_proofs_compositions,
         column_line_coeffs_hints,
