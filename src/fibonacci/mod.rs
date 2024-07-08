@@ -13,7 +13,7 @@ use crate::constraints::{
 };
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
 use crate::fri::{FieldInversionHint, QueriesWithHint};
-use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
+use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::oods::OODS;
 use crate::pow::PoWHint;
 use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
@@ -336,10 +336,9 @@ pub fn verify_with_hints(
     );
 
     for (&query, twin_proof) in queries_parents.iter().zip(merkle_proofs_traces.iter()) {
-        assert!(MerkleTree::verify_twin(
+        assert!(twin_proof.verify(
             &proof.commitments[0],
             (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
-            twin_proof,
             query << 1
         ));
     }
@@ -348,10 +347,9 @@ pub fn verify_with_hints(
         .iter()
         .zip(merkle_proofs_compositions.iter())
     {
-        assert!(MerkleTree::verify_twin(
+        assert!(twin_proof.verify(
             &proof.commitments[1],
             (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
-            twin_proof,
             query << 1
         ));
     }

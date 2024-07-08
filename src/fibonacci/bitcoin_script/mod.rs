@@ -593,6 +593,10 @@ mod test {
             OP_TRUE
         };
 
+        let script_length = script.len();
+        let witness_length = witness.len();
+        println!("{:?} {:?}", script_length, witness_length);
+
         let exec_result = execute_script_with_witness_unlimited_stack(
             script,
             convert_to_witness(witness).unwrap(),

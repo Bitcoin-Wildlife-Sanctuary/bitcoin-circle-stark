@@ -35,14 +35,7 @@ impl MerkleTreeTwinGadget {
             OP_FROMALTSTACK
             OP_SWAP OP_CAT OP_SHA256
 
-            for _ in 0..(logn - 1) {
-                OP_HINT
-                OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
-                OP_CAT OP_SHA256
-            }
-
-            OP_FROMALTSTACK
-            OP_EQUALVERIFY
+            { MerkleTreePathGadget::verify(logn - 1) }
         }
     }
 
@@ -69,14 +62,46 @@ impl MerkleTreeTwinGadget {
     }
 }
 
+/// Gadget that handles the path verification (non-leaf-related parts).
+pub struct MerkleTreePathGadget;
+
+impl MerkleTreePathGadget {
+    /// Verify the Merkle tree path.
+    ///
+    /// Hint:
+    /// - `path_len` sibling elements.
+    ///
+    /// Input:
+    /// - starting hash
+    ///
+    /// Input from altstack:
+    /// - root hash
+    /// - control bits
+    ///
+    /// Output: none
+    ///
+    /// It fails the script execution if the root hash doesn't match.
+    pub fn verify(path_len: usize) -> Script {
+        script! {
+            for _ in 0..path_len {
+                OP_HINT
+                OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
+                OP_CAT OP_SHA256
+            }
+
+            OP_FROMALTSTACK
+            OP_EQUALVERIFY
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use crate::merkle_tree::bitcoin_script::MerkleTreeTwinGadget;
+    use crate::merkle_tree::MerkleTreeTwinProof;
     use crate::treepp::*;
     use crate::utils::get_rand_qm31;
-    use crate::{
-        merkle_tree::{MerkleTree, MerkleTreeTwinGadget},
-        tests_utils::report::report_bitcoin_script_size,
-    };
+    use crate::{merkle_tree::MerkleTree, tests_utils::report::report_bitcoin_script_size};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
@@ -107,13 +132,8 @@ mod test {
                 pos -= 1;
             }
 
-            let proof = merkle_tree.query_twin(pos as usize);
-            assert!(MerkleTree::verify_twin(
-                &merkle_tree.root_hash,
-                logn,
-                &proof,
-                pos as usize
-            ));
+            let proof = MerkleTreeTwinProof::query(&merkle_tree, pos as usize);
+            assert!(proof.verify(&merkle_tree.root_hash, logn, pos as usize));
 
             let script = script! {
                 { proof }
