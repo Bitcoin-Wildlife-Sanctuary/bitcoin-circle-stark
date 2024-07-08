@@ -59,12 +59,6 @@ pub struct MerkleTreePath {
     pub siblings: Vec<BWSSha256Hash>,
 }
 
-impl Pushable for MerkleTreePath {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
 impl Pushable for &MerkleTreePath {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
         for elem in self.siblings.iter() {
