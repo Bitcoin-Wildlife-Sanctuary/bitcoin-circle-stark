@@ -25,7 +25,7 @@ use crate::oods::OODS;
 use crate::pow::PoWHint;
 use itertools::Itertools;
 
-/// fri inputs
+/// FRI inputs
 pub struct FriInput {
     /// log blowup factor
     pub fri_log_blowup_factor: u32,
@@ -63,7 +63,7 @@ pub struct FSOutput {
     /// Fiat Shamir hints
     pub fiat_shamir_hints: FiatShamirHints,
 
-    /// fri inputs
+    /// FRI inputs
     pub fri_input: FriInput,
 }
 
