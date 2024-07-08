@@ -25,21 +25,45 @@ use crate::oods::OODS;
 use crate::pow::PoWHint;
 use itertools::Itertools;
 
+/// fri inputs
 pub struct FriInput {
+    /// log blowup factor
     pub fri_log_blowup_factor: u32,
+
+    /// log degree bound of column
     pub max_column_log_degree_bound: u32,
+
+    /// log sizes of columns
     pub column_log_sizes: Vec<u32>,
+
+    /// log sizes of commitment scheme columns
     pub commitment_scheme_column_log_sizes: TreeVec<ColumnVec<u32>>,
+
+    /// trace sample points and odds points
     pub sampled_points: TreeVec<Vec<Vec<CirclePoint<QM31>>>>,
+
+    /// sample values
     pub sample_values: Vec<Vec<Vec<QM31>>>,
+
+    /// random coefficient  
     pub random_coeff: QM31,
+
+    /// alpha
     pub circle_poly_alpha: QM31,
+
+    /// last layer domain
     pub last_layer_domain: LineDomain,
+
+    /// queries
     pub queries: Queries,
 }
 
+/// Fiat Shamir hints along with fri inputs
 pub struct FSOutput {
+    /// Fiat Shamir hints
     pub fiat_shamir_hints: FiatShamirHints,
+
+    /// fri inputs
     pub fri_input: FriInput,
 }
 
@@ -242,19 +266,21 @@ pub fn generate_fs_hints(
         queries_hints,
     };
 
+    let fri_input = FriInput {
+        fri_log_blowup_factor: fri_config.log_blowup_factor,
+        max_column_log_degree_bound: max_column_bound.log_degree_bound,
+        column_log_sizes,
+        commitment_scheme_column_log_sizes: commitment_scheme.column_log_sizes(),
+        sampled_points,
+        sample_values: sample_values.to_vec(),
+        random_coeff,
+        circle_poly_alpha,
+        last_layer_domain,
+        queries,
+    };
+
     Ok(FSOutput {
         fiat_shamir_hints,
-        fri_input: FriInput {
-            fri_log_blowup_factor: fri_config.log_blowup_factor,
-            max_column_log_degree_bound: max_column_bound.log_degree_bound,
-            column_log_sizes,
-            commitment_scheme_column_log_sizes: commitment_scheme.column_log_sizes(),
-            sampled_points,
-            sample_values: sample_values.to_vec(),
-            random_coeff,
-            circle_poly_alpha,
-            last_layer_domain,
-            queries,
-        },
+        fri_input,
     })
 }
