@@ -12,7 +12,7 @@ use crate::constraints::{
 };
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
 use crate::fri::FieldInversionHint;
-use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
+use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::air::Air;
@@ -170,7 +170,6 @@ pub fn verify_with_hints(
             &proof.commitments[0],
             (fs_output.fri_input.max_column_log_degree_bound
                 + fs_output.fri_input.fri_log_blowup_factor) as usize,
-            twin_proof,
             query << 1
         ));
     }
@@ -183,7 +182,6 @@ pub fn verify_with_hints(
             &proof.commitments[1],
             (fs_output.fri_input.max_column_log_degree_bound
                 + fs_output.fri_input.fri_log_blowup_factor) as usize,
-            twin_proof,
             query << 1
         ));
     }
