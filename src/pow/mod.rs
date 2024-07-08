@@ -52,17 +52,23 @@ impl PoWHint {
     }
 }
 
-impl Pushable for PoWHint {
+impl Pushable for &PoWHint {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
         builder = self
             .nonce
             .to_le_bytes()
             .to_vec()
             .bitcoin_script_push(builder);
-        builder = self.prefix.bitcoin_script_push(builder);
+        builder = self.prefix.clone().bitcoin_script_push(builder);
         if let Some(msb) = self.msb {
             builder = msb.bitcoin_script_push(builder);
         }
         builder
+    }
+}
+
+impl Pushable for PoWHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
     }
 }

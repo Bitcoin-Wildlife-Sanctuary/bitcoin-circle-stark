@@ -1,17 +1,20 @@
 mod bitcoin_script;
 
+mod fiat_shamir;
+
 pub use bitcoin_script::*;
 use itertools::Itertools;
 use std::iter::zip;
 
 use crate::air::CompositionHint;
-use crate::channel::{ChannelWithHint, DrawHints};
+use crate::channel::ChannelWithHint;
 use crate::constraints::{
     ColumnLineCoeffs, ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint,
 };
-use crate::fri::QueriesWithHint;
+use crate::fibonacci::fiat_shamir::FiatShamirHints;
+use crate::fri::{FieldInversionHint, QueriesWithHint};
 use crate::merkle_tree::{MerkleTree, MerkleTreeTwinProof};
-use crate::oods::{OODSHint, OODS};
+use crate::oods::OODS;
 use crate::pow::PoWHint;
 use crate::precomputed_merkle_tree::{PrecomputedMerkleTree, PrecomputedMerkleTreeProof};
 use crate::treepp::pushable::{Builder, Pushable};
@@ -21,6 +24,7 @@ use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::constraints::complex_conjugate_line_coeffs_normalized;
+use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::FieldExpOps;
@@ -28,7 +32,7 @@ use stwo_prover::core::fri::{
     get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
     FriVerificationError, FOLD_STEP,
 };
-use stwo_prover::core::pcs::quotients::{ColumnSampleBatch, PointSample};
+use stwo_prover::core::pcs::quotients::{fri_answers, ColumnSampleBatch, PointSample};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::circle::{CanonicCoset, SecureCirclePoly};
 use stwo_prover::core::poly::line::LineDomain;
@@ -38,57 +42,29 @@ use stwo_prover::core::prover::{
     LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
 };
 use stwo_prover::core::queries::Queries;
-use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
-    /// Commitments from the proof.
-    pub commitments: [BWSSha256Hash; 2],
+    /// Fiat-Shamir hints.
+    pub fiat_shamir_hints: FiatShamirHints,
 
-    /// random_coeff comes from adding `proof.commitments[0]` to the channel.
-    pub random_coeff_hint: DrawHints,
-
-    /// OODS hint.
-    pub oods_hint: OODSHint,
-
-    /// trace oods values.
-    pub trace_oods_values: [SecureField; 3],
-
-    /// composition odds raw values.
-    pub composition_oods_values: [SecureField; 4],
-
-    /// Composition hint.
-    pub composition_hint: CompositionHint,
-
-    /// second random_coeff hint
-    pub random_coeff_hint2: DrawHints,
-
-    /// circle_poly_alpha hint
-    pub circle_poly_alpha_hint: DrawHints,
-
-    /// fri commit and hints for deriving the folding parameter
-    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawHints)>,
-
-    /// last layer poly (assuming only one element)
-    pub last_layer: QM31,
-
-    /// PoW hint
-    pub pow_hint: PoWHint,
-
-    /// Query sampling hints
-    pub queries_hints: DrawHints,
-
-    /// Merkle proofs for the trace Merkle tree
+    /// Merkle proofs for the trace Merkle tree.
     pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
 
-    /// Merkle proofs for the composition Merkle tree
+    /// Merkle proofs for the composition Merkle tree.
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
 
     /// Column line coeff hints.
     pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
 
+    /// Per query hints.
+    pub per_query_hints: Vec<PerQueryHint>,
+}
+
+/// Hint that repeats for each query.
+pub struct PerQueryHint {
     /// Prepared pair vanishing hints.
     pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
 
@@ -98,32 +74,16 @@ pub struct VerifierHints {
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 
-    /// test-only: the nominators of the first point.
-    pub test_only_nominators: Vec<CM31>,
+    /// Y inverse hint.
+    pub y_inverse_hint: FieldInversionHint,
+
+    /// Test-only: the FRI answer.
+    pub test_only_fri_answer: Vec<QM31>,
 }
 
-impl Pushable for VerifierHints {
+impl Pushable for &VerifierHints {
     fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = self.commitments[0].bitcoin_script_push(builder);
-        builder = self.random_coeff_hint.bitcoin_script_push(builder);
-        builder = self.commitments[1].bitcoin_script_push(builder);
-        builder = self.oods_hint.bitcoin_script_push(builder);
-        for v in self.trace_oods_values.iter() {
-            builder = v.bitcoin_script_push(builder);
-        }
-        for v in self.composition_oods_values.iter() {
-            builder = v.bitcoin_script_push(builder);
-        }
-        builder = self.composition_hint.bitcoin_script_push(builder);
-        builder = self.random_coeff_hint2.bitcoin_script_push(builder);
-        builder = self.circle_poly_alpha_hint.bitcoin_script_push(builder);
-        for (c, h) in self.fri_commitment_and_folding_hints.iter() {
-            builder = c.bitcoin_script_push(builder);
-            builder = h.bitcoin_script_push(builder);
-        }
-        builder = self.last_layer.bitcoin_script_push(builder);
-        builder = self.pow_hint.bitcoin_script_push(builder);
-        builder = self.queries_hints.bitcoin_script_push(builder);
+        builder = (&self.fiat_shamir_hints).bitcoin_script_push(builder);
         for proof in self.merkle_proofs_traces.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
@@ -133,6 +93,21 @@ impl Pushable for VerifierHints {
         for hint in self.column_line_coeffs_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
+        for hint in self.per_query_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
+        }
+        builder
+    }
+}
+
+impl Pushable for VerifierHints {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
+
+impl Pushable for &PerQueryHint {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
         for hint in self.prepared_pair_vanishing_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
@@ -142,10 +117,17 @@ impl Pushable for VerifierHints {
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
-        for elem in self.test_only_nominators.iter().rev() {
+        builder = (&self.y_inverse_hint).bitcoin_script_push(builder);
+        for elem in self.test_only_fri_answer.iter().rev() {
             builder = elem.bitcoin_script_push(builder);
         }
         builder
+    }
+}
+
+impl Pushable for PerQueryHint {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
     }
 }
 
@@ -497,7 +479,7 @@ pub fn verify_with_hints(
     let precomputed_merkle_tree = PrecomputedMerkleTree::new(
         (max_column_bound.log_degree_bound + fri_config.log_blowup_factor - 1) as usize,
     );
-    let first_proof = precomputed_merkle_tree.query(query_domain.1.domains[0].coset_index << 1);
+    let first_proof = precomputed_merkle_tree.query(queries_parents[0] << 1);
 
     let commitment_domain =
         CanonicCoset::new(max_column_bound.log_degree_bound + fri_config.log_blowup_factor)
@@ -541,6 +523,26 @@ pub fn verify_with_hints(
         queried_values_right.push(right_vec);
     }
 
+    let mut flatten_values = vec![vec![]; 5];
+    for (l, r) in queried_values_left.iter().zip(queried_values_right.iter()) {
+        for ((flatten, &ll), &rr) in flatten_values.iter_mut().zip_eq(l.iter()).zip_eq(r.iter()) {
+            flatten.push(ll);
+            flatten.push(rr);
+        }
+    }
+
+    let fri_answers = fri_answers(
+        commitment_scheme
+            .column_log_sizes()
+            .flatten()
+            .into_iter()
+            .collect(),
+        &samples,
+        random_coeff,
+        fri_query_domains,
+        &flatten_values,
+    )?;
+
     let mut nominators = vec![];
     for column_line_coeff in column_line_coeffs.iter().take(3) {
         nominators.push(column_line_coeff.apply_twin(
@@ -565,29 +567,64 @@ pub fn verify_with_hints(
         ],
     ));
 
-    let test_only_nominators = vec![
-        nominators[0].0[0],
-        nominators[0].1[0],
-        nominators[1].0[0],
-        nominators[1].1[0],
-        nominators[2].0[0],
-        nominators[2].1[0],
-        nominators[3].0[0],
-        nominators[3].1[0],
-        nominators[3].0[1],
-        nominators[3].1[1],
-        nominators[3].0[2],
-        nominators[3].1[2],
-        nominators[3].0[3],
-        nominators[3].1[3],
-    ];
+    let expected_eval_left = random_coeff.pow(6)
+        * QM31::from(nominators[0].0[0] * denominator_inverses_expected[0][0][0])
+        + random_coeff.pow(5)
+            * QM31::from(nominators[1].0[0] * denominator_inverses_expected[0][1][0])
+        + random_coeff.pow(4)
+            * QM31::from(nominators[2].0[0] * denominator_inverses_expected[0][2][0])
+        + (random_coeff.pow(3) * QM31::from(nominators[3].0[0])
+            + random_coeff.pow(2) * QM31::from(nominators[3].0[1])
+            + random_coeff * QM31::from(nominators[3].0[2])
+            + QM31::from(nominators[3].0[3]))
+            * QM31::from(denominator_inverses_expected[0][3][0]);
 
+    assert_eq!(
+        expected_eval_left,
+        fri_answers[0].subcircle_evals[0].values[0]
+    );
+
+    let expected_eval_right = random_coeff.pow(6)
+        * QM31::from(nominators[0].1[0] * denominator_inverses_expected[0][0][1])
+        + random_coeff.pow(5)
+            * QM31::from(nominators[1].1[0] * denominator_inverses_expected[0][1][1])
+        + random_coeff.pow(4)
+            * QM31::from(nominators[2].1[0] * denominator_inverses_expected[0][2][1])
+        + (random_coeff.pow(3) * QM31::from(nominators[3].1[0])
+            + random_coeff.pow(2) * QM31::from(nominators[3].1[1])
+            + random_coeff * QM31::from(nominators[3].1[2])
+            + QM31::from(nominators[3].1[3]))
+            * QM31::from(denominator_inverses_expected[0][3][1]);
+
+    assert_eq!(
+        expected_eval_right,
+        fri_answers[0].subcircle_evals[0].values[1]
+    );
+
+    let y_inverse_hint = FieldInversionHint::from(first_proof.circle_point.y);
+
+    let test_only_fri_answer = {
+        let p = first_proof.circle_point;
+        let py_inverse = p.y.inverse();
+
+        let f_p = expected_eval_left;
+        let f_neg_p = expected_eval_right;
+
+        let (mut f0_px, mut f1_px) = (f_p, f_neg_p);
+        ibutterfly(&mut f0_px, &mut f1_px, py_inverse);
+
+        vec![f0_px, f1_px]
+    };
+
+    let first_fold = circle_poly_alpha * test_only_fri_answer[1] + test_only_fri_answer[0];
+
+    let _ = first_fold;
     let _ = expected_line_coeffs;
     let _ = last_layer_domain;
     let _ = circle_poly_alpha;
     let _ = random_coeff;
 
-    Ok(VerifierHints {
+    let fiat_shamir_hints = FiatShamirHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
         oods_hint,
@@ -609,13 +646,22 @@ pub fn verify_with_hints(
         last_layer: last_layer_poly.to_vec()[0],
         pow_hint,
         queries_hints,
-        merkle_proofs_traces,
-        merkle_proofs_compositions,
-        column_line_coeffs_hints,
+    };
+
+    let first_query_hint = PerQueryHint {
         prepared_pair_vanishing_hints,
         precomputed_merkle_proofs: vec![first_proof.clone()],
         denominator_inverse_hints,
-        test_only_nominators,
+        y_inverse_hint,
+        test_only_fri_answer,
+    };
+
+    Ok(VerifierHints {
+        fiat_shamir_hints,
+        merkle_proofs_traces,
+        merkle_proofs_compositions,
+        column_line_coeffs_hints,
+        per_query_hints: vec![first_query_hint],
     })
 }
 
