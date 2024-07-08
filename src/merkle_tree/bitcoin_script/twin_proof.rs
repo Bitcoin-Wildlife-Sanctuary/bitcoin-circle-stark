@@ -107,7 +107,7 @@ mod test {
                 pos -= 1;
             }
 
-            let proof = merkle_tree.query(pos as usize);
+            let proof = merkle_tree.query_twin(pos as usize);
             assert!(MerkleTree::verify_twin(
                 &merkle_tree.root_hash,
                 logn,
