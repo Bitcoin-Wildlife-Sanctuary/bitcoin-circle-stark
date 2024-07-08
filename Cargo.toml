@@ -11,7 +11,7 @@ bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo/" }
+stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo" }
 num-traits = "0.2.0"
 lazy_static = "1.4.0"
 ctor = "0.2.8"
