@@ -8,7 +8,7 @@ mod quotients;
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
-use crate::constraints::{ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint};
+use crate::constraints::DenominatorInverseHint;
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
 use crate::fibonacci::fold::compute_fold_hints;
 use crate::fibonacci::quotients::compute_quotients_hints;
@@ -26,6 +26,8 @@ use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, Verifica
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
+use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
+
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
     /// Fiat-Shamir hints.
@@ -37,11 +39,8 @@ pub struct VerifierHints {
     /// Merkle proofs for the composition Merkle tree.
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
 
-    /// Column line coeff hints.
-    pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
-
-    /// Prepared pair vanishing hints.
-    pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
+    /// Column line coefficient and pairing vanishing hints
+    pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
 
     /// Per query hints.
     pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
@@ -69,12 +68,8 @@ impl Pushable for &VerifierHints {
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        for hint in self.column_line_coeffs_hints.iter() {
-            builder = hint.bitcoin_script_push(builder);
-        }
-        for hint in self.prepared_pair_vanishing_hints.iter() {
-            builder = hint.bitcoin_script_push(builder);
-        }
+        builder = (&self.column_line_coeff_pair_vanishing_hints).bitcoin_script_push(builder);
+
         for hint in self.per_query_quotients_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
@@ -133,8 +128,8 @@ pub fn verify_with_hints(
         fiat_shamir_hints: fs_output.fiat_shamir_hints,
         merkle_proofs_traces: prepare_output.merkle_proofs_traces,
         merkle_proofs_compositions: prepare_output.merkle_proofs_compositions,
-        column_line_coeffs_hints: prepare_output.column_line_coeffs_hints,
-        prepared_pair_vanishing_hints: prepare_output.prepared_pair_vanishing_hints,
+        column_line_coeff_pair_vanishing_hints: prepare_output
+            .column_line_coeff_pair_vanishing_hints,
         per_query_quotients_hints,
     })
 }

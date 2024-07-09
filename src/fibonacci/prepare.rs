@@ -15,7 +15,35 @@ use crate::{
     fibonacci::fiat_shamir::FSOutput,
     merkle_tree::MerkleTreeTwinProof,
     precomputed_merkle_tree::PrecomputedMerkleTree,
+    treepp::pushable::{Builder, Pushable},
 };
+
+/// Column Line Coefficients and Pair Vanishing Hints
+pub struct ColumnLineCoeffPairVanishingHints {
+    /// Column line coeff hints.
+    pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
+
+    /// Prepared pair vanishing hints.
+    pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
+}
+
+impl Pushable for &ColumnLineCoeffPairVanishingHints {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        for hint in self.column_line_coeffs_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
+        }
+        for hint in self.prepared_pair_vanishing_hints.iter() {
+            builder = hint.bitcoin_script_push(builder);
+        }
+        builder
+    }
+}
+
+impl Pushable for ColumnLineCoeffPairVanishingHints {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
+}
 
 /// Prepare Output
 pub struct PrepareOutput {
@@ -26,8 +54,7 @@ pub struct PrepareOutput {
     pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
     pub queries_parents: Vec<usize>,
-    pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
-    pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
+    pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
 }
 
 /// prepare output for quotients and verifier hints
@@ -247,6 +274,11 @@ pub fn prepare(
         .collect::<Vec<_>>();
     assert_eq!(denominator_inverses_expected.len(), N_QUERIES);
 
+    let column_line_coeff_pair_vanishing_hints = ColumnLineCoeffPairVanishingHints {
+        column_line_coeffs_hints,
+        prepared_pair_vanishing_hints,
+    };
+
     Ok(PrepareOutput {
         precomputed_merkle_tree,
         denominator_inverses_expected,
@@ -255,7 +287,6 @@ pub fn prepare(
         merkle_proofs_traces,
         merkle_proofs_compositions,
         queries_parents,
-        column_line_coeffs_hints,
-        prepared_pair_vanishing_hints,
+        column_line_coeff_pair_vanishing_hints,
     })
 }
