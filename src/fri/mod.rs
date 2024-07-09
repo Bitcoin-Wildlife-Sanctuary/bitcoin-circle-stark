@@ -34,6 +34,7 @@ impl QueriesWithHint for Queries {
     }
 }
 
+#[derive(Default, Clone)]
 /// Hint for inverting a field element.
 pub struct FieldInversionHint {
     /// The computed inverse.
