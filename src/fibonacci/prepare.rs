@@ -1,5 +1,13 @@
+use crate::{
+    constraints::{ColumnLineCoeffs, ColumnLineCoeffsHint, PreparedPairVanishingHint},
+    fibonacci::fiat_shamir::FSOutput,
+    merkle_tree::MerkleTreeTwinProof,
+    precomputed_merkle_tree::PrecomputedMerkleTree,
+    treepp::pushable::{Builder, Pushable},
+};
 use itertools::Itertools;
 use std::iter::zip;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
     backend::cpu::quotients::{batch_random_coeffs, denominator_inverses},
     constraints::complex_conjugate_line_coeffs_normalized,
@@ -8,14 +16,6 @@ use stwo_prover::core::{
     pcs::quotients::{ColumnSampleBatch, PointSample},
     poly::circle::CanonicCoset,
     prover::{StarkProof, VerificationError, N_QUERIES},
-};
-
-use crate::{
-    constraints::{ColumnLineCoeffs, ColumnLineCoeffsHint, PreparedPairVanishingHint},
-    fibonacci::fiat_shamir::FSOutput,
-    merkle_tree::MerkleTreeTwinProof,
-    precomputed_merkle_tree::PrecomputedMerkleTree,
-    treepp::pushable::{Builder, Pushable},
 };
 
 /// Column Line Coefficients and Pair Vanishing Hints
@@ -55,12 +55,14 @@ pub struct PrepareOutput {
     pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
     pub queries_parents: Vec<usize>,
     pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
+    pub queried_values_left: Vec<Vec<M31>>,
+    pub queried_values_right: Vec<Vec<M31>>,
 }
 
 /// prepare output for quotients and verifier hints
 pub fn prepare(
     fs_output: &FSOutput,
-    proof: StarkProof,
+    proof: &StarkProof,
 ) -> Result<PrepareOutput, VerificationError> {
     let fri_query_domains = get_opening_positions(
         &fs_output.fri_input.queries,
@@ -279,6 +281,27 @@ pub fn prepare(
         prepared_pair_vanishing_hints,
     };
 
+    let mut queried_values_left = vec![];
+    let mut queried_values_right = vec![];
+    for (trace, composition) in merkle_proofs_traces
+        .iter()
+        .zip(merkle_proofs_compositions.iter())
+    {
+        let mut left_vec = vec![];
+        let mut right_vec = vec![];
+        for (&left, &right) in trace
+            .left
+            .iter()
+            .zip(trace.right.iter())
+            .chain(composition.left.iter().zip(composition.right.iter()))
+        {
+            left_vec.push(left);
+            right_vec.push(right);
+        }
+        queried_values_left.push(left_vec);
+        queried_values_right.push(right_vec);
+    }
+
     Ok(PrepareOutput {
         precomputed_merkle_tree,
         denominator_inverses_expected,
@@ -288,5 +311,7 @@ pub fn prepare(
         merkle_proofs_compositions,
         queries_parents,
         column_line_coeff_pair_vanishing_hints,
+        queried_values_left,
+        queried_values_right,
     })
 }

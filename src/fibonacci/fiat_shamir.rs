@@ -122,6 +122,9 @@ pub struct FriInput {
     /// alpha
     pub circle_poly_alpha: QM31,
 
+    /// folding alphas
+    pub folding_alphas: Vec<QM31>,
+
     /// last layer domain
     pub last_layer_domain: LineDomain,
 
@@ -250,6 +253,7 @@ pub fn generate_fs_hints(
 
     let mut fri_commitment_and_folding_hints = vec![];
 
+    let mut folding_alphas = vec![];
     for (layer_index, proof) in proof
         .commitment_scheme_proof
         .fri_proof
@@ -260,6 +264,7 @@ pub fn generate_fs_hints(
         channel.mix_digest(proof.commitment);
 
         let (folding_alpha, folding_alpha_hint) = channel.draw_felt_and_hints();
+        folding_alphas.push(folding_alpha);
 
         fri_commitment_and_folding_hints.push((proof.commitment, folding_alpha_hint));
 
@@ -346,6 +351,7 @@ pub fn generate_fs_hints(
         sample_values: sample_values.to_vec(),
         random_coeff,
         circle_poly_alpha,
+        folding_alphas,
         last_layer_domain,
         queries,
     };

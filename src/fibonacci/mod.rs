@@ -1,31 +1,30 @@
 mod bitcoin_script;
 
 mod fiat_shamir;
+mod fold;
 mod prepare;
 mod quotients;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
-use crate::constraints::DenominatorInverseHint;
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
+use crate::fibonacci::fold::compute_fold_hints;
+use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
 use crate::fibonacci::quotients::compute_quotients_hints;
-use crate::fri::FieldInversionHint;
 use crate::merkle_tree::MerkleTreeTwinProof;
-use crate::precomputed_merkle_tree::PrecomputedMerkleTreeProof;
 use crate::treepp::pushable::{Builder, Pushable};
+use quotients::PerQueryQuotientHint;
 use stwo_prover::core::air::Air;
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
-
-use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
@@ -43,22 +42,6 @@ pub struct VerifierHints {
 
     /// Per query hints.
     pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
-}
-
-#[derive(Default, Clone)]
-/// Hint that repeats for each query.
-pub struct PerQueryQuotientHint {
-    /// Precomputed tree Merkle proofs.
-    pub precomputed_merkle_proofs: Vec<PrecomputedMerkleTreeProof>,
-
-    /// Denominator inverse hints.
-    pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
-
-    /// Y inverse hint.
-    pub y_inverse_hint: FieldInversionHint,
-
-    /// Test-only: the FRI answer.
-    pub test_only_fri_answer: Vec<QM31>,
 }
 
 impl Pushable for &VerifierHints {
@@ -85,28 +68,6 @@ impl Pushable for VerifierHints {
     }
 }
 
-impl Pushable for &PerQueryQuotientHint {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        for proof in self.precomputed_merkle_proofs.iter() {
-            builder = proof.bitcoin_script_push(builder);
-        }
-        for hint in self.denominator_inverse_hints.iter() {
-            builder = hint.bitcoin_script_push(builder);
-        }
-        builder = (&self.y_inverse_hint).bitcoin_script_push(builder);
-        for elem in self.test_only_fri_answer.iter().rev() {
-            builder = elem.bitcoin_script_push(builder);
-        }
-        builder
-    }
-}
-
-impl Pushable for PerQueryQuotientHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
 /// A verifier program that generates hints.
 pub fn verify_with_hints(
     proof: StarkProof,
@@ -115,17 +76,16 @@ pub fn verify_with_hints(
 ) -> Result<VerifierHints, VerificationError> {
     let fs_output = fiat_shamir::generate_fs_hints(proof.clone(), channel, air).unwrap();
 
-    let prepare_output = prepare::prepare(&fs_output, proof).unwrap();
+    let prepare_output = prepare::prepare(&fs_output, &proof).unwrap();
 
-    let (_quotients_output, per_query_quotients_hints) = compute_quotients_hints(
-        &prepare_output.precomputed_merkle_tree,
+    let (quotients_output, per_query_quotients_hints) =
+        compute_quotients_hints(&fs_output, &prepare_output);
+
+    let _ = compute_fold_hints(
+        &proof.commitment_scheme_proof.fri_proof,
         &fs_output,
-        &prepare_output.denominator_inverses_expected,
-        &prepare_output.samples,
-        &prepare_output.column_line_coeffs,
-        &prepare_output.merkle_proofs_traces,
-        &prepare_output.merkle_proofs_compositions,
-        &prepare_output.queries_parents,
+        &prepare_output,
+        &quotients_output,
     );
 
     Ok(VerifierHints {
