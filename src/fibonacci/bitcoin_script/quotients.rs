@@ -1,13 +1,12 @@
 use crate::constraints::ConstraintsGadget;
 use crate::fibonacci::bitcoin_script::FIB_LOG_SIZE;
-use crate::fri::FFTGadget;
 use crate::precomputed_merkle_tree::{
     get_precomputed_merkle_tree_roots, PrecomputedMerkleTreeGadget, PRECOMPUTED_MERKLE_TREE_ROOTS,
 };
 use crate::treepp::*;
 use rust_bitcoin_m31::{
-    cm31_add, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add, qm31_equalverify,
-    qm31_from_bottom, qm31_fromaltstack, qm31_mul_cm31, qm31_rot, qm31_swap, qm31_toaltstack,
+    cm31_add, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add, qm31_fromaltstack,
+    qm31_mul_cm31, qm31_rot, qm31_swap, qm31_toaltstack,
 };
 use stwo_prover::core::prover::{LOG_BLOWUP_FACTOR, N_QUERIES};
 
@@ -353,28 +352,6 @@ impl FibonacciPerQueryQuotientGadget {
             //    twiddle factors (15)
             //    answer_1 (qm31)
             //    answer_2 (qm31)
-
-            // pull y inverse (last twiddle factor)
-            8 OP_ROLL
-
-            // local stack (4 elements):
-            //    ---------------------------- per query ----------------------------
-            //    twiddle factors (15)
-            //    answer_1 (qm31)
-            //    answer_2 (qm31)
-            //    y inverse (1)
-
-            // perform the inverse FFT using p.y inverse
-            { FFTGadget::ibutterfly() }
-
-            // test only: check the result consistency
-            qm31_from_bottom qm31_equalverify
-            qm31_from_bottom qm31_equalverify
-
-            // test only: clean the twiddle factors
-            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR - 1) {
-                OP_DROP
-            } // drop the twiddle factors
         }
     }
 }

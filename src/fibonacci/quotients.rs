@@ -115,7 +115,6 @@ pub fn compute_quotients_hints(
         hints.push(PerQueryQuotientHint {
             precomputed_merkle_proofs: vec![precomputed.clone()],
             denominator_inverse_hints,
-            test_only_fri_answer,
         });
     }
 
@@ -130,9 +129,6 @@ pub struct PerQueryQuotientHint {
 
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
-
-    /// Test-only: the FRI answer.
-    pub test_only_fri_answer: Vec<QM31>,
 }
 
 impl Pushable for &PerQueryQuotientHint {
@@ -142,9 +138,6 @@ impl Pushable for &PerQueryQuotientHint {
         }
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
-        }
-        for elem in self.test_only_fri_answer.iter().rev() {
-            builder = elem.bitcoin_script_push(builder);
         }
         builder
     }

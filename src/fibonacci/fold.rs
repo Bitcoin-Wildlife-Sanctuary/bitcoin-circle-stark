@@ -2,6 +2,7 @@ use crate::fibonacci::fiat_shamir::FSOutput;
 use crate::fibonacci::prepare::PrepareOutput;
 use crate::fibonacci::quotients::QuotientsOutput;
 use crate::merkle_tree::MerkleTreeTwinProof;
+use crate::treepp::pushable::{Builder, Pushable};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use stwo_prover::core::fft::ibutterfly;
@@ -12,6 +13,21 @@ use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 
 pub struct PerQueryFoldHints {
     pub twin_proofs: Vec<MerkleTreeTwinProof>,
+}
+
+impl Pushable for &PerQueryFoldHints {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        for proof in self.twin_proofs.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
+        builder
+    }
+}
+
+impl Pushable for PerQueryFoldHints {
+    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+        (&self).bitcoin_script_push(builder)
+    }
 }
 
 pub fn compute_fold_hints(

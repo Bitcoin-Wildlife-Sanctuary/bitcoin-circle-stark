@@ -24,6 +24,21 @@ pub fn trim_m31_gadget(logn: usize) -> Script {
     }
 }
 
+/// Convert the column representation back to the field element.
+///
+/// Input:
+/// - a, b, c, d
+///
+/// Output:
+/// - d, c, b, a
+pub fn qm31_reverse() -> Script {
+    script! {
+        OP_SWAP
+        OP_2SWAP
+        OP_SWAP
+    }
+}
+
 /// Copy some stack elements to the altstack, where the stack top is being inserted first.
 pub fn copy_to_altstack_top_item_first_in_gadget(n: usize) -> Script {
     script! {

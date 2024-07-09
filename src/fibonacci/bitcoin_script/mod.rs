@@ -1,5 +1,6 @@
 use crate::circle::CirclePointGadget;
 use crate::fibonacci::bitcoin_script::fiat_shamir::FibonacciFiatShamirGadget;
+use crate::fibonacci::bitcoin_script::fold::FibonacciFoldGadget;
 use crate::fibonacci::bitcoin_script::prepare::PrepareGadget;
 use crate::fibonacci::bitcoin_script::quotients::FibonacciPerQueryQuotientGadget;
 use crate::treepp::*;
@@ -47,8 +48,11 @@ impl FibonacciVerifierGadget {
             //    prepared oods point (4)
             //    coeff^6, coeff^5, ..., coeff (24)
 
-            for i in 0..8 {
+            // 0x9115ae4e 0xeb342c4c 0xd3f1703d 0x8fbcb777 0x28507867
+
+            for i in 0..N_QUERIES {
                 { FibonacciPerQueryQuotientGadget::run(i) }
+                { FibonacciFoldGadget::run(i) }
             }
 
             // stack:
@@ -103,6 +107,7 @@ impl FibonacciVerifierGadget {
 mod test {
     use crate::fibonacci::bitcoin_script::FIB_LOG_SIZE;
     use crate::fibonacci::{verify_with_hints, FibonacciVerifierGadget};
+    use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
@@ -150,6 +155,8 @@ mod test {
             { FibonacciVerifierGadget::run_verifier(&channel_clone) }
             OP_TRUE
         };
+
+        report_bitcoin_script_size("Fibonacci", "verifier", script.len());
 
         let exec_result = execute_script_with_witness_unlimited_stack(
             script,
