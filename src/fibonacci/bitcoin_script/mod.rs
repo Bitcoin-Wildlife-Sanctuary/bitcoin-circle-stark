@@ -48,8 +48,6 @@ impl FibonacciVerifierGadget {
             //    prepared oods point (4)
             //    coeff^6, coeff^5, ..., coeff (24)
 
-            // 0x9115ae4e 0xeb342c4c 0xd3f1703d 0x8fbcb777 0x28507867
-
             for i in 0..N_QUERIES {
                 { FibonacciPerQueryQuotientGadget::run(i) }
                 { FibonacciFoldGadget::run(i) }
