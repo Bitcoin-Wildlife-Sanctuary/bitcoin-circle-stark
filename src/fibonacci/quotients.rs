@@ -65,23 +65,23 @@ pub fn compute_quotients_hints(
         for column_line_coeff in column_line_coeffs.iter().take(3) {
             nominators.push(column_line_coeff.apply_twin(
                 precomputed.circle_point,
-                &[queried_values_left[0][0]],
-                &[queried_values_right[0][0]],
+                &[queried_values_left[i][0]],
+                &[queried_values_right[i][0]],
             ));
         }
         nominators.push(column_line_coeffs[3].apply_twin(
             precomputed.circle_point,
             &[
-                queried_values_left[0][1],
-                queried_values_left[0][2],
-                queried_values_left[0][3],
-                queried_values_left[0][4],
+                queried_values_left[i][1],
+                queried_values_left[i][2],
+                queried_values_left[i][3],
+                queried_values_left[i][4],
             ],
             &[
-                queried_values_right[0][1],
-                queried_values_right[0][2],
-                queried_values_right[0][3],
-                queried_values_right[0][4],
+                queried_values_right[i][1],
+                queried_values_right[i][2],
+                queried_values_right[i][3],
+                queried_values_right[i][4],
             ],
         ));
 

@@ -53,7 +53,7 @@ pub struct VerifierHints {
     pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
 
     /// Per query hints.
-    pub per_query_hints: Vec<PerQueryQuotientHint>,
+    pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
 }
 
 #[derive(Default, Clone)]
@@ -87,7 +87,7 @@ impl Pushable for &VerifierHints {
         for hint in self.prepared_pair_vanishing_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
-        for hint in self.per_query_hints.iter() {
+        for hint in self.per_query_quotients_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
         builder
@@ -364,7 +364,7 @@ pub fn verify_with_hints(
         merkle_proofs_compositions,
         column_line_coeffs_hints,
         prepared_pair_vanishing_hints,
-        per_query_hints: vec![per_query_quotients_hints[0].clone()],
+        per_query_quotients_hints,
     })
 }
 
