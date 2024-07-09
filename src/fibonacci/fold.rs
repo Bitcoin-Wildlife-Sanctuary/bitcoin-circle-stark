@@ -3,7 +3,7 @@ use crate::fibonacci::prepare::PrepareOutput;
 use crate::fibonacci::quotients::QuotientsOutput;
 use crate::merkle_tree::MerkleTreeTwinProof;
 use itertools::Itertools;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
@@ -50,10 +50,15 @@ pub fn compute_fold_hints(
         }
     }
 
-    for ((layer_twiddles, fri_layer_proof), &folding_alpha) in twiddles
+    let mut twin_proofs = vec![BTreeMap::<usize, MerkleTreeTwinProof>::new(); num_fri_steps];
+
+    let mut depth = prepare_output.precomputed_merkle_tree.layers.len() - 1;
+
+    for (((layer_twiddles, fri_layer_proof), &folding_alpha), twin_proofs_mut) in twiddles
         .iter()
         .zip_eq(fri_proof.inner_layers.iter())
         .zip_eq(fs_output.fri_input.folding_alphas.iter())
+        .zip_eq(twin_proofs.iter_mut())
     {
         let mut iter = fri_layer_proof.evals_subset.iter();
 
@@ -89,12 +94,78 @@ pub fn compute_fold_hints(
             new_queries_and_results.insert(queries_parent >> 1, res);
         }
 
+        let mut queries = BTreeSet::new();
+        let mut values = vec![vec![]; 4];
+        for &queries_parent in queries_parent_sorted.iter() {
+            queries.insert(queries_parent >> 1);
+            let (left, right) = if queries_parent % 2 == 0 {
+                (queries_parent, queries_parent ^ 1)
+            } else {
+                (queries_parent ^ 1, queries_parent)
+            };
+
+            let f_p = *queries_and_results.get(&left).unwrap();
+            values[0].push(f_p.0 .0);
+            values[1].push(f_p.0 .1);
+            values[2].push(f_p.1 .0);
+            values[3].push(f_p.1 .1);
+
+            let f_neg_p = *queries_and_results.get(&right).unwrap();
+            values[0].push(f_neg_p.0 .0);
+            values[1].push(f_neg_p.0 .1);
+            values[2].push(f_neg_p.1 .0);
+            values[3].push(f_neg_p.1 .1);
+        }
+
+        let proofs = MerkleTreeTwinProof::from_stwo_proof(
+            depth,
+            &queries.iter().copied().collect::<Vec<usize>>(),
+            &values,
+            &fri_layer_proof.decommitment,
+        );
+
+        for (&queries_parent, proof) in queries_parent_sorted.iter().zip(proofs.iter()) {
+            twin_proofs_mut.insert(queries_parent, proof.clone());
+        }
+
         queries_and_results = new_queries_and_results;
+        depth -= 1;
     }
 
     for (_, &v) in queries_and_results.iter() {
         assert_eq!(v, fs_output.fiat_shamir_hints.last_layer);
     }
 
-    vec![]
+    let mut all_fold_hints = vec![];
+
+    for &queries_parent in prepare_output.queries_parents.iter() {
+        let mut idx = queries_parent;
+        let mut proofs = vec![];
+
+        for layer_twin_proofs in twin_proofs.iter() {
+            proofs.push(layer_twin_proofs.get(&idx).unwrap().clone());
+            idx >>= 1;
+        }
+
+        // test if the proof are correct
+        let mut depth = prepare_output.precomputed_merkle_tree.layers.len() - 1;
+        let mut idx = queries_parent;
+
+        for (proof, (commitment, _)) in proofs.iter().zip(
+            fs_output
+                .fiat_shamir_hints
+                .fri_commitment_and_folding_hints
+                .iter(),
+        ) {
+            assert!(proof.verify(commitment, depth, (idx >> 1) << 1));
+            depth -= 1;
+            idx >>= 1;
+        }
+
+        all_fold_hints.push(PerQueryFoldHints {
+            twin_proofs: proofs,
+        });
+    }
+
+    all_fold_hints
 }
