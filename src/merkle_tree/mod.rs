@@ -1,3 +1,4 @@
+use crate::treepp::pushable::{Builder, Pushable};
 use std::collections::{BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::{BaseField, M31};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
@@ -6,7 +7,6 @@ use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
 
 mod bitcoin_script;
-use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 
 /// A Merkle tree.
@@ -50,49 +50,53 @@ impl MerkleTree {
             root_hash: cur[0],
         }
     }
+}
 
-    /// Query the Merkle tree and generate a corresponding proof.
-    pub fn query(&self, mut pos: usize) -> MerkleTreeTwinProof {
-        let logn = self.intermediate_layers.len();
-        assert_eq!(pos & 1, 0);
+#[derive(Default, Clone, Debug)]
+/// An internal proof type that excludes the leaf (or leaves).
+pub struct MerkleTreePath {
+    /// All the intermediate sibling nodes.
+    pub siblings: Vec<BWSSha256Hash>,
+}
 
-        let mut merkle_tree_proof = MerkleTreeTwinProof {
-            left: self.leaf_layer[pos].clone(),
-            right: self.leaf_layer[pos | 1].clone(),
-            ..Default::default()
-        };
+impl Pushable for &MerkleTreePath {
+    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+        for elem in self.siblings.iter() {
+            builder = elem.bitcoin_script_push(builder);
+        }
+        builder
+    }
+}
 
-        for i in 0..(logn - 1) {
+impl MerkleTreePath {
+    /// Generate the Merkle tree path.
+    pub fn query(tree: &MerkleTree, mut pos: usize) -> Self {
+        let mut siblings = vec![];
+
+        let num_layers = tree.intermediate_layers.len();
+        for i in 0..num_layers - 1 {
             pos >>= 1;
-            merkle_tree_proof
-                .siblings
-                .push(self.intermediate_layers[i][pos ^ 1]);
+            siblings.push(tree.intermediate_layers[i][pos ^ 1]);
         }
 
-        merkle_tree_proof
+        Self { siblings }
     }
 
-    /// Verify a Merkle tree proof.
-    pub fn verify_twin(
+    /// Verify the Merkle tree path given the root hash, the considered depth, the leaf hash, and the query.
+    pub fn verify(
+        &self,
         root_hash: &BWSSha256Hash,
-        logn: usize,
-        proof: &MerkleTreeTwinProof,
+        depth: usize,
+        mut leaf_hash: BWSSha256Hash,
         mut query: usize,
     ) -> bool {
-        assert_eq!(proof.siblings.len(), logn - 1);
-        assert_eq!(query & 1, 0);
+        assert_eq!(self.siblings.len(), depth);
 
-        let left_hash = BWSSha256MerkleHasher::hash_node(None, &proof.left);
-        let right_hash = BWSSha256MerkleHasher::hash_node(None, &proof.right);
-
-        let mut leaf_hash = BWSSha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
-        query >>= 1;
-
-        for i in 0..logn - 1 {
+        for i in 0..depth {
             let (f0, f1) = if query & 1 == 0 {
-                (leaf_hash, proof.siblings[i])
+                (leaf_hash, self.siblings[i])
             } else {
-                (proof.siblings[i], leaf_hash)
+                (self.siblings[i], leaf_hash)
             };
 
             leaf_hash = BWSSha256MerkleHasher::hash_node(Some((f0, f1)), &[]);
@@ -110,8 +114,8 @@ pub struct MerkleTreeTwinProof {
     pub left: Vec<M31>,
     /// Leaf sibling as an M31 array.
     pub right: Vec<M31>,
-    /// All the intermediate sibling nodes.
-    pub siblings: Vec<BWSSha256Hash>,
+    /// Remaining path.
+    pub path: MerkleTreePath,
 }
 
 impl Pushable for MerkleTreeTwinProof {
@@ -128,14 +132,35 @@ impl Pushable for &MerkleTreeTwinProof {
         for v in self.right.iter() {
             builder = v.bitcoin_script_push(builder);
         }
-        for elem in self.siblings.iter() {
-            builder = elem.bitcoin_script_push(builder);
-        }
-        builder
+        (&self.path).bitcoin_script_push(builder)
     }
 }
 
 impl MerkleTreeTwinProof {
+    /// Query the Merkle tree and generate a corresponding proof.
+    pub fn query(tree: &MerkleTree, pos: usize) -> MerkleTreeTwinProof {
+        assert_eq!(pos & 1, 0);
+
+        let left = tree.leaf_layer[pos].clone();
+        let right = tree.leaf_layer[pos | 1].clone();
+        let path = MerkleTreePath::query(tree, pos);
+
+        MerkleTreeTwinProof { left, right, path }
+    }
+
+    /// Verify a Merkle tree proof.
+    pub fn verify(&self, root_hash: &BWSSha256Hash, logn: usize, mut query: usize) -> bool {
+        assert_eq!(query & 1, 0);
+
+        let left_hash = BWSSha256MerkleHasher::hash_node(None, &self.left);
+        let right_hash = BWSSha256MerkleHasher::hash_node(None, &self.right);
+
+        let leaf_hash = BWSSha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
+        query >>= 1;
+
+        self.path.verify(root_hash, logn - 1, leaf_hash, query)
+    }
+
     /// Convert a stwo Merkle proof into twin proofs for each pairs of queries.
     pub fn from_stwo_proof(
         logn: usize,
@@ -233,7 +258,7 @@ impl MerkleTreeTwinProof {
                     .get(&((queries_parent << 1) + 1))
                     .unwrap()
                     .clone(),
-                siblings,
+                path: MerkleTreePath { siblings },
             });
         }
         res
@@ -271,13 +296,8 @@ mod test {
                 query ^= 1;
             }
 
-            let proof = merkle_tree.query(query);
-            assert!(MerkleTree::verify_twin(
-                &merkle_tree.root_hash,
-                12,
-                &proof,
-                query
-            ));
+            let proof = MerkleTreeTwinProof::query(&merkle_tree, query);
+            assert!(proof.verify(&merkle_tree.root_hash, 12, query));
         }
     }
 
@@ -322,12 +342,7 @@ mod test {
             let proofs =
                 MerkleTreeTwinProof::from_stwo_proof(LOG_SIZE, &queries, &values, &decommitment);
             for (&query, proof) in queries.iter().zip(proofs.iter()) {
-                assert!(MerkleTree::verify_twin(
-                    &prover.root(),
-                    LOG_SIZE,
-                    proof,
-                    query << 1
-                ));
+                assert!(proof.verify(&prover.root(), LOG_SIZE, query << 1));
             }
         }
     }
