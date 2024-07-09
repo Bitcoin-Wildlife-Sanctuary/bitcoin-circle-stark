@@ -7,7 +7,7 @@ mod quotients;
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
-use crate::constraints::{ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint};
+use crate::constraints::DenominatorInverseHint;
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
 use crate::fibonacci::quotients::compute_quotients_hints;
 use crate::fri::FieldInversionHint;
