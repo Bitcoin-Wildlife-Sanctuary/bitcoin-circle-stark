@@ -8,25 +8,23 @@ mod quotients;
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
-use crate::constraints::DenominatorInverseHint;
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
 use crate::fibonacci::fold::compute_fold_hints;
+use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
 use crate::fibonacci::quotients::compute_quotients_hints;
 use crate::merkle_tree::MerkleTreeTwinProof;
-use crate::precomputed_merkle_tree::PrecomputedMerkleTreeProof;
 use crate::treepp::pushable::{Builder, Pushable};
+use quotients::PerQueryQuotientHint;
 use stwo_prover::core::air::Air;
 use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
 use stwo_prover::core::{ColumnVec, ComponentVec};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
-
-use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
 pub struct VerifierHints {
@@ -44,19 +42,6 @@ pub struct VerifierHints {
 
     /// Per query hints.
     pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
-}
-
-#[derive(Default, Clone)]
-/// Hint that repeats for each query.
-pub struct PerQueryQuotientHint {
-    /// Precomputed tree Merkle proofs.
-    pub precomputed_merkle_proofs: Vec<PrecomputedMerkleTreeProof>,
-
-    /// Denominator inverse hints.
-    pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
-
-    /// Test-only: the FRI answer.
-    pub test_only_fri_answer: Vec<QM31>,
 }
 
 impl Pushable for &VerifierHints {
@@ -78,27 +63,6 @@ impl Pushable for &VerifierHints {
 }
 
 impl Pushable for VerifierHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &PerQueryQuotientHint {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        for proof in self.precomputed_merkle_proofs.iter() {
-            builder = proof.bitcoin_script_push(builder);
-        }
-        for hint in self.denominator_inverse_hints.iter() {
-            builder = hint.bitcoin_script_push(builder);
-        }
-        for elem in self.test_only_fri_answer.iter().rev() {
-            builder = elem.bitcoin_script_push(builder);
-        }
-        builder
-    }
-}
-
-impl Pushable for PerQueryQuotientHint {
     fn bitcoin_script_push(self, builder: Builder) -> Builder {
         (&self).bitcoin_script_push(builder)
     }
