@@ -139,7 +139,7 @@ pub fn verify_with_hints(
         merkle_proofs_compositions: prepare_output.merkle_proofs_compositions,
         column_line_coeffs_hints: prepare_output.column_line_coeffs_hints,
         prepared_pair_vanishing_hints: prepare_output.prepared_pair_vanishing_hints,
-        per_query_hints: vec![per_query_quotients_hints[0].clone()],
+        per_query_quotients_hints,
     })
 }
 
