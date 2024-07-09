@@ -33,7 +33,7 @@ pub struct PrepareOutput {
 /// prepare output for quotients and verifier hints
 pub fn prepare(
     fs_output: &FSOutput,
-    proof: StarkProof,
+    proof: &StarkProof,
 ) -> Result<PrepareOutput, VerificationError> {
     let fri_query_domains = get_opening_positions(
         &fs_output.fri_input.queries,

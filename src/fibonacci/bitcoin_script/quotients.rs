@@ -1,6 +1,6 @@
 use crate::constraints::ConstraintsGadget;
 use crate::fibonacci::bitcoin_script::FIB_LOG_SIZE;
-use crate::fri::{FFTGadget, FieldInversionGadget};
+use crate::fri::FFTGadget;
 use crate::precomputed_merkle_tree::{
     get_precomputed_merkle_tree_roots, PrecomputedMerkleTreeGadget, PRECOMPUTED_MERKLE_TREE_ROOTS,
 };
@@ -149,8 +149,9 @@ impl FibonacciPerQueryQuotientGadget {
                 28 OP_ROLL OP_DROP
             }
 
-            // remove x (unused)
-            { 28 + 16 + 1 } OP_ROLL OP_DROP
+            // remove x, y (unused)
+            { 28 + 16 } OP_ROLL OP_DROP
+            { 28 + 16 } OP_ROLL OP_DROP
 
             // stack:
             //    circle_poly_alpha (4)
@@ -168,7 +169,6 @@ impl FibonacciPerQueryQuotientGadget {
             //    coeff^6, coeff^5, ..., coeff (6 * 4 = 24)
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
-            //    y (1)
             //    denominator inverses (4 * 2 * 2 = 16)
             //    nominators (7 * 2 * 2 = 28)
 
@@ -222,19 +222,19 @@ impl FibonacciPerQueryQuotientGadget {
             //      v1 * b1 (cm31), v2 * b2 (cm31), v3 * b3 (cm31)
 
             for _ in 0..4 {
-                { (8 + 2) * 2 + 1 + 15 + 12 - 1 } OP_PICK
+                { (8 + 2) * 2 + 15 + 12 - 1 } OP_PICK
             } // copy coeff^3
             { cm31_roll(2 + 8 - 1) } // c1
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (7 + 2) * 2 + 1 + 15 + 8 - 1 } OP_PICK
+                { (7 + 2) * 2 + 15 + 8 - 1 } OP_PICK
             } // copy coeff^2
             { cm31_roll(2 + 6 - 1) } // c2
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (6 + 2) * 2 + 1 + 15 + 4 - 1 } OP_PICK
+                { (6 + 2) * 2 + 15 + 4 - 1 } OP_PICK
             } // copy coeff
             { cm31_roll(2 + 4 - 1) } // c3
             qm31_mul_cm31
@@ -259,19 +259,19 @@ impl FibonacciPerQueryQuotientGadget {
             //      (coeff^3 * c1 + coeff^2 * c2 + coeff * c3 + c4) * u4 (qm31)
 
             for _ in 0..4 {
-                { (4 + 1) * 2 + 1 + 15 + 12 - 1 } OP_PICK
+                { (4 + 1) * 2 + 15 + 12 - 1 } OP_PICK
             } // copy coeff^3
             { cm31_roll(2 + 4 - 1) } // d1
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (3 + 1) * 2 + 1 + 15 + 8 - 1 } OP_PICK
+                { (3 + 1) * 2 + 15 + 8 - 1 } OP_PICK
             } // copy coeff^2
             { cm31_roll(2 + 3 - 1) } // d2
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { (2 + 1) * 2 + 1 + 15 + 4 - 1 } OP_PICK
+                { (2 + 1) * 2 + 15 + 4 - 1 } OP_PICK
             } // copy coeff
             { cm31_roll(2 + 2 - 1) } // d3
             qm31_mul_cm31
@@ -304,19 +304,19 @@ impl FibonacciPerQueryQuotientGadget {
             //      u3 * a3 (cm31), u2 * a2 (cm31), u1 * a1 (cm31)
 
             for _ in 0..4 {
-                { 20 + 1 + 15 + 24 - 1 } OP_PICK
+                { 20 + 15 + 24 - 1 } OP_PICK
             } // copy coeff^6
             { cm31_roll(2) } // u1 * a1
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { 18 + 1 + 15 + 20 - 1 } OP_PICK
+                { 18 + 15 + 20 - 1 } OP_PICK
             } // copy coeff^5
             { cm31_roll(2) } // u2 * a2
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { 16 + 1 + 15 + 16 - 1 } OP_PICK
+                { 16 + 15 + 16 - 1 } OP_PICK
             } // copy coeff^4
             { cm31_roll(2) } // u3 * a3
             qm31_mul_cm31
@@ -325,19 +325,19 @@ impl FibonacciPerQueryQuotientGadget {
             qm31_toaltstack
 
             for _ in 0..4 {
-                { 14 + 1 + 15 + 24 - 1 } OP_PICK
+                { 14 + 15 + 24 - 1 } OP_PICK
             } // copy coeff^6
             { cm31_roll(2) } // v1 * b1
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { 12 + 1 + 15 + 20 - 1 } OP_PICK
+                { 12 + 15 + 20 - 1 } OP_PICK
             } // copy coeff^5
             { cm31_roll(2) } // v2 * b2
             qm31_mul_cm31 qm31_toaltstack
 
             for _ in 0..4 {
-                { 10 + 1 + 15 + 16 - 1 } OP_PICK
+                { 10 + 15 + 16 - 1 } OP_PICK
             } // copy coeff^4
             { cm31_roll(2) } // v3 * b3
             qm31_mul_cm31
@@ -351,13 +351,11 @@ impl FibonacciPerQueryQuotientGadget {
             // local stack (4 elements):
             //    ---------------------------- per query ----------------------------
             //    twiddle factors (15)
-            //    y (1)
             //    answer_1 (qm31)
             //    answer_2 (qm31)
 
-            // pull y and compute its inverse
+            // pull y inverse (last twiddle factor)
             8 OP_ROLL
-            { FieldInversionGadget::inverse_with_hint() }
 
             // local stack (4 elements):
             //    ---------------------------- per query ----------------------------
@@ -374,7 +372,7 @@ impl FibonacciPerQueryQuotientGadget {
             qm31_from_bottom qm31_equalverify
 
             // test only: clean the twiddle factors
-            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR) {
+            for _ in 0..(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR - 1) {
                 OP_DROP
             } // drop the twiddle factors
         }

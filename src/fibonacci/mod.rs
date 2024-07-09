@@ -1,6 +1,7 @@
 mod bitcoin_script;
 
 mod fiat_shamir;
+mod fold;
 mod prepare;
 mod quotients;
 
@@ -9,8 +10,8 @@ use itertools::Itertools;
 
 use crate::constraints::{ColumnLineCoeffsHint, DenominatorInverseHint, PreparedPairVanishingHint};
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
+use crate::fibonacci::fold::compute_fold_hints;
 use crate::fibonacci::quotients::compute_quotients_hints;
-use crate::fri::FieldInversionHint;
 use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::precomputed_merkle_tree::PrecomputedMerkleTreeProof;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -55,9 +56,6 @@ pub struct PerQueryQuotientHint {
     /// Denominator inverse hints.
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 
-    /// Y inverse hint.
-    pub y_inverse_hint: FieldInversionHint,
-
     /// Test-only: the FRI answer.
     pub test_only_fri_answer: Vec<QM31>,
 }
@@ -98,7 +96,6 @@ impl Pushable for &PerQueryQuotientHint {
         for hint in self.denominator_inverse_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
-        builder = (&self.y_inverse_hint).bitcoin_script_push(builder);
         for elem in self.test_only_fri_answer.iter().rev() {
             builder = elem.bitcoin_script_push(builder);
         }
@@ -120,17 +117,16 @@ pub fn verify_with_hints(
 ) -> Result<VerifierHints, VerificationError> {
     let fs_output = fiat_shamir::generate_fs_hints(proof.clone(), channel, air).unwrap();
 
-    let prepare_output = prepare::prepare(&fs_output, proof).unwrap();
+    let prepare_output = prepare::prepare(&fs_output, &proof).unwrap();
 
-    let (_quotients_output, per_query_quotients_hints) = compute_quotients_hints(
-        &prepare_output.precomputed_merkle_tree,
+    let (quotients_output, per_query_quotients_hints) =
+        compute_quotients_hints(&fs_output, &prepare_output);
+
+    let _ = compute_fold_hints(
+        &proof.commitment_scheme_proof.fri_proof,
         &fs_output,
-        &prepare_output.denominator_inverses_expected,
-        &prepare_output.samples,
-        &prepare_output.column_line_coeffs,
-        &prepare_output.merkle_proofs_traces,
-        &prepare_output.merkle_proofs_compositions,
-        &prepare_output.queries_parents,
+        &prepare_output,
+        &quotients_output,
     );
 
     Ok(VerifierHints {

@@ -1,15 +1,10 @@
-use crate::constraints::{ColumnLineCoeffs, DenominatorInverseHint};
+use crate::constraints::DenominatorInverseHint;
 use crate::fibonacci::fiat_shamir::FSOutput;
+use crate::fibonacci::prepare::PrepareOutput;
 use crate::fibonacci::PerQueryQuotientHint;
-use crate::fri::FieldInversionHint;
-use crate::merkle_tree::MerkleTreeTwinProof;
-use crate::precomputed_merkle_tree::PrecomputedMerkleTree;
 use stwo_prover::core::fft::ibutterfly;
-use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
-use stwo_prover::core::pcs::quotients::PointSample;
-use stwo_prover::core::ColumnVec;
 
 #[derive(Default, Clone, Debug)]
 pub struct QuotientsOutput {
@@ -18,33 +13,42 @@ pub struct QuotientsOutput {
 
 #[allow(clippy::too_many_arguments)]
 pub fn compute_quotients_hints(
-    precomputed_merkle_tree: &PrecomputedMerkleTree,
     fs_output: &FSOutput,
-    denominator_inverses_expected: &[Vec<Vec<CM31>>],
-    samples: &ColumnVec<Vec<PointSample>>,
-    column_line_coeffs: &[ColumnLineCoeffs],
-    merkle_proofs_traces: &[MerkleTreeTwinProof],
-    merkle_proofs_compositions: &[MerkleTreeTwinProof],
-    queries_parents: &[usize],
+    prepare_output: &PrepareOutput,
 ) -> (QuotientsOutput, Vec<PerQueryQuotientHint>) {
     let mut hints = vec![];
     let mut fold_results = vec![];
 
-    for (i, queries_parent) in queries_parents.iter().enumerate() {
-        let precomputed = precomputed_merkle_tree.query(queries_parent << 1);
+    for (i, queries_parent) in prepare_output.queries_parents.iter().enumerate() {
+        let precomputed = prepare_output
+            .precomputed_merkle_tree
+            .query(queries_parent << 1);
 
         let denominator_inverse_hints = vec![
-            DenominatorInverseHint::new(samples[0][0].point, precomputed.circle_point),
-            DenominatorInverseHint::new(samples[0][1].point, precomputed.circle_point),
-            DenominatorInverseHint::new(samples[0][2].point, precomputed.circle_point),
-            DenominatorInverseHint::new(samples[1][0].point, precomputed.circle_point),
+            DenominatorInverseHint::new(
+                prepare_output.samples[0][0].point,
+                precomputed.circle_point,
+            ),
+            DenominatorInverseHint::new(
+                prepare_output.samples[0][1].point,
+                precomputed.circle_point,
+            ),
+            DenominatorInverseHint::new(
+                prepare_output.samples[0][2].point,
+                precomputed.circle_point,
+            ),
+            DenominatorInverseHint::new(
+                prepare_output.samples[1][0].point,
+                precomputed.circle_point,
+            ),
         ];
 
         let mut queried_values_left = vec![];
         let mut queried_values_right = vec![];
-        for (trace, composition) in merkle_proofs_traces
+        for (trace, composition) in prepare_output
+            .merkle_proofs_traces
             .iter()
-            .zip(merkle_proofs_compositions.iter())
+            .zip(prepare_output.merkle_proofs_compositions.iter())
         {
             let mut left_vec = vec![];
             let mut right_vec = vec![];
@@ -62,14 +66,14 @@ pub fn compute_quotients_hints(
         }
 
         let mut nominators = vec![];
-        for column_line_coeff in column_line_coeffs.iter().take(3) {
+        for column_line_coeff in prepare_output.column_line_coeffs.iter().take(3) {
             nominators.push(column_line_coeff.apply_twin(
                 precomputed.circle_point,
                 &[queried_values_left[i][0]],
                 &[queried_values_right[i][0]],
             ));
         }
-        nominators.push(column_line_coeffs[3].apply_twin(
+        nominators.push(prepare_output.column_line_coeffs[3].apply_twin(
             precomputed.circle_point,
             &[
                 queried_values_left[i][1],
@@ -84,6 +88,8 @@ pub fn compute_quotients_hints(
                 queried_values_right[i][4],
             ],
         ));
+
+        let denominator_inverses_expected = &prepare_output.denominator_inverses_expected;
 
         let eval_left = fs_output.fri_input.random_coeff.pow(6)
             * QM31::from(nominators[0].0[0] * denominator_inverses_expected[i][0][0])
@@ -109,8 +115,6 @@ pub fn compute_quotients_hints(
                 + QM31::from(nominators[3].1[3]))
                 * QM31::from(denominator_inverses_expected[i][3][1]);
 
-        let y_inverse_hint = FieldInversionHint::from(precomputed.circle_point.y);
-
         let test_only_fri_answer = {
             let p = precomputed.circle_point;
             let py_inverse = p.y.inverse();
@@ -132,7 +136,6 @@ pub fn compute_quotients_hints(
         hints.push(PerQueryQuotientHint {
             precomputed_merkle_proofs: vec![precomputed.clone()],
             denominator_inverse_hints,
-            y_inverse_hint,
             test_only_fri_answer,
         });
     }
