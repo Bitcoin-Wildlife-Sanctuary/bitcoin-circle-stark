@@ -15,6 +15,8 @@ mod quotients;
 
 mod prepare;
 
+mod fold;
+
 const FIB_LOG_SIZE: u32 = 5;
 
 /// A verifier for the Fibonacci proof.
