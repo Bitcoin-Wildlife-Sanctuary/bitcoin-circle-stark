@@ -1,5 +1,5 @@
 use crate::constraints::{ColumnLineCoeffs, DenominatorInverseHint};
-use crate::fibonacci::utils::FSOutput;
+use crate::fibonacci::fiat_shamir::FSOutput;
 use crate::fibonacci::PerQueryQuotientHint;
 use crate::fri::FieldInversionHint;
 use crate::merkle_tree::MerkleTreeTwinProof;

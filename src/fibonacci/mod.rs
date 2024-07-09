@@ -2,7 +2,6 @@ mod bitcoin_script;
 
 mod fiat_shamir;
 mod quotients;
-mod utils;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
@@ -129,7 +128,7 @@ pub fn verify_with_hints(
     air: &FibonacciAir,
     channel: &mut BWSSha256Channel,
 ) -> Result<VerifierHints, VerificationError> {
-    let fs_output = utils::generate_fs_hints(proof.clone(), channel, air).unwrap();
+    let fs_output = fiat_shamir::generate_fs_hints(proof.clone(), channel, air).unwrap();
 
     let fri_query_domains = get_opening_positions(
         &fs_output.fri_input.queries,
