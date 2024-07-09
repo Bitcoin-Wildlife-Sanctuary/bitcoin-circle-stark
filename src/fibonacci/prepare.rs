@@ -17,7 +17,7 @@ use crate::{
     precomputed_merkle_tree::PrecomputedMerkleTree,
 };
 
-/// Prepare Ouput
+/// Prepare Output
 pub struct PrepareOutput {
     pub precomputed_merkle_tree: PrecomputedMerkleTree,
     pub denominator_inverses_expected: Vec<Vec<Vec<CM31>>>,
