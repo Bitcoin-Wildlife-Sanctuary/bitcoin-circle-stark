@@ -47,4 +47,3 @@ impl Pushable for OODSHint {
         self.y.bitcoin_script_push(builder)
     }
 }
-

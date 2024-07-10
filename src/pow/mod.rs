@@ -66,4 +66,3 @@ impl Pushable for PoWHint {
         builder
     }
 }
-

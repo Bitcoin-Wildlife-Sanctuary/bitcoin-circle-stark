@@ -56,7 +56,9 @@ impl Pushable for VerifierHints {
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        builder = self.column_line_coeff_pair_vanishing_hints.bitcoin_script_push(builder);
+        builder = self
+            .column_line_coeff_pair_vanishing_hints
+            .bitcoin_script_push(builder);
 
         for (quotients_hint, fold_hint) in self
             .per_query_quotients_hints
