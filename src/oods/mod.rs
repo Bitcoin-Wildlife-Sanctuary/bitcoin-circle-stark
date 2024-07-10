@@ -40,16 +40,11 @@ pub struct OODSHint {
     pub hint: DrawHints,
 }
 
-impl Pushable for &OODSHint {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = (&self.hint).bitcoin_script_push(builder);
+impl Pushable for OODSHint {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
+        builder = self.hint.bitcoin_script_push(builder);
         builder = self.x.bitcoin_script_push(builder);
         self.y.bitcoin_script_push(builder)
     }
 }
 
-impl Pushable for OODSHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}

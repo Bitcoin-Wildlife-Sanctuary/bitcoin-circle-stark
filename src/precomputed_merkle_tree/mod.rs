@@ -189,13 +189,7 @@ pub struct PrecomputedMerkleTreeProof {
 }
 
 impl Pushable for PrecomputedMerkleTreeProof {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &PrecomputedMerkleTreeProof {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.circle_point.x.bitcoin_script_push(builder);
         builder = self.circle_point.y.bitcoin_script_push(builder);
         builder = self

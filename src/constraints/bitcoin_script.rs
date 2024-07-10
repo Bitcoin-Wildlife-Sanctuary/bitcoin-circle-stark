@@ -568,13 +568,13 @@ mod test {
                 { h }
                 { point.y }
                 for value in values.iter() {
-                    { value }
+                    { *value }
                 }
                 { column_line_coeffs_script.clone() }
                 for (fp_imag_div_y_imag, cross_term) in expected.fp_imag_div_y_imag.iter().zip(expected.cross_term.iter()).rev() {
-                    { cross_term }
+                    { *cross_term }
                     cm31_equalverify
-                    { fp_imag_div_y_imag }
+                    { *fp_imag_div_y_imag }
                     cm31_equalverify
                 }
                 OP_TRUE

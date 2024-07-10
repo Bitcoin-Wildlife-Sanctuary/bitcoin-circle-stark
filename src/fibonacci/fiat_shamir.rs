@@ -64,35 +64,29 @@ pub struct FiatShamirHints {
     pub queries_hints: DrawHints,
 }
 
-impl Pushable for &FiatShamirHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for FiatShamirHints {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.commitments[0].bitcoin_script_push(builder);
-        builder = (&self.random_coeff_hint).bitcoin_script_push(builder);
+        builder = self.random_coeff_hint.bitcoin_script_push(builder);
         builder = self.commitments[1].bitcoin_script_push(builder);
-        builder = (&self.oods_hint).bitcoin_script_push(builder);
+        builder = self.oods_hint.bitcoin_script_push(builder);
         for v in self.trace_oods_values.iter() {
             builder = v.bitcoin_script_push(builder);
         }
         for v in self.composition_oods_values.iter() {
             builder = v.bitcoin_script_push(builder);
         }
-        builder = (&self.composition_hint).bitcoin_script_push(builder);
-        builder = (&self.random_coeff_hint2).bitcoin_script_push(builder);
-        builder = (&self.circle_poly_alpha_hint).bitcoin_script_push(builder);
+        builder = self.composition_hint.bitcoin_script_push(builder);
+        builder = self.random_coeff_hint2.bitcoin_script_push(builder);
+        builder = self.circle_poly_alpha_hint.bitcoin_script_push(builder);
         for (c, h) in self.fri_commitment_and_folding_hints.iter() {
             builder = c.bitcoin_script_push(builder);
             builder = h.bitcoin_script_push(builder);
         }
         builder = self.last_layer.bitcoin_script_push(builder);
-        builder = (&self.pow_hint).bitcoin_script_push(builder);
-        builder = (&self.queries_hints).bitcoin_script_push(builder);
+        builder = self.pow_hint.bitcoin_script_push(builder);
+        builder = self.queries_hints.bitcoin_script_push(builder);
         builder
-    }
-}
-
-impl Pushable for FiatShamirHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 

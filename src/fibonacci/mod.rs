@@ -47,16 +47,16 @@ pub struct VerifierHints {
     pub per_query_fold_hints: Vec<PerQueryFoldHints>,
 }
 
-impl Pushable for &VerifierHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = (&self.fiat_shamir_hints).bitcoin_script_push(builder);
+impl Pushable for VerifierHints {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
+        builder = self.fiat_shamir_hints.bitcoin_script_push(builder);
         for proof in self.merkle_proofs_traces.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        builder = (&self.column_line_coeff_pair_vanishing_hints).bitcoin_script_push(builder);
+        builder = self.column_line_coeff_pair_vanishing_hints.bitcoin_script_push(builder);
 
         for (quotients_hint, fold_hint) in self
             .per_query_quotients_hints
@@ -67,12 +67,6 @@ impl Pushable for &VerifierHints {
             builder = fold_hint.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for VerifierHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 

@@ -47,25 +47,13 @@ pub(crate) mod treepp {
 }
 
 impl Pushable for M31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &M31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
         self.0.bitcoin_script_push(builder)
     }
 }
 
 impl Pushable for CM31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &CM31 {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.1.bitcoin_script_push(builder);
         builder = self.0.bitcoin_script_push(builder);
         builder
@@ -73,13 +61,7 @@ impl Pushable for &CM31 {
 }
 
 impl Pushable for QM31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &QM31 {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
         let mut builder = self.1 .1.bitcoin_script_push(builder);
         builder = self.1 .0.bitcoin_script_push(builder);
         builder = self.0 .1.bitcoin_script_push(builder);
@@ -88,13 +70,13 @@ impl Pushable for &QM31 {
 }
 
 impl Pushable for BWSSha256Hash {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
         self.as_ref().to_vec().bitcoin_script_push(builder)
     }
 }
 
 impl Pushable for CirclePoint<QM31> {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.x.bitcoin_script_push(builder);
         builder = self.y.bitcoin_script_push(builder);
         builder

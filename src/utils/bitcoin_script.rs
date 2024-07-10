@@ -251,14 +251,14 @@ mod test {
         for i in 0..=20 {
             let script = script! {
                 for elem in v.iter() {
-                    { elem }
+                    { *elem }
                 }
                 { dup_m31_vec_gadget(i) }
                 for elem in v.iter().rev() {
-                    { elem } OP_EQUALVERIFY
+                    { *elem } OP_EQUALVERIFY
                 }
                 for elem in v.iter().rev() {
-                    { elem } OP_EQUALVERIFY
+                    { *elem } OP_EQUALVERIFY
                 }
                 OP_TRUE
             };
@@ -296,7 +296,7 @@ mod test {
             let hash = hash_m31_vec(&v);
             let script = script! {
                 for elem in v.iter() {
-                    { elem }
+                    { *elem }
                 }
                 { hash_m31_vec_gadget(i) }
                 { hash.to_vec() }

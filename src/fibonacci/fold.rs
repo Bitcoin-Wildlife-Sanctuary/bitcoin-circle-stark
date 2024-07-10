@@ -15,18 +15,12 @@ pub struct PerQueryFoldHints {
     pub twin_proofs: Vec<MerkleTreeTwinProof>,
 }
 
-impl Pushable for &PerQueryFoldHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for PerQueryFoldHints {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         for proof in self.twin_proofs.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for PerQueryFoldHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 

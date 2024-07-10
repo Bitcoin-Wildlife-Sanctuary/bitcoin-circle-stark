@@ -106,12 +106,12 @@ impl Default for BitcoinIntegerEncodedData {
 }
 
 impl Pushable for BitcoinIntegerEncodedData {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
         match self {
             BitcoinIntegerEncodedData::NegativeZero => {
                 builder.push_slice(PushBytesBuf::from([0x80]))
             }
-            BitcoinIntegerEncodedData::Other(v) => builder.push_int(v),
+            BitcoinIntegerEncodedData::Other(v) => builder.push_int(*v),
         }
     }
 }
@@ -121,13 +121,7 @@ impl Pushable for BitcoinIntegerEncodedData {
 pub struct DrawHints(pub Vec<BitcoinIntegerEncodedData>, pub Vec<u8>);
 
 impl Pushable for DrawHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
-    }
-}
-
-impl Pushable for &DrawHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         let n = self.0.len();
 
         if n % 8 == 0 {

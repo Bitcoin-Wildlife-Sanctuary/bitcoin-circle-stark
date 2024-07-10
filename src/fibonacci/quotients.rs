@@ -131,8 +131,8 @@ pub struct PerQueryQuotientHint {
     pub denominator_inverse_hints: Vec<DenominatorInverseHint>,
 }
 
-impl Pushable for &PerQueryQuotientHint {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for PerQueryQuotientHint {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         for proof in self.precomputed_merkle_proofs.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
@@ -140,11 +140,5 @@ impl Pushable for &PerQueryQuotientHint {
             builder = hint.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for PerQueryQuotientHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
