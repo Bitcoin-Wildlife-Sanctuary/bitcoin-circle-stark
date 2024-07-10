@@ -27,8 +27,8 @@ pub struct ColumnLineCoeffPairVanishingHints {
     pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
 }
 
-impl Pushable for &ColumnLineCoeffPairVanishingHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for ColumnLineCoeffPairVanishingHints {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         for hint in self.column_line_coeffs_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
         }
@@ -36,12 +36,6 @@ impl Pushable for &ColumnLineCoeffPairVanishingHints {
             builder = hint.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for ColumnLineCoeffPairVanishingHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 

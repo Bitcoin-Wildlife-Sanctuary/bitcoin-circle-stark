@@ -24,6 +24,21 @@ pub fn trim_m31_gadget(logn: usize) -> Script {
     }
 }
 
+/// Convert the column representation back to the field element.
+///
+/// Input:
+/// - a, b, c, d
+///
+/// Output:
+/// - d, c, b, a
+pub fn qm31_reverse() -> Script {
+    script! {
+        OP_SWAP
+        OP_2SWAP
+        OP_SWAP
+    }
+}
+
 /// Copy some stack elements to the altstack, where the stack top is being inserted first.
 pub fn copy_to_altstack_top_item_first_in_gadget(n: usize) -> Script {
     script! {
@@ -236,14 +251,14 @@ mod test {
         for i in 0..=20 {
             let script = script! {
                 for elem in v.iter() {
-                    { elem }
+                    { *elem }
                 }
                 { dup_m31_vec_gadget(i) }
                 for elem in v.iter().rev() {
-                    { elem } OP_EQUALVERIFY
+                    { *elem } OP_EQUALVERIFY
                 }
                 for elem in v.iter().rev() {
-                    { elem } OP_EQUALVERIFY
+                    { *elem } OP_EQUALVERIFY
                 }
                 OP_TRUE
             };
@@ -281,7 +296,7 @@ mod test {
             let hash = hash_m31_vec(&v);
             let script = script! {
                 for elem in v.iter() {
-                    { elem }
+                    { *elem }
                 }
                 { hash_m31_vec_gadget(i) }
                 { hash.to_vec() }

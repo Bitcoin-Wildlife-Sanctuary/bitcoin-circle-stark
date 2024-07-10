@@ -9,7 +9,7 @@ pub use bitcoin_script::*;
 use itertools::Itertools;
 
 use crate::fibonacci::fiat_shamir::FiatShamirHints;
-use crate::fibonacci::fold::compute_fold_hints;
+use crate::fibonacci::fold::{compute_fold_hints, PerQueryFoldHints};
 use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
 use crate::fibonacci::quotients::compute_quotients_hints;
 use crate::merkle_tree::MerkleTreeTwinProof;
@@ -40,31 +40,35 @@ pub struct VerifierHints {
     /// Column line coefficient and pairing vanishing hints
     pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
 
-    /// Per query hints.
+    /// Per query quotients hints.
     pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
+
+    /// Per query folding hints.
+    pub per_query_fold_hints: Vec<PerQueryFoldHints>,
 }
 
-impl Pushable for &VerifierHints {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
-        builder = (&self.fiat_shamir_hints).bitcoin_script_push(builder);
+impl Pushable for VerifierHints {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
+        builder = self.fiat_shamir_hints.bitcoin_script_push(builder);
         for proof in self.merkle_proofs_traces.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
         for proof in self.merkle_proofs_compositions.iter() {
             builder = proof.bitcoin_script_push(builder);
         }
-        builder = (&self.column_line_coeff_pair_vanishing_hints).bitcoin_script_push(builder);
+        builder = self
+            .column_line_coeff_pair_vanishing_hints
+            .bitcoin_script_push(builder);
 
-        for hint in self.per_query_quotients_hints.iter() {
-            builder = hint.bitcoin_script_push(builder);
+        for (quotients_hint, fold_hint) in self
+            .per_query_quotients_hints
+            .iter()
+            .zip(self.per_query_fold_hints.iter())
+        {
+            builder = quotients_hint.bitcoin_script_push(builder);
+            builder = fold_hint.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for VerifierHints {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 
@@ -81,7 +85,7 @@ pub fn verify_with_hints(
     let (quotients_output, per_query_quotients_hints) =
         compute_quotients_hints(&fs_output, &prepare_output);
 
-    let _ = compute_fold_hints(
+    let per_query_fold_hints = compute_fold_hints(
         &proof.commitment_scheme_proof.fri_proof,
         &fs_output,
         &prepare_output,
@@ -95,6 +99,7 @@ pub fn verify_with_hints(
         column_line_coeff_pair_vanishing_hints: prepare_output
             .column_line_coeff_pair_vanishing_hints,
         per_query_quotients_hints,
+        per_query_fold_hints,
     })
 }
 

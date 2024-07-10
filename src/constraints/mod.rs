@@ -17,17 +17,11 @@ pub struct DenominatorInverseHint {
     pub sibling_inverse: CM31,
 }
 
-impl Pushable for &DenominatorInverseHint {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for DenominatorInverseHint {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.inverse.bitcoin_script_push(builder);
         builder = self.sibling_inverse.bitcoin_script_push(builder);
         builder
-    }
-}
-
-impl Pushable for DenominatorInverseHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 
@@ -64,17 +58,11 @@ impl From<CirclePoint<QM31>> for PreparedPairVanishing {
     }
 }
 
-impl Pushable for &PreparedPairVanishing {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for PreparedPairVanishing {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.x_imag_div_y_imag.bitcoin_script_push(builder);
         builder = self.cross_term.bitcoin_script_push(builder);
         builder
-    }
-}
-
-impl Pushable for PreparedPairVanishing {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 
@@ -92,15 +80,9 @@ impl From<CirclePoint<QM31>> for PreparedPairVanishingHint {
     }
 }
 
-impl Pushable for &PreparedPairVanishingHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        self.x_imag_div_y_imag.bitcoin_script_push(builder)
-    }
-}
-
 impl Pushable for PreparedPairVanishingHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
+        self.x_imag_div_y_imag.bitcoin_script_push(builder)
     }
 }
 
@@ -208,8 +190,8 @@ impl ColumnLineCoeffs {
     }
 }
 
-impl Pushable for &ColumnLineCoeffs {
-    fn bitcoin_script_push(self, mut builder: Builder) -> Builder {
+impl Pushable for ColumnLineCoeffs {
+    fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         for (fp_imag_div_y_imag, cross_term) in
             self.fp_imag_div_y_imag.iter().zip(self.cross_term.iter())
         {
@@ -217,12 +199,6 @@ impl Pushable for &ColumnLineCoeffs {
             builder = cross_term.bitcoin_script_push(builder);
         }
         builder
-    }
-}
-
-impl Pushable for ColumnLineCoeffs {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
     }
 }
 
@@ -241,15 +217,9 @@ impl From<CirclePoint<QM31>> for ColumnLineCoeffsHint {
     }
 }
 
-impl Pushable for &ColumnLineCoeffsHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        self.y_imag_inv.bitcoin_script_push(builder)
-    }
-}
-
 impl Pushable for ColumnLineCoeffsHint {
-    fn bitcoin_script_push(self, builder: Builder) -> Builder {
-        (&self).bitcoin_script_push(builder)
+    fn bitcoin_script_push(&self, builder: Builder) -> Builder {
+        self.y_imag_inv.bitcoin_script_push(builder)
     }
 }
 
