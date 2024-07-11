@@ -210,6 +210,18 @@ pub fn limb_to_le_bits_common(num_bits: u32) -> Script {
     }
 }
 
+/// Clean the stack.
+pub fn clean_stack(num: usize) -> Script {
+    script! {
+        for _ in 0..(num / 2) {
+            OP_2DROP
+        }
+        if num % 2 == 1 {
+            OP_DROP
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::treepp::*;

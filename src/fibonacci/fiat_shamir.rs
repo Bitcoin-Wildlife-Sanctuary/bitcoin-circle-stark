@@ -2,6 +2,7 @@ use crate::air::CompositionHint;
 use crate::channel::{ChannelWithHint, DrawHints};
 use crate::fibonacci::sampled_values_to_mask;
 use crate::fri::QueriesWithHint;
+use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -9,9 +10,11 @@ use itertools::Itertools;
 use stwo_prover::core::air::AirExt;
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fri::{
-    CirclePolyDegreeBound, FriConfig, FriLayerVerifier, FriVerificationError, FOLD_STEP,
+    get_opening_positions, CirclePolyDegreeBound, FriConfig, FriLayerVerifier,
+    FriVerificationError, FOLD_STEP,
 };
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, TreeVec};
 use stwo_prover::core::poly::line::LineDomain;
@@ -20,12 +23,13 @@ use stwo_prover::core::prover::{
     StarkProof, VerificationError, LOG_BLOWUP_FACTOR, LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES,
     PROOF_OF_WORK_BITS,
 };
-use stwo_prover::core::queries::Queries;
+use stwo_prover::core::queries::{Queries, SparseSubCircleDomain};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
-/// Hints for performing the Fiat-Shamir transform until finalziing the queries.
+#[derive(Clone)]
+/// Hints for performing the Fiat-Shamir transform until finalizing the queries.
 pub struct FiatShamirHints {
     /// Commitments from the proof.
     pub commitments: [BWSSha256Hash; 2],
@@ -62,6 +66,12 @@ pub struct FiatShamirHints {
 
     /// Query sampling hints
     pub queries_hints: DrawHints,
+
+    /// Merkle proofs for the trace Merkle tree.
+    pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
+
+    /// Merkle proofs for the composition Merkle tree.
+    pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
 }
 
 impl Pushable for FiatShamirHints {
@@ -86,12 +96,18 @@ impl Pushable for FiatShamirHints {
         builder = self.last_layer.bitcoin_script_push(builder);
         builder = self.pow_hint.bitcoin_script_push(builder);
         builder = self.queries_hints.bitcoin_script_push(builder);
+        for proof in self.merkle_proofs_traces.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
+        for proof in self.merkle_proofs_compositions.iter() {
+            builder = proof.bitcoin_script_push(builder);
+        }
         builder
     }
 }
 
-/// FRI inputs
-pub struct FriInput {
+/// Fiat Shamir hints along with fri inputs
+pub struct FiatShamirOutput {
     /// log blowup factor
     pub fri_log_blowup_factor: u32,
 
@@ -124,23 +140,32 @@ pub struct FriInput {
 
     /// queries
     pub queries: Queries,
-}
 
-/// Fiat Shamir hints along with fri inputs
-pub struct FSOutput {
-    /// Fiat Shamir hints
-    pub fiat_shamir_hints: FiatShamirHints,
+    /// query subcircle domain.
+    pub query_subcircle_domain: SparseSubCircleDomain,
 
-    /// FRI inputs
-    pub fri_input: FriInput,
+    /// queries' parent indices.
+    pub queries_parents: Vec<usize>,
+
+    /// queried values on the leaves on the left.
+    pub queried_values_left: Vec<Vec<M31>>,
+
+    /// queried values on the leaves on the right.
+    pub queried_values_right: Vec<Vec<M31>>,
+
+    /// last layer.
+    pub last_layer: QM31,
+
+    /// fri commit and hints for deriving the folding parameter
+    pub fri_commitment_and_folding_hints: Vec<(BWSSha256Hash, DrawHints)>,
 }
 
 /// Generate Fiat Shamir hints along with fri inputs
-pub fn generate_fs_hints(
+pub fn compute_fiat_shamir_hints(
     proof: StarkProof,
     channel: &mut BWSSha256Channel,
     air: &FibonacciAir,
-) -> Result<FSOutput, VerificationError> {
+) -> Result<(FiatShamirOutput, FiatShamirHints), VerificationError> {
     // Read trace commitment.
     let mut commitment_scheme = CommitmentSchemeVerifier::new();
     commitment_scheme.commit(proof.commitments[0], air.column_log_sizes(), channel);
@@ -312,6 +337,77 @@ pub fn generate_fs_hints(
     let (queries, queries_hints) =
         Queries::generate_with_hints(channel, column_log_sizes[0], fri_config.n_queries);
 
+    let fri_query_domains = get_opening_positions(&queries, &column_log_sizes);
+
+    assert_eq!(fri_query_domains.len(), 1);
+    let query_domain = fri_query_domains.first_key_value().unwrap();
+    assert_eq!(
+        *query_domain.0,
+        max_column_bound.log_degree_bound + fri_config.log_blowup_factor
+    );
+
+    let queries_parents: Vec<usize> = query_domain
+        .1
+        .iter()
+        .map(|subdomain| {
+            assert_eq!(subdomain.log_size, 1);
+            subdomain.coset_index
+        })
+        .collect();
+
+    let merkle_proofs_traces = MerkleTreeTwinProof::from_stwo_proof(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        &queries_parents,
+        &proof.commitment_scheme_proof.queried_values[0],
+        &proof.commitment_scheme_proof.decommitments[0],
+    );
+    let merkle_proofs_compositions = MerkleTreeTwinProof::from_stwo_proof(
+        (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+        &queries_parents,
+        &proof.commitment_scheme_proof.queried_values[1],
+        &proof.commitment_scheme_proof.decommitments[1],
+    );
+
+    for (&query, twin_proof) in queries_parents.iter().zip(merkle_proofs_traces.iter()) {
+        assert!(twin_proof.verify(
+            &proof.commitments[0],
+            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            query << 1
+        ));
+    }
+
+    for (&query, twin_proof) in queries_parents
+        .iter()
+        .zip(merkle_proofs_compositions.iter())
+    {
+        assert!(twin_proof.verify(
+            &proof.commitments[1],
+            (max_column_bound.log_degree_bound + fri_config.log_blowup_factor) as usize,
+            query << 1
+        ));
+    }
+
+    let mut queried_values_left = vec![];
+    let mut queried_values_right = vec![];
+    for (trace, composition) in merkle_proofs_traces
+        .iter()
+        .zip(merkle_proofs_compositions.iter())
+    {
+        let mut left_vec = vec![];
+        let mut right_vec = vec![];
+        for (&left, &right) in trace
+            .left
+            .iter()
+            .zip(trace.right.iter())
+            .chain(composition.left.iter().zip(composition.right.iter()))
+        {
+            left_vec.push(left);
+            right_vec.push(right);
+        }
+        queried_values_left.push(left_vec);
+        queried_values_right.push(right_vec);
+    }
+
     let fiat_shamir_hints = FiatShamirHints {
         commitments: [proof.commitments[0], proof.commitments[1]],
         random_coeff_hint,
@@ -330,13 +426,15 @@ pub fn generate_fs_hints(
         composition_hint,
         random_coeff_hint2,
         circle_poly_alpha_hint,
-        fri_commitment_and_folding_hints,
+        fri_commitment_and_folding_hints: fri_commitment_and_folding_hints.clone(),
         last_layer: last_layer_poly.to_vec()[0],
         pow_hint,
         queries_hints,
+        merkle_proofs_traces,
+        merkle_proofs_compositions,
     };
 
-    let fri_input = FriInput {
+    let fiat_shamir_output = FiatShamirOutput {
         fri_log_blowup_factor: fri_config.log_blowup_factor,
         max_column_log_degree_bound: max_column_bound.log_degree_bound,
         column_log_sizes,
@@ -348,10 +446,13 @@ pub fn generate_fs_hints(
         folding_alphas,
         last_layer_domain,
         queries,
+        query_subcircle_domain: query_domain.1.clone(),
+        queries_parents,
+        queried_values_left,
+        queried_values_right,
+        last_layer: last_layer_poly.to_vec()[0],
+        fri_commitment_and_folding_hints,
     };
 
-    Ok(FSOutput {
-        fiat_shamir_hints,
-        fri_input,
-    })
+    Ok((fiat_shamir_output, fiat_shamir_hints))
 }

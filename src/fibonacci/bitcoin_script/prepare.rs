@@ -8,9 +8,9 @@ use stwo_prover::core::prover::N_QUERIES;
 const FIB_LOG_SIZE: u32 = 5;
 
 /// Prepare Gadget
-pub struct PrepareGadget;
+pub struct FibonacciPrepareGadget;
 
-impl PrepareGadget {
+impl FibonacciPrepareGadget {
     pub fn run() -> Script {
         script! {
             // stack:
