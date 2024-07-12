@@ -1,0 +1,20 @@
+./bitcoin-cli --datadir=signet sendtoaddress "tb1qlpxp7md3sn9cfu7z3ygh2cv8vhfgh7p829s4ly" 0.008
+
+./bitcoin-cli --datadir=signet createrawtransaction "[{\"txid\":\"66424b8d982856435307cf5200b825cfcf0a126daf888bb2daa2530106f4cd71\", \"vout\": 0}]" "[{\"tb1p2jczsavv377s46epv9ry6uydy67fqew0ghdhxtz2xp5f56ghj5wqlexrvn\":0.00794341}, {\"tb1qvu62dh2l4d9j09e880musdew6g5ex8n6apx72cx5zafv2mjx6r5qn2hzkf\":0.0000033}]"
+
+./bitcoin-cli --datadir=signet signrawtransactionwithwallet 020000000171cdf4060153a2dab28b88af6d120acfcf25b80052cf0753435628988d4b42660000000000fdffffff02e51e0c000000000022512054b028758c8fbd0aeb2161464d708d26bc9065cf45db732c4a30689a6917951c4a010000000000002200206734a6dd5fab4b2797273bf7c8372ed229931e7ae84de560d41752c56e46d0e800000000
+
+./bitcoin-cli --datadir=signet sendrawtransaction 0200000000010171cdf4060153a2dab28b88af6d120acfcf25b80052cf0753435628988d4b42660000000000fdffffff02e51e0c000000000022512054b028758c8fbd0aeb2161464d708d26bc9065cf45db732c4a30689a6917951c4a010000000000002200206734a6dd5fab4b2797273bf7c8372ed229931e7ae84de560d41752c56e46d0e802473044022035cf2eb36768cf39ac0b158dec8882afe670e868e87dd2259e5930e5eec2f6fe022012252cddc148f0c9c83b3d241c2800982e36fc4c9e6ff57a2b3dbbaf80ebb615012103126f275795cf7beaa0fcea23bec70ba56bfa6120c8c8331d9f8916fe7bee2fba00000000
+
+cargo run -- -f 66424b8d982856435307cf5200b825cfcf0a126daf888bb2daa2530106f4cd71 -i 973957fcc55b7a39f3d3d738fd6946ccc9d58d3edb4c4a55928ef0e5bada61b7
+
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-1.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-2.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-3.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-4.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-5.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-6.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-7.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-8.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-9.txt)
+./bitcoin-cli --datadir=signet sendrawtransaction $(< ~/RustroverProjects/bitcoin-cfri/demo/tx-10.txt)

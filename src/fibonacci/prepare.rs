@@ -39,9 +39,13 @@ impl Pushable for PrepareHints {
 
 /// Prepare Output
 pub struct PrepareOutput {
+    /// Precomputed Merkle tree for point and twiddles.
     pub precomputed_merkle_tree: PrecomputedMerkleTree,
+    /// Expected denominator inverses.
     pub denominator_inverses_expected: Vec<Vec<Vec<CM31>>>,
+    /// Sample points and their evaluations.
     pub samples: Vec<Vec<PointSample>>,
+    /// Column line coefficients.
     pub column_line_coeffs: Vec<ColumnLineCoeffs>,
 }
 
