@@ -48,6 +48,8 @@ pub enum FibonacciSplitInput {
     Prepare(Vec<Vec<u8>>, PrepareHints),
     /// Hints for per-query quotient and folding
     PerQuery(Vec<Vec<u8>>, PerQueryQuotientHint, PerQueryFoldHints),
+    /// Dummy hints for reset
+    Reset,
 }
 
 impl From<FibonacciSplitInput> for Script {
@@ -69,6 +71,7 @@ impl From<FibonacciSplitInput> for Script {
                 { h1 }
                 { h2 }
             },
+            FibonacciSplitInput::Reset => script! {},
         }
     }
 }
@@ -270,6 +273,21 @@ impl CovenantProgram for FibonacciSplitProgram {
                 OP_TRUE
             }
         );
+        map.insert(
+            10, // reset
+            script! {
+                // input:
+                // - old pc
+                // - old stack hash
+                // - new pc
+                // - new stack hash
+
+                { [0u8; 32].to_vec() } OP_EQUALVERIFY
+                0 OP_EQUALVERIFY
+                OP_2DROP
+                OP_TRUE
+            },
+        );
         map
     }
 
@@ -382,6 +400,12 @@ impl CovenantProgram for FibonacciSplitProgram {
                     stack: vec![],
                 })
             }
+        } else if id == 10 {
+            Ok(Self::State {
+                pc: 0,
+                stack_hash: vec![0u8; 32],
+                stack: vec![],
+            })
         } else {
             unreachable!()
         }
@@ -399,6 +423,11 @@ mod test {
     };
     use crate::fibonacci::FIB_LOG_SIZE;
     use covenants_gadgets::test::{simulation_test, SimulationInstruction};
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+    use std::cell::RefCell;
+    use std::ops::AddAssign;
+    use std::rc::Rc;
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
@@ -409,6 +438,8 @@ mod test {
 
     #[test]
     fn test_integration() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
         let fib = Fibonacci::new(FIB_LOG_SIZE, M31::reduce(443693538));
 
         let trace = fib.get_trace();
@@ -440,20 +471,40 @@ mod test {
             &quotients_output,
         );
 
-        let mut total_fee = 0;
+        let total_fee = Rc::new(RefCell::new(0));
+        let mut step = 0;
+
+        let reset = Rc::new(RefCell::new(false));
+        let mut reset_times = 0;
 
         let mut test_generator = |old_state: &FibonacciSplitState| {
-            if old_state.pc == 0 {
-                total_fee += 473921;
+            step += 1;
+
+            let should_reset = if *reset.borrow() && step % 5 == 0 {
+                prng.gen_bool(0.5)
+            } else {
+                false
+            };
+
+            if should_reset {
+                reset_times += 1;
+                total_fee.borrow_mut().add_assign(2989);
+                Some(SimulationInstruction {
+                    program_index: 10,
+                    fee: 2989,
+                    program_input: FibonacciSplitInput::Reset,
+                })
+            } else if old_state.pc == 0 {
+                total_fee.borrow_mut().add_assign(473977);
                 Some(SimulationInstruction {
                     program_index: 0,
-                    fee: 473921,
+                    fee: 473977,
                     program_input: FibonacciSplitInput::FiatShamir(Box::new(
                         fiat_shamir_hints.clone(),
                     )),
                 })
             } else if old_state.pc == 1 {
-                total_fee += 325136;
+                total_fee.borrow_mut().add_assign(325136);
                 Some(SimulationInstruction {
                     program_index: 1,
                     fee: 325136,
@@ -463,11 +514,11 @@ mod test {
                     ),
                 })
             } else if old_state.pc >= 2 && old_state.pc <= 9 {
-                total_fee += 591255;
+                total_fee.borrow_mut().add_assign(591311);
                 let i = old_state.pc - 2;
                 Some(SimulationInstruction {
                     program_index: old_state.pc,
-                    fee: 591255,
+                    fee: 591311,
                     program_input: FibonacciSplitInput::PerQuery(
                         old_state.stack.clone(),
                         per_query_quotients_hints[i].clone(),
@@ -479,14 +530,22 @@ mod test {
             }
         };
 
-        const TIMES: usize = 5;
+        const TIMES: usize = 10;
 
         simulation_test::<FibonacciSplitProgram>(TIMES * 10, &mut test_generator);
 
         println!(
             "Doing {} Fibonacci STARK verification takes {} BTC (with a rate 7 sat/vBytes)",
             TIMES,
-            total_fee as f64 / 1000.0 / 1000.0 / 100.0
+            *total_fee.borrow() as f64 / 1000.0 / 1000.0 / 100.0
+        );
+
+        *reset.borrow_mut() = true;
+        simulation_test::<FibonacciSplitProgram>(TIMES * 5, &mut test_generator);
+        println!(
+            "Testing reset of the script with a probability of 0.5 every 5 steps. {} resets have happened during {} steps.",
+            reset_times,
+            TIMES * 5,
         );
     }
 }
