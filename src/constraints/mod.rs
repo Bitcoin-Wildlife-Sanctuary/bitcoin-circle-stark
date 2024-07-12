@@ -67,7 +67,7 @@ impl Pushable for PreparedPairVanishing {
 }
 
 /// Hint for computing the prepared pair vanishing value.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PreparedPairVanishingHint {
     /// The coefficient before -X.y, which is `Im(P.x) / Im(P.y)`.
     pub x_imag_div_y_imag: CM31,

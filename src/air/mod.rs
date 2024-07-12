@@ -4,6 +4,7 @@ use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 use stwo_prover::core::fields::qm31::SecureField;
 
+#[derive(Clone)]
 /// Hint for the two eval quotient results involved in the composition polynomial.
 pub struct CompositionHint {
     /// A vector of the quotient evaluation result for each constraint.

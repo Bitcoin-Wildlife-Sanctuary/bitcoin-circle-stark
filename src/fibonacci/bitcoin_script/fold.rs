@@ -11,9 +11,9 @@ use rust_bitcoin_m31::{
 };
 use stwo_prover::core::prover::{LOG_BLOWUP_FACTOR, N_QUERIES};
 
-pub struct FibonacciFoldGadget;
+pub struct FibonacciPerQueryFoldGadget;
 
-impl FibonacciFoldGadget {
+impl FibonacciPerQueryFoldGadget {
     pub fn run(query_idx: usize) -> Script {
         script! {
             // stack:

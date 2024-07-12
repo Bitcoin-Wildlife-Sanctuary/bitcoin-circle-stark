@@ -1,25 +1,23 @@
 use crate::{
     constraints::{ColumnLineCoeffs, ColumnLineCoeffsHint, PreparedPairVanishingHint},
-    fibonacci::fiat_shamir::FSOutput,
-    merkle_tree::MerkleTreeTwinProof,
+    fibonacci::fiat_shamir::FiatShamirOutput,
     precomputed_merkle_tree::PrecomputedMerkleTree,
     treepp::pushable::{Builder, Pushable},
 };
 use itertools::Itertools;
 use std::iter::zip;
-use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::{
     backend::cpu::quotients::{batch_random_coeffs, denominator_inverses},
     constraints::complex_conjugate_line_coeffs_normalized,
     fields::{cm31::CM31, FieldExpOps},
-    fri::get_opening_positions,
     pcs::quotients::{ColumnSampleBatch, PointSample},
     poly::circle::CanonicCoset,
     prover::{StarkProof, VerificationError, N_QUERIES},
 };
 
-/// Column Line Coefficients and Pair Vanishing Hints
-pub struct ColumnLineCoeffPairVanishingHints {
+#[derive(Clone)]
+/// Hints for the prepare step.
+pub struct PrepareHints {
     /// Column line coeff hints.
     pub column_line_coeffs_hints: Vec<ColumnLineCoeffsHint>,
 
@@ -27,7 +25,7 @@ pub struct ColumnLineCoeffPairVanishingHints {
     pub prepared_pair_vanishing_hints: Vec<PreparedPairVanishingHint>,
 }
 
-impl Pushable for ColumnLineCoeffPairVanishingHints {
+impl Pushable for PrepareHints {
     fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         for hint in self.column_line_coeffs_hints.iter() {
             builder = hint.bitcoin_script_push(builder);
@@ -45,78 +43,14 @@ pub struct PrepareOutput {
     pub denominator_inverses_expected: Vec<Vec<Vec<CM31>>>,
     pub samples: Vec<Vec<PointSample>>,
     pub column_line_coeffs: Vec<ColumnLineCoeffs>,
-    pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
-    pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
-    pub queries_parents: Vec<usize>,
-    pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
-    pub queried_values_left: Vec<Vec<M31>>,
-    pub queried_values_right: Vec<Vec<M31>>,
 }
 
 /// prepare output for quotients and verifier hints
-pub fn prepare(
-    fs_output: &FSOutput,
+pub fn compute_prepare_hints(
+    fs_output: &FiatShamirOutput,
     proof: &StarkProof,
-) -> Result<PrepareOutput, VerificationError> {
-    let fri_query_domains = get_opening_positions(
-        &fs_output.fri_input.queries,
-        &fs_output.fri_input.column_log_sizes,
-    );
-
-    assert_eq!(fri_query_domains.len(), 1);
-    let query_domain = fri_query_domains.first_key_value().unwrap();
-    assert_eq!(
-        *query_domain.0,
-        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor
-    );
-
-    let queries_parents: Vec<usize> = query_domain
-        .1
-        .iter()
-        .map(|subdomain| {
-            assert_eq!(subdomain.log_size, 1);
-            subdomain.coset_index
-        })
-        .collect();
-
-    let merkle_proofs_traces = MerkleTreeTwinProof::from_stwo_proof(
-        (fs_output.fri_input.max_column_log_degree_bound
-            + fs_output.fri_input.fri_log_blowup_factor) as usize,
-        &queries_parents,
-        &proof.commitment_scheme_proof.queried_values[0],
-        &proof.commitment_scheme_proof.decommitments[0],
-    );
-    let merkle_proofs_compositions = MerkleTreeTwinProof::from_stwo_proof(
-        (fs_output.fri_input.max_column_log_degree_bound
-            + fs_output.fri_input.fri_log_blowup_factor) as usize,
-        &queries_parents,
-        &proof.commitment_scheme_proof.queried_values[1],
-        &proof.commitment_scheme_proof.decommitments[1],
-    );
-
-    for (&query, twin_proof) in queries_parents.iter().zip(merkle_proofs_traces.iter()) {
-        assert!(twin_proof.verify(
-            &proof.commitments[0],
-            (fs_output.fri_input.max_column_log_degree_bound
-                + fs_output.fri_input.fri_log_blowup_factor) as usize,
-            query << 1
-        ));
-    }
-
-    for (&query, twin_proof) in queries_parents
-        .iter()
-        .zip(merkle_proofs_compositions.iter())
-    {
-        assert!(twin_proof.verify(
-            &proof.commitments[1],
-            (fs_output.fri_input.max_column_log_degree_bound
-                + fs_output.fri_input.fri_log_blowup_factor) as usize,
-            query << 1
-        ));
-    }
-
+) -> Result<(PrepareOutput, PrepareHints), VerificationError> {
     let column_size: Vec<u32> = fs_output
-        .fri_input
         .commitment_scheme_column_log_sizes
         .clone()
         .flatten()
@@ -126,7 +60,7 @@ pub fn prepare(
     assert_eq!(column_size.len(), 1);
     assert_eq!(
         column_size[0],
-        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor
+        fs_output.max_column_log_degree_bound + fs_output.fri_log_blowup_factor
     );
 
     // trace polynomials are evaluated on oods, oods+1, oods+2
@@ -146,7 +80,6 @@ pub fn prepare(
     // construct the list of samples
     // Answer FRI queries.
     let samples = fs_output
-        .fri_input
         .sampled_points
         .clone()
         .zip_cols(&proof.commitment_scheme_proof.sampled_values)
@@ -186,10 +119,10 @@ pub fn prepare(
         ColumnLineCoeffs::from_values_and_point(&[samples[0][2].value], samples[0][2].point),
         ColumnLineCoeffs::from_values_and_point(
             &[
-                fs_output.fri_input.sample_values[1][0][0],
-                fs_output.fri_input.sample_values[1][1][0],
-                fs_output.fri_input.sample_values[1][2][0],
-                fs_output.fri_input.sample_values[1][3][0],
+                fs_output.sample_values[1][0][0],
+                fs_output.sample_values[1][1][0],
+                fs_output.sample_values[1][2][0],
+                fs_output.sample_values[1][3][0],
             ],
             samples[1][0].point,
         ),
@@ -231,37 +164,25 @@ pub fn prepare(
     ];
 
     let expected_batch_random_coeffs =
-        { batch_random_coeffs(&column_sample_batches, fs_output.fri_input.random_coeff) };
-    assert_eq!(
-        expected_batch_random_coeffs[0],
-        fs_output.fri_input.random_coeff
-    );
-    assert_eq!(
-        expected_batch_random_coeffs[1],
-        fs_output.fri_input.random_coeff
-    );
-    assert_eq!(
-        expected_batch_random_coeffs[2],
-        fs_output.fri_input.random_coeff
-    );
+        { batch_random_coeffs(&column_sample_batches, fs_output.random_coeff) };
+    assert_eq!(expected_batch_random_coeffs[0], fs_output.random_coeff);
+    assert_eq!(expected_batch_random_coeffs[1], fs_output.random_coeff);
+    assert_eq!(expected_batch_random_coeffs[2], fs_output.random_coeff);
     assert_eq!(
         expected_batch_random_coeffs[3],
-        fs_output.fri_input.random_coeff.square().square()
+        fs_output.random_coeff.square().square()
     );
 
     let precomputed_merkle_tree = PrecomputedMerkleTree::new(
-        (fs_output.fri_input.max_column_log_degree_bound
-            + fs_output.fri_input.fri_log_blowup_factor
-            - 1) as usize,
+        (fs_output.max_column_log_degree_bound + fs_output.fri_log_blowup_factor - 1) as usize,
     );
 
-    let commitment_domain = CanonicCoset::new(
-        fs_output.fri_input.max_column_log_degree_bound + fs_output.fri_input.fri_log_blowup_factor,
-    )
-    .circle_domain();
+    let commitment_domain =
+        CanonicCoset::new(fs_output.max_column_log_degree_bound + fs_output.fri_log_blowup_factor)
+            .circle_domain();
 
-    let denominator_inverses_expected = query_domain
-        .1
+    let denominator_inverses_expected = fs_output
+        .query_subcircle_domain
         .iter()
         .map(|subdomain| {
             let domain = subdomain.to_circle_domain(&commitment_domain);
@@ -270,42 +191,18 @@ pub fn prepare(
         .collect::<Vec<_>>();
     assert_eq!(denominator_inverses_expected.len(), N_QUERIES);
 
-    let column_line_coeff_pair_vanishing_hints = ColumnLineCoeffPairVanishingHints {
+    let prepare_hints = PrepareHints {
         column_line_coeffs_hints,
         prepared_pair_vanishing_hints,
     };
 
-    let mut queried_values_left = vec![];
-    let mut queried_values_right = vec![];
-    for (trace, composition) in merkle_proofs_traces
-        .iter()
-        .zip(merkle_proofs_compositions.iter())
-    {
-        let mut left_vec = vec![];
-        let mut right_vec = vec![];
-        for (&left, &right) in trace
-            .left
-            .iter()
-            .zip(trace.right.iter())
-            .chain(composition.left.iter().zip(composition.right.iter()))
-        {
-            left_vec.push(left);
-            right_vec.push(right);
-        }
-        queried_values_left.push(left_vec);
-        queried_values_right.push(right_vec);
-    }
-
-    Ok(PrepareOutput {
-        precomputed_merkle_tree,
-        denominator_inverses_expected,
-        samples,
-        column_line_coeffs,
-        merkle_proofs_traces,
-        merkle_proofs_compositions,
-        queries_parents,
-        column_line_coeff_pair_vanishing_hints,
-        queried_values_left,
-        queried_values_right,
-    })
+    Ok((
+        PrepareOutput {
+            precomputed_merkle_tree,
+            denominator_inverses_expected,
+            samples,
+            column_line_coeffs,
+        },
+        prepare_hints,
+    ))
 }

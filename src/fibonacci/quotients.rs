@@ -1,5 +1,5 @@
 use crate::constraints::DenominatorInverseHint;
-use crate::fibonacci::fiat_shamir::FSOutput;
+use crate::fibonacci::fiat_shamir::FiatShamirOutput;
 use crate::fibonacci::prepare::PrepareOutput;
 use crate::precomputed_merkle_tree::PrecomputedMerkleTreeProof;
 use crate::treepp::pushable::{Builder, Pushable};
@@ -14,13 +14,13 @@ pub struct QuotientsOutput {
 
 #[allow(clippy::too_many_arguments)]
 pub fn compute_quotients_hints(
-    fs_output: &FSOutput,
+    fs_output: &FiatShamirOutput,
     prepare_output: &PrepareOutput,
 ) -> (QuotientsOutput, Vec<PerQueryQuotientHint>) {
     let mut hints = vec![];
     let mut fold_results = vec![];
 
-    for (i, queries_parent) in prepare_output.queries_parents.iter().enumerate() {
+    for (i, queries_parent) in fs_output.queries_parents.iter().enumerate() {
         let precomputed = prepare_output
             .precomputed_merkle_tree
             .query(queries_parent << 1);
@@ -48,49 +48,49 @@ pub fn compute_quotients_hints(
         for column_line_coeff in prepare_output.column_line_coeffs.iter().take(3) {
             nominators.push(column_line_coeff.apply_twin(
                 precomputed.circle_point,
-                &[prepare_output.queried_values_left[i][0]],
-                &[prepare_output.queried_values_right[i][0]],
+                &[fs_output.queried_values_left[i][0]],
+                &[fs_output.queried_values_right[i][0]],
             ));
         }
         nominators.push(prepare_output.column_line_coeffs[3].apply_twin(
             precomputed.circle_point,
             &[
-                prepare_output.queried_values_left[i][1],
-                prepare_output.queried_values_left[i][2],
-                prepare_output.queried_values_left[i][3],
-                prepare_output.queried_values_left[i][4],
+                fs_output.queried_values_left[i][1],
+                fs_output.queried_values_left[i][2],
+                fs_output.queried_values_left[i][3],
+                fs_output.queried_values_left[i][4],
             ],
             &[
-                prepare_output.queried_values_right[i][1],
-                prepare_output.queried_values_right[i][2],
-                prepare_output.queried_values_right[i][3],
-                prepare_output.queried_values_right[i][4],
+                fs_output.queried_values_right[i][1],
+                fs_output.queried_values_right[i][2],
+                fs_output.queried_values_right[i][3],
+                fs_output.queried_values_right[i][4],
             ],
         ));
 
         let denominator_inverses_expected = &prepare_output.denominator_inverses_expected;
 
-        let eval_left = fs_output.fri_input.random_coeff.pow(6)
+        let eval_left = fs_output.random_coeff.pow(6)
             * QM31::from(nominators[0].0[0] * denominator_inverses_expected[i][0][0])
-            + fs_output.fri_input.random_coeff.pow(5)
+            + fs_output.random_coeff.pow(5)
                 * QM31::from(nominators[1].0[0] * denominator_inverses_expected[i][1][0])
-            + fs_output.fri_input.random_coeff.pow(4)
+            + fs_output.random_coeff.pow(4)
                 * QM31::from(nominators[2].0[0] * denominator_inverses_expected[i][2][0])
-            + (fs_output.fri_input.random_coeff.pow(3) * QM31::from(nominators[3].0[0])
-                + fs_output.fri_input.random_coeff.pow(2) * QM31::from(nominators[3].0[1])
-                + fs_output.fri_input.random_coeff * QM31::from(nominators[3].0[2])
+            + (fs_output.random_coeff.pow(3) * QM31::from(nominators[3].0[0])
+                + fs_output.random_coeff.pow(2) * QM31::from(nominators[3].0[1])
+                + fs_output.random_coeff * QM31::from(nominators[3].0[2])
                 + QM31::from(nominators[3].0[3]))
                 * QM31::from(denominator_inverses_expected[i][3][0]);
 
-        let eval_right = fs_output.fri_input.random_coeff.pow(6)
+        let eval_right = fs_output.random_coeff.pow(6)
             * QM31::from(nominators[0].1[0] * denominator_inverses_expected[i][0][1])
-            + fs_output.fri_input.random_coeff.pow(5)
+            + fs_output.random_coeff.pow(5)
                 * QM31::from(nominators[1].1[0] * denominator_inverses_expected[i][1][1])
-            + fs_output.fri_input.random_coeff.pow(4)
+            + fs_output.random_coeff.pow(4)
                 * QM31::from(nominators[2].1[0] * denominator_inverses_expected[i][2][1])
-            + (fs_output.fri_input.random_coeff.pow(3) * QM31::from(nominators[3].1[0])
-                + fs_output.fri_input.random_coeff.pow(2) * QM31::from(nominators[3].1[1])
-                + fs_output.fri_input.random_coeff * QM31::from(nominators[3].1[2])
+            + (fs_output.random_coeff.pow(3) * QM31::from(nominators[3].1[0])
+                + fs_output.random_coeff.pow(2) * QM31::from(nominators[3].1[1])
+                + fs_output.random_coeff * QM31::from(nominators[3].1[2])
                 + QM31::from(nominators[3].1[3]))
                 * QM31::from(denominator_inverses_expected[i][3][1]);
 
@@ -107,10 +107,8 @@ pub fn compute_quotients_hints(
             vec![f0_px, f1_px]
         };
 
-        fold_results.push(
-            fs_output.fri_input.circle_poly_alpha * test_only_fri_answer[1]
-                + test_only_fri_answer[0],
-        );
+        fold_results
+            .push(fs_output.circle_poly_alpha * test_only_fri_answer[1] + test_only_fri_answer[0]);
 
         hints.push(PerQueryQuotientHint {
             precomputed_merkle_proofs: vec![precomputed.clone()],

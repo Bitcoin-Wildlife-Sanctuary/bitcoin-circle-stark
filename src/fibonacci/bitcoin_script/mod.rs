@@ -1,24 +1,24 @@
-use crate::circle::CirclePointGadget;
 use crate::fibonacci::bitcoin_script::fiat_shamir::FibonacciFiatShamirGadget;
-use crate::fibonacci::bitcoin_script::fold::FibonacciFoldGadget;
-use crate::fibonacci::bitcoin_script::prepare::PrepareGadget;
+use crate::fibonacci::bitcoin_script::fold::FibonacciPerQueryFoldGadget;
+use crate::fibonacci::bitcoin_script::prepare::FibonacciPrepareGadget;
 use crate::fibonacci::bitcoin_script::quotients::FibonacciPerQueryQuotientGadget;
 use crate::treepp::*;
-use rust_bitcoin_m31::qm31_drop;
+use crate::utils::clean_stack;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::prover::N_QUERIES;
 
 mod composition;
 
-mod fiat_shamir;
+pub(crate) mod fiat_shamir;
 
-mod quotients;
+pub(crate) mod quotients;
 
-mod prepare;
+pub(crate) mod prepare;
 
-mod fold;
+pub(crate) mod fold;
 
-const FIB_LOG_SIZE: u32 = 5;
+/// The Fibonacci log size in this test.
+pub const FIB_LOG_SIZE: u32 = 5;
 
 /// A verifier for the Fibonacci proof.
 pub struct FibonacciVerifierGadget;
@@ -31,7 +31,7 @@ impl FibonacciVerifierGadget {
             { FibonacciFiatShamirGadget::run(channel) }
 
             // Run prepare gadget
-            { PrepareGadget::run() }
+            { FibonacciPrepareGadget::run() }
 
             // stack:
             //    circle_poly_alpha (4)
@@ -50,7 +50,7 @@ impl FibonacciVerifierGadget {
 
             for i in 0..N_QUERIES {
                 { FibonacciPerQueryQuotientGadget::run(i) }
-                { FibonacciFoldGadget::run(i) }
+                { FibonacciPerQueryFoldGadget::run(i) }
             }
 
             // stack:
@@ -58,45 +58,18 @@ impl FibonacciVerifierGadget {
             //    (commitment, alpha), ..., (commitment, alpha) (1 + 4) * FIB_LOG_SIZE
             //    last layer (4)
             //    queries (N_QUERIES)
-            //    trace queries (2 * N_QUERIES - 2 * 1)
-            //    composition queries (8 * N_QUERIES - 8 * 1)
+            //    trace queries (2 * N_QUERIES)
+            //    composition queries (8 * N_QUERIES)
             //    masked points (3 * 8 = 24)
             //    oods point (8)
             //    (a, b), (a, b), (a, b) for trace (3 * 2 * 2 = 12)
             //    (a, b), (a, b), (a, b), (a, b) for composition (4 * 2 * 2 = 16)
             //    prepared masked points (3 * 4 = 12)
             //    prepared oods point (4)
-            //    random_coeff2 (4)
+            //    coeff^6, coeff^5, ..., coeff (24)
 
-            // test-only: clean up the stack
-            for _ in 0..6 {
-                qm31_drop
-            } // drop coeff^6, coeff^5, ..., coeff
-            for _ in 0..16 {
-                OP_DROP
-            } // drop the prepared points
-            for _ in 0..28 {
-                OP_DROP
-            } // drop the column line coeffs
-            { CirclePointGadget::drop() } // drop oods point
-            for _ in 0..3 {
-                { CirclePointGadget::drop() } // drop masked points
-            }
-            for _ in 0..N_QUERIES {
-                OP_2DROP OP_2DROP OP_2DROP OP_2DROP // drop the queried values for composition
-            }
-            for _ in 0..N_QUERIES {
-                OP_2DROP // drop the queried values for trace
-            }
-            for _ in 0..N_QUERIES {
-                OP_DROP // drop the queries (out of order)
-            }
-            qm31_drop // drop the last layer eval
-            for _ in 0..FIB_LOG_SIZE {
-                qm31_drop // drop the derived folding_alpha
-                OP_DROP // drop the commitment
-            }
-            qm31_drop // drop circle_poly_alpha
+            // clean up the stack
+            { clean_stack(24 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4) }
         }
     }
 }

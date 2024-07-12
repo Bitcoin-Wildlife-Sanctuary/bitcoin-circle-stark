@@ -16,6 +16,7 @@ pub fn hash_with_nonce(seed: &[u8], nonce: u64) -> Vec<u8> {
     hasher.finalize().as_slice().to_vec()
 }
 
+#[derive(Clone)]
 /// A hint for PoW.
 pub struct PoWHint {
     /// The PoW nonce.

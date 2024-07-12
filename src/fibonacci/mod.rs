@@ -1,18 +1,18 @@
-mod bitcoin_script;
+pub(crate) mod bitcoin_script;
 
 mod fiat_shamir;
 mod fold;
 mod prepare;
 mod quotients;
+mod split;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;
 
-use crate::fibonacci::fiat_shamir::FiatShamirHints;
+use crate::fibonacci::fiat_shamir::{compute_fiat_shamir_hints, FiatShamirHints};
 use crate::fibonacci::fold::{compute_fold_hints, PerQueryFoldHints};
-use crate::fibonacci::prepare::ColumnLineCoeffPairVanishingHints;
+use crate::fibonacci::prepare::{compute_prepare_hints, PrepareHints};
 use crate::fibonacci::quotients::compute_quotients_hints;
-use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::treepp::pushable::{Builder, Pushable};
 use quotients::PerQueryQuotientHint;
 use stwo_prover::core::air::Air;
@@ -31,14 +31,8 @@ pub struct VerifierHints {
     /// Fiat-Shamir hints.
     pub fiat_shamir_hints: FiatShamirHints,
 
-    /// Merkle proofs for the trace Merkle tree.
-    pub merkle_proofs_traces: Vec<MerkleTreeTwinProof>,
-
-    /// Merkle proofs for the composition Merkle tree.
-    pub merkle_proofs_compositions: Vec<MerkleTreeTwinProof>,
-
-    /// Column line coefficient and pairing vanishing hints
-    pub column_line_coeff_pair_vanishing_hints: ColumnLineCoeffPairVanishingHints,
+    /// Prepare hints.
+    pub prepare_hints: PrepareHints,
 
     /// Per query quotients hints.
     pub per_query_quotients_hints: Vec<PerQueryQuotientHint>,
@@ -50,15 +44,7 @@ pub struct VerifierHints {
 impl Pushable for VerifierHints {
     fn bitcoin_script_push(&self, mut builder: Builder) -> Builder {
         builder = self.fiat_shamir_hints.bitcoin_script_push(builder);
-        for proof in self.merkle_proofs_traces.iter() {
-            builder = proof.bitcoin_script_push(builder);
-        }
-        for proof in self.merkle_proofs_compositions.iter() {
-            builder = proof.bitcoin_script_push(builder);
-        }
-        builder = self
-            .column_line_coeff_pair_vanishing_hints
-            .bitcoin_script_push(builder);
+        builder = self.prepare_hints.bitcoin_script_push(builder);
 
         for (quotients_hint, fold_hint) in self
             .per_query_quotients_hints
@@ -78,26 +64,25 @@ pub fn verify_with_hints(
     air: &FibonacciAir,
     channel: &mut BWSSha256Channel,
 ) -> Result<VerifierHints, VerificationError> {
-    let fs_output = fiat_shamir::generate_fs_hints(proof.clone(), channel, air).unwrap();
+    let (fiat_shamir_output, fiat_shamir_hints) =
+        compute_fiat_shamir_hints(proof.clone(), channel, air).unwrap();
 
-    let prepare_output = prepare::prepare(&fs_output, &proof).unwrap();
+    let (prepare_output, prepare_hints) =
+        compute_prepare_hints(&fiat_shamir_output, &proof).unwrap();
 
     let (quotients_output, per_query_quotients_hints) =
-        compute_quotients_hints(&fs_output, &prepare_output);
+        compute_quotients_hints(&fiat_shamir_output, &prepare_output);
 
     let per_query_fold_hints = compute_fold_hints(
         &proof.commitment_scheme_proof.fri_proof,
-        &fs_output,
+        &fiat_shamir_output,
         &prepare_output,
         &quotients_output,
     );
 
     Ok(VerifierHints {
-        fiat_shamir_hints: fs_output.fiat_shamir_hints,
-        merkle_proofs_traces: prepare_output.merkle_proofs_traces,
-        merkle_proofs_compositions: prepare_output.merkle_proofs_compositions,
-        column_line_coeff_pair_vanishing_hints: prepare_output
-            .column_line_coeff_pair_vanishing_hints,
+        fiat_shamir_hints,
+        prepare_hints,
         per_query_quotients_hints,
         per_query_fold_hints,
     })

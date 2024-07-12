@@ -1,4 +1,4 @@
-use crate::fibonacci::fiat_shamir::FSOutput;
+use crate::fibonacci::fiat_shamir::FiatShamirOutput;
 use crate::fibonacci::prepare::PrepareOutput;
 use crate::fibonacci::quotients::QuotientsOutput;
 use crate::merkle_tree::MerkleTreeTwinProof;
@@ -11,6 +11,7 @@ use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fri::FriProof;
 use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 
+#[derive(Clone)]
 pub struct PerQueryFoldHints {
     pub twin_proofs: Vec<MerkleTreeTwinProof>,
 }
@@ -26,7 +27,7 @@ impl Pushable for PerQueryFoldHints {
 
 pub fn compute_fold_hints(
     fri_proof: &FriProof<BWSSha256MerkleHasher>,
-    fs_output: &FSOutput,
+    fs_output: &FiatShamirOutput,
     prepare_output: &PrepareOutput,
     quotients_output: &QuotientsOutput,
 ) -> Vec<PerQueryFoldHints> {
@@ -35,7 +36,7 @@ pub fn compute_fold_hints(
     let num_fri_steps = fri_proof.inner_layers.len();
 
     let mut queries_and_results = BTreeMap::new();
-    for (&queries_parent, &value) in prepare_output
+    for (&queries_parent, &value) in fs_output
         .queries_parents
         .iter()
         .zip_eq(quotients_output.fold_results.iter())
@@ -45,7 +46,7 @@ pub fn compute_fold_hints(
 
     let mut twiddles = vec![BTreeMap::<usize, M31>::new(); num_fri_steps];
 
-    for &queries_parent in prepare_output.queries_parents.iter() {
+    for &queries_parent in fs_output.queries_parents.iter() {
         let query_result = prepare_output
             .precomputed_merkle_tree
             .query(queries_parent << 1);
@@ -67,7 +68,7 @@ pub fn compute_fold_hints(
     for (((layer_twiddles, fri_layer_proof), &folding_alpha), twin_proofs_mut) in twiddles
         .iter()
         .zip_eq(fri_proof.inner_layers.iter())
-        .zip_eq(fs_output.fri_input.folding_alphas.iter())
+        .zip_eq(fs_output.folding_alphas.iter())
         .zip_eq(twin_proofs.iter_mut())
     {
         let mut iter = fri_layer_proof.evals_subset.iter();
@@ -143,12 +144,12 @@ pub fn compute_fold_hints(
     }
 
     for (_, &v) in queries_and_results.iter() {
-        assert_eq!(v, fs_output.fiat_shamir_hints.last_layer);
+        assert_eq!(v, fs_output.last_layer);
     }
 
     let mut all_fold_hints = vec![];
 
-    for &queries_parent in prepare_output.queries_parents.iter() {
+    for &queries_parent in fs_output.queries_parents.iter() {
         let mut idx = queries_parent;
         let mut proofs = vec![];
 
@@ -161,12 +162,10 @@ pub fn compute_fold_hints(
         let mut depth = prepare_output.precomputed_merkle_tree.layers.len() - 1;
         let mut idx = queries_parent;
 
-        for (proof, (commitment, _)) in proofs.iter().zip(
-            fs_output
-                .fiat_shamir_hints
-                .fri_commitment_and_folding_hints
-                .iter(),
-        ) {
+        for (proof, (commitment, _)) in proofs
+            .iter()
+            .zip(fs_output.fri_commitment_and_folding_hints.iter())
+        {
             assert!(proof.verify(commitment, depth, (idx >> 1) << 1));
             depth -= 1;
             idx >>= 1;
