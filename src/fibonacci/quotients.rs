@@ -7,12 +7,14 @@ use stwo_prover::core::fft::ibutterfly;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 
+/// Output from the quotient step.
 #[derive(Default, Clone, Debug)]
 pub struct QuotientsOutput {
+    /// Results to be folded.
     pub fold_results: Vec<QM31>,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Compute the quotients hints.
 pub fn compute_quotients_hints(
     fs_output: &FiatShamirOutput,
     prepare_output: &PrepareOutput,

@@ -11,8 +11,10 @@ use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fri::FriProof;
 use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 
+/// The hints for folding for each query.
 #[derive(Clone)]
 pub struct PerQueryFoldHints {
+    /// Merkle proofs for the commitments on intermediate folding results.
     pub twin_proofs: Vec<MerkleTreeTwinProof>,
 }
 
@@ -25,6 +27,7 @@ impl Pushable for PerQueryFoldHints {
     }
 }
 
+/// Compute the hints for folding.
 pub fn compute_fold_hints(
     fri_proof: &FriProof<BWSSha256MerkleHasher>,
     fs_output: &FiatShamirOutput,

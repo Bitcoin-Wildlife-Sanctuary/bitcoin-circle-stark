@@ -1,10 +1,16 @@
 pub(crate) mod bitcoin_script;
 
-mod fiat_shamir;
-mod fold;
-mod prepare;
-mod quotients;
-mod split;
+/// Module for Fiat-Shamir.
+pub mod fiat_shamir;
+/// Module for folding.
+pub mod fold;
+/// Module for prepare.
+pub mod prepare;
+/// Module for quotients.
+pub mod quotients;
+
+/// The implementation of a verifier split into multiple transactions.
+pub mod split;
 
 pub use bitcoin_script::*;
 use itertools::Itertools;

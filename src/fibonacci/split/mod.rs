@@ -24,10 +24,14 @@ use stwo_prover::core::fields::{
 use stwo_prover::core::prover::N_QUERIES;
 use stwo_prover::core::vcs::{bws_sha256_hash::BWSSha256Hasher, hasher::Hasher};
 
+/// The state of the Fibonacci split program.
 #[derive(Clone, Debug)]
 pub struct FibonacciSplitState {
+    /// The program counter.
     pub pc: usize,
+    /// The hash of the stack.
     pub stack_hash: Vec<u8>,
+    /// The stack from the execution.
     pub stack: Vec<Vec<u8>>,
 }
 
@@ -40,6 +44,7 @@ impl From<FibonacciSplitState> for Script {
     }
 }
 
+/// An enum of the input to the Fibonacci split program.
 #[derive(Clone)]
 pub enum FibonacciSplitInput {
     /// Hints for Fiat-Shamir
@@ -76,6 +81,7 @@ impl From<FibonacciSplitInput> for Script {
     }
 }
 
+/// The Fibonacci split program.
 pub struct FibonacciSplitProgram;
 
 impl CovenantProgram for FibonacciSplitProgram {
@@ -488,10 +494,10 @@ mod test {
 
             if should_reset {
                 reset_times += 1;
-                total_fee.borrow_mut().add_assign(2989);
+                total_fee.borrow_mut().add_assign(3045);
                 Some(SimulationInstruction {
                     program_index: 10,
-                    fee: 2989,
+                    fee: 3045,
                     program_input: FibonacciSplitInput::Reset,
                 })
             } else if old_state.pc == 0 {
