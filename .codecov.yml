@@ -3,3 +3,6 @@ coverage:
     patch:
       default:
         target: 95%
+
+ignore:
+  - "src/bin"
