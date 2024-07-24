@@ -1,7 +1,15 @@
 use crate::treepp::*;
 use crate::OP_HINT;
+use bitcoin_scriptexec::{profiler_end, profiler_start};
 use sha2::{Digest, Sha256};
 use std::cmp::min;
+
+/// Call the selected hash function.
+pub fn hash() -> Script {
+    script! {
+        { profiler_start("op_sha256") } OP_SHA256 { profiler_end("op_sha256") }
+    }
+}
 
 /// Gadget for trimming away a m31 element to keep only logn bits.
 pub fn trim_m31_gadget(logn: usize) -> Script {
@@ -62,9 +70,9 @@ pub fn hash_m31_vec_gadget(len: usize) -> Script {
         }
     } else {
         script! {
-            OP_SHA256
+            hash
             for _ in 1..len {
-                OP_CAT OP_SHA256
+                OP_CAT hash
             }
         }
     }

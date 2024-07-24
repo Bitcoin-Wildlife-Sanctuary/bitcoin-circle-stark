@@ -1,6 +1,7 @@
 use crate::treepp::*;
 use crate::utils::{
-    dup_m31_vec_gadget, hash_m31_vec_gadget, limb_to_be_bits_toaltstack, m31_vec_from_bottom_gadget,
+    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits_toaltstack,
+    m31_vec_from_bottom_gadget,
 };
 use crate::OP_HINT;
 
@@ -18,7 +19,7 @@ impl MerkleTreeTwinGadget {
 
             // hash the left and keep the hash in the altstack
             { hash_m31_vec_gadget(len) }
-            OP_SHA256
+            hash
             OP_TOALTSTACK
 
             // right
@@ -29,11 +30,11 @@ impl MerkleTreeTwinGadget {
 
             // hash the right
             { hash_m31_vec_gadget(len) }
-            OP_SHA256
+            hash
 
             // put the left hash out and merge into the parent hash
             OP_FROMALTSTACK
-            OP_SWAP OP_CAT OP_SHA256
+            OP_SWAP OP_CAT hash
 
             { MerkleTreePathGadget::verify(logn - 1) }
         }
@@ -86,7 +87,7 @@ impl MerkleTreePathGadget {
             for _ in 0..path_len {
                 OP_HINT
                 OP_FROMALTSTACK OP_IF OP_SWAP OP_ENDIF
-                OP_CAT OP_SHA256
+                OP_CAT hash
             }
 
             OP_FROMALTSTACK

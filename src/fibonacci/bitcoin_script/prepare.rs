@@ -1,5 +1,6 @@
 use crate::constraints::ConstraintsGadget;
 use crate::treepp::*;
+use bitcoin_scriptexec::{profiler_end, profiler_start};
 use rust_bitcoin_m31::{
     qm31_dup, qm31_fromaltstack, qm31_mul, qm31_over, qm31_square, qm31_toaltstack,
 };
@@ -37,7 +38,9 @@ impl FibonacciPrepareGadget {
                 for _ in 0..4 {
                     { i * 4 + 4 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 + (8 - 4 * i) + 4 - 1 } OP_ROLL
                 }
+                { profiler_start("column line coeffs for trace") }
                 { ConstraintsGadget::column_line_coeffs_with_hint(1) }
+                { profiler_end("column line coeffs for trace") }
             }
 
             // stack:
@@ -63,7 +66,10 @@ impl FibonacciPrepareGadget {
             for _ in 0..16 {
                 { 4 + 12 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 + 16 - 1 } OP_ROLL
             }
+
+            { profiler_start("column line coeffs for composition") }
             { ConstraintsGadget::column_line_coeffs_with_hint(4) }
+            { profiler_end("column line coeffs for composition") }
 
             // stack:
             //    random_coeff2 (4)
@@ -83,7 +89,9 @@ impl FibonacciPrepareGadget {
                 for _ in 0..8 {
                     { 16 + 12 + 4 * i + (8 + 24) - 8 * i - 1 } OP_PICK
                 }
+                { profiler_start("prepare pair vanishing") }
                 { ConstraintsGadget::prepare_pair_vanishing_with_hint() }
+                { profiler_end("prepare pair vanishing") }
             }
 
             // move random_coeffs2 closer
@@ -91,6 +99,7 @@ impl FibonacciPrepareGadget {
                 { 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8 + 1) * N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 - 1 } OP_ROLL
             }
 
+            { profiler_start("compute coeff power sequence") }
             // compute coeff^6, coeff^5, coeff^4, coeff^3, coeff^2, coeff
             qm31_dup qm31_toaltstack
             qm31_dup qm31_square qm31_dup qm31_toaltstack
@@ -98,6 +107,7 @@ impl FibonacciPrepareGadget {
             qm31_over qm31_mul qm31_dup qm31_toaltstack
             qm31_over qm31_mul qm31_dup qm31_toaltstack
             qm31_mul qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack qm31_fromaltstack
+            { profiler_end("compute coeff power sequence") }
         }
     }
 }

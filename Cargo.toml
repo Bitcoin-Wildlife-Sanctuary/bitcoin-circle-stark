@@ -33,3 +33,6 @@ opt-level = 3
 
 [profile.release]
 lto = true
+
+[features]
+profiler = ["bitcoin-scriptexec/profiler"]

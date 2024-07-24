@@ -1,5 +1,5 @@
 use crate::treepp::*;
-use crate::utils::limb_to_le_bits;
+use crate::utils::{hash, limb_to_le_bits};
 use crate::OP_HINT;
 
 /// Gadget for verifying a Merkle tree path in a precomputed data tree.
@@ -35,7 +35,7 @@ impl PrecomputedMerkleTreeGadget {
             OP_DUP OP_TOALTSTACK
 
             // compute the current element's hash
-            OP_SHA256 OP_CAT OP_SHA256 OP_CAT OP_SHA256
+            hash OP_CAT hash OP_CAT hash
 
             // stack: root_hash, <bits>, leaf-hash
             // altstack: leaf
@@ -61,7 +61,7 @@ impl PrecomputedMerkleTreeGadget {
                 OP_IF OP_SWAP OP_ROT OP_ENDIF
 
                 OP_CAT OP_CAT
-                OP_SHA256
+                hash
             }
 
             // pull the sibling
@@ -74,7 +74,7 @@ impl PrecomputedMerkleTreeGadget {
             // check if we need to swap, and swap if needed
             OP_IF OP_SWAP OP_ENDIF
             OP_CAT
-            OP_SHA256
+            hash
 
             { root.to_vec() }
             OP_EQUALVERIFY
