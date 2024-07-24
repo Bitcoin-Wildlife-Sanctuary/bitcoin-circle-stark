@@ -8,6 +8,7 @@ use crate::oods::OODSGadget;
 use crate::pow::PowGadget;
 use crate::treepp::*;
 use crate::OP_HINT;
+use bitcoin_scriptexec::{profiler_end, profiler_start};
 use rust_bitcoin_m31::{
     qm31_copy, qm31_dup, qm31_equalverify, qm31_from_bottom, qm31_over, qm31_roll,
 };
@@ -158,7 +159,9 @@ impl FibonacciFiatShamirGadget {
             // altstack:
             //    channel_digest, c2
 
+            { profiler_start("eval composition polynomial") }
             { FibonacciCompositionGadget::eval_composition_polynomial_at_point(FIB_LOG_SIZE, M31::from_u32_unchecked(443693538)) }
+            { profiler_end("eval composition polynomial") }
 
             qm31_equalverify
 
@@ -257,7 +260,9 @@ impl FibonacciFiatShamirGadget {
             for i in 0..N_QUERIES {
                 { 2 * i } OP_PICK // copy c1
                 { 2 * i + 1 + 1 + N_QUERIES - i - 1 } OP_PICK // copy query
+                { profiler_start("merkle tree for trace") }
                 { MerkleTreeTwinGadget::query_and_verify(1, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+                { profiler_end("merkle tree for trace") }
             }
 
             // drop c1
@@ -279,11 +284,14 @@ impl FibonacciFiatShamirGadget {
             // pull c2, which is the commitment of the composition Merkle tree
             { 2 * N_QUERIES + N_QUERIES + 4 + (1 + 4) * FIB_LOG_SIZE as usize + 4 + 4 } OP_ROLL
 
+
             // handle each query for composition
             for i in 0..N_QUERIES {
                 { 8 * i } OP_PICK // copy c2
                 { 1 + 8 * i + 1 + 2 * N_QUERIES + N_QUERIES - i - 1 } OP_PICK // copy query
+                { profiler_start("merkle tree for composition") }
                 { MerkleTreeTwinGadget::query_and_verify(4, (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+                { profiler_end("merkle tree for composition") }
             }
 
             // drop c2

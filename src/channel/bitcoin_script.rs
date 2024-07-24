@@ -1,5 +1,5 @@
 use crate::treepp::*;
-use crate::utils::{hash_qm31_gadget, trim_m31_gadget};
+use crate::utils::{hash, hash_qm31_gadget, trim_m31_gadget};
 use crate::OP_HINT;
 use rust_bitcoin_m31::MOD;
 
@@ -17,7 +17,7 @@ impl Sha256ChannelGadget {
     /// - new channel digest
     pub fn mix_digest() -> Script {
         script! {
-            OP_CAT OP_SHA256
+            OP_CAT hash
         }
     }
 
@@ -33,7 +33,7 @@ impl Sha256ChannelGadget {
         script! {
             OP_TOALTSTACK
             hash_qm31_gadget
-            OP_FROMALTSTACK OP_CAT OP_SHA256
+            OP_FROMALTSTACK OP_CAT hash
         }
     }
 
@@ -69,8 +69,8 @@ impl Sha256ChannelGadget {
     /// - qm31
     pub fn draw_felt_with_hint() -> Script {
         script! {
-            OP_DUP OP_SHA256 OP_SWAP
-            OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
+            OP_DUP hash OP_SWAP
+            OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
             { Self::unpack_multi_m31(4) }
         }
     }
@@ -82,8 +82,8 @@ impl Sha256ChannelGadget {
     ///    all the numbers (m)
     pub fn draw_numbers_with_hint(m: usize, logn: usize) -> Script {
         script! {
-            OP_DUP OP_SHA256 OP_SWAP
-            OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
+            OP_DUP hash OP_SWAP
+            OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
             { Self::unpack_multi_m31(m) }
             for i in 0..m {
                 { i } OP_ROLL { trim_m31_gadget(logn) }
@@ -169,7 +169,7 @@ mod test {
     use crate::channel::{generate_hints, ChannelWithHint, Sha256Channel, Sha256ChannelGadget};
     use crate::tests_utils::report::report_bitcoin_script_size;
     use crate::treepp::*;
-    use crate::utils::{get_rand_qm31, hash_qm31, hash_qm31_gadget};
+    use crate::utils::{get_rand_qm31, hash, hash_qm31, hash_qm31_gadget};
     use bitcoin_script::script;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -283,8 +283,8 @@ mod test {
             let script = script! {
                 { hint }
                 { a }
-                OP_DUP OP_SHA256 OP_SWAP
-                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT OP_SHA256
+                OP_DUP hash OP_SWAP
+                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
                 { Sha256ChannelGadget::unpack_multi_m31(8) }
                 for i in 0..8 {
                     { b[i] }
