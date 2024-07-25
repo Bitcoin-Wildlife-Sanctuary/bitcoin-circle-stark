@@ -3,9 +3,10 @@ use crate::fri::FFTGadget;
 use crate::merkle_tree::MerkleTreePathGadget;
 use crate::treepp::*;
 use crate::utils::{
-    dup_m31_vec_gadget, hash_m31_vec_gadget, limb_to_be_bits, m31_vec_from_bottom_gadget,
+    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits, m31_vec_from_bottom_gadget,
     qm31_reverse,
 };
+use bitcoin_scriptexec::{profiler_end, profiler_start};
 use rust_bitcoin_m31::{
     qm31_add, qm31_copy, qm31_equalverify, qm31_mul, qm31_over, qm31_rot, qm31_swap,
 };
@@ -108,7 +109,7 @@ impl FibonacciPerQueryFoldGadget {
                 qm31_reverse qm31_swap
                 // hash the left and keep the hash in the altstack
                 { hash_m31_vec_gadget(4) }
-                OP_SHA256
+                hash
                 OP_TOALTSTACK
 
                 // right
@@ -118,14 +119,16 @@ impl FibonacciPerQueryFoldGadget {
                 qm31_reverse qm31_swap
                 // hash the right
                 { hash_m31_vec_gadget(4) }
-                OP_SHA256
+                hash
 
                 // put the left hash out and merge into the parent hash
                 OP_FROMALTSTACK
                 OP_SWAP
-                OP_CAT OP_SHA256
+                OP_CAT hash
 
+                { profiler_start("merkle tree verification for folding") }
                 { MerkleTreePathGadget::verify((FIB_LOG_SIZE + LOG_BLOWUP_FACTOR - 1) as usize - j) }
+                { profiler_end("merkle tree verification for folding") }
 
                 qm31_rot
 
@@ -136,6 +139,7 @@ impl FibonacciPerQueryFoldGadget {
 
                 qm31_equalverify
 
+                { profiler_start("fft and multiply by alpha in folding") }
                 8 OP_ROLL
                 { FFTGadget::ibutterfly() }
 
@@ -145,6 +149,7 @@ impl FibonacciPerQueryFoldGadget {
                 }
 
                 qm31_mul qm31_add
+                { profiler_end("fft and multiply by alpha in folding") }
             }
 
             // pull the last layer

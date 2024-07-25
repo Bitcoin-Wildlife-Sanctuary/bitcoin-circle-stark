@@ -134,5 +134,7 @@ mod test {
             convert_to_witness(witness).unwrap(),
         );
         assert!(exec_result.success);
+        #[cfg(feature = "profiler")]
+        exec_result.profiler.print_stats();
     }
 }

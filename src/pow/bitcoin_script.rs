@@ -1,5 +1,6 @@
 use crate::channel::Sha256ChannelGadget;
 use crate::treepp::*;
+use crate::utils::hash;
 use crate::OP_HINT;
 
 /// Gadget for verifying PoW.
@@ -38,7 +39,7 @@ impl PowGadget {
 
             // compute sha256(channel||nonce)
             OP_2DUP
-            OP_CAT OP_SHA256
+            OP_CAT hash
 
             // stack: channel, nonce, sha256(channel||nonce)
 

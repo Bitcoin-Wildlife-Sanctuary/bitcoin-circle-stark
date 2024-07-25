@@ -8,7 +8,7 @@ use crate::fibonacci::prepare::PrepareHints;
 use crate::fibonacci::quotients::PerQueryQuotientHint;
 use crate::fibonacci::FIB_LOG_SIZE;
 use crate::treepp::*;
-use crate::utils::clean_stack;
+use crate::utils::{clean_stack, hash};
 use crate::OP_HINT;
 use bitcoin_scriptexec::utils::scriptint_vec;
 use covenants_gadgets::utils::stack_hash::StackHash;
@@ -322,7 +322,7 @@ impl CovenantProgram for FibonacciSplitProgram {
 
                 OP_2DUP
                 OP_CAT
-                OP_SHA256
+                hash
                 OP_FROMALTSTACK OP_EQUALVERIFY
             }
         }

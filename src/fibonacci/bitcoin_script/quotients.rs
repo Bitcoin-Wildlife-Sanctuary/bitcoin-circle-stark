@@ -4,6 +4,7 @@ use crate::precomputed_merkle_tree::{
     get_precomputed_merkle_tree_roots, PrecomputedMerkleTreeGadget, PRECOMPUTED_MERKLE_TREE_ROOTS,
 };
 use crate::treepp::*;
+use bitcoin_scriptexec::{profiler_end, profiler_start};
 use rust_bitcoin_m31::{
     cm31_add, cm31_fromaltstack, cm31_mul, cm31_roll, cm31_toaltstack, qm31_add, qm31_fromaltstack,
     qm31_mul_cm31, qm31_rot, qm31_swap, qm31_toaltstack,
@@ -20,7 +21,10 @@ impl FibonacciPerQueryQuotientGadget {
         script! {
             // resolve the point and obtain its twiddle factors
             { 24 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES - query_idx + (N_QUERIES - 1) } OP_PICK
+
+            { profiler_start("query precomputed merkle tree") }
             { PrecomputedMerkleTreeGadget::query_and_verify(*precomputed_merkle_tree_roots.get(&(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR)).unwrap(), (FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) as usize) }
+            { profiler_end("query precomputed merkle tree") }
 
             // stack:
             //    circle_poly_alpha (4)
@@ -46,7 +50,10 @@ impl FibonacciPerQueryQuotientGadget {
                     { 4 * i + 2 + 15 + (24 + 4 + 12) - 4 * i - 1 } OP_PICK // the prepared masked point
                 }
                 { 4 + 4 * i + 1 } OP_PICK { 4 + 4 * i + 1 } OP_PICK // x, y
+
+                { profiler_start("compute denominator inverse") }
                 { ConstraintsGadget::denominator_inverse_from_prepared() }
+                { profiler_end("compute denominator inverse") }
             }
 
             // stack:
@@ -105,7 +112,9 @@ impl FibonacciPerQueryQuotientGadget {
                     { 3 + 4 * i + 8 + 2 + 16 + 2 + 15 + 24 + 4 + 12 + 16 + (12 - 4 * i) - 1 } OP_PICK // copy (a, b)
                 }
 
+                { profiler_start("apply column line coeffs") }
                 { ConstraintsGadget::apply_twin() }
+                { profiler_end("apply column line coeffs") }
             }
 
             for i in 0..4 {
@@ -118,7 +127,9 @@ impl FibonacciPerQueryQuotientGadget {
                     { 3 + 4 * i + 12 + 8 + 2 + 16 + 2 + 15 + 24 + 4 + 12 + (16 - 4 * i) - 1 } OP_PICK
                 } // copy (a, b)
 
+                { profiler_start("apply column line coeffs") }
                 { ConstraintsGadget::apply_twin() }
+                { profiler_end("apply column line coeffs") }
             }
 
             // stack:
@@ -170,6 +181,9 @@ impl FibonacciPerQueryQuotientGadget {
             //    twiddle factors (15)
             //    denominator inverses (4 * 2 * 2 = 16)
             //    nominators (7 * 2 * 2 = 28)
+
+
+            { profiler_start("aggregate different components of the quotient") }
 
             // u1, u2, u3:
             //   nominator[0, 1, 2].left * denominator_inverses[0].left
@@ -346,6 +360,8 @@ impl FibonacciPerQueryQuotientGadget {
 
             qm31_rot qm31_add
             qm31_toaltstack qm31_add qm31_fromaltstack qm31_swap
+
+            { profiler_end("aggregate different components of the quotient") }
 
             // local stack (4 elements):
             //    ---------------------------- per query ----------------------------
