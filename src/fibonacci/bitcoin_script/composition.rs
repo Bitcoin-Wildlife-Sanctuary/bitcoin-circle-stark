@@ -165,26 +165,28 @@ impl FibonacciCompositionGadget {
 #[cfg(test)]
 mod test {
     use crate::air::CompositionHint;
+    use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
+    use crate::tests_utils::report::report_bitcoin_script_size;
+    use crate::treepp::*;
+    use crate::utils::get_rand_qm31;
     use itertools::Itertools;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use std::iter::zip;
+    use stwo_prover::core::air::accumulation::PointEvaluationAccumulator;
+    use stwo_prover::core::air::Component;
     use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::pcs::TreeVec;
+    use stwo_prover::core::{InteractionElements, LookupValues};
     use stwo_prover::{
         core::{
             air::{AirExt, ComponentTrace},
             circle::CirclePoint,
             poly::circle::CanonicCoset,
-            ComponentVec,
         },
         examples::fibonacci::Fibonacci,
     };
-
-    use crate::fibonacci::bitcoin_script::composition::FibonacciCompositionGadget;
-    use crate::tests_utils::report::report_bitcoin_script_size;
-    use crate::treepp::*;
-    use crate::utils::get_rand_qm31;
 
     #[test]
     fn test_eval_composition_polynomial_at_point() {
@@ -196,7 +198,10 @@ mod test {
         let trace_poly = trace.interpolate();
         let trace_eval =
             trace_poly.evaluate(CanonicCoset::new(trace_poly.log_size() + 1).circle_domain());
-        let trace = ComponentTrace::new(vec![&trace_poly], vec![&trace_eval]);
+        let trace = ComponentTrace::new(
+            TreeVec::new(vec![vec![&trace_poly]]),
+            TreeVec::new(vec![vec![&trace_eval]]),
+        );
 
         let component_traces = vec![trace];
 
@@ -223,7 +228,7 @@ mod test {
             };
 
             let points = fib.air.mask_points(z);
-            let comp = zip(&component_traces[0].polys, &points[0])
+            let mask_values = zip(&component_traces[0].polys[0], &points[0])
                 .map(|(poly, points)| {
                     points
                         .iter()
@@ -232,22 +237,26 @@ mod test {
                 })
                 .collect_vec();
 
-            let mut mask_values = ComponentVec(Vec::new());
-            mask_values.push(comp.clone());
+            let mut evaluation_accumulator = PointEvaluationAccumulator::new(random_coeff);
+            fib.air.component.evaluate_constraint_quotients_at_point(
+                z,
+                &TreeVec::new(vec![mask_values.clone()]),
+                &mut evaluation_accumulator,
+                &InteractionElements::default(),
+                &LookupValues::default(),
+            );
 
-            let res = fib
-                .air
-                .eval_composition_polynomial_at_point(z, &mask_values, random_coeff);
+            let res = evaluation_accumulator.finalize();
 
             let composition_hint = CompositionHint {
                 constraint_eval_quotients_by_mask: vec![
                     fib.air.component.boundary_constraint_eval_quotient_by_mask(
                         z,
-                        mask_values[0][0][..1].try_into().unwrap(),
+                        mask_values[0][..1].try_into().unwrap(),
                     ),
                     fib.air.component.step_constraint_eval_quotient_by_mask(
                         z,
-                        mask_values[0][0][..].try_into().unwrap(),
+                        mask_values[0][..].try_into().unwrap(),
                     ),
                 ],
             };
@@ -255,9 +264,9 @@ mod test {
             let script = script! {
                 { composition_hint } // hint
                 { random_coeff }
-                { comp[0][0] }
-                { comp[0][1] }
-                { comp[0][2] }
+                { mask_values[0][0] }
+                { mask_values[0][1] }
+                { mask_values[0][2] }
                 { z.x }
                 { z.y }
                 { composition_polynomial_script.clone() }

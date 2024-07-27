@@ -437,10 +437,10 @@ mod test {
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
-    use stwo_prover::core::prover::prove;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hasher;
     use stwo_prover::core::vcs::hasher::Hasher;
     use stwo_prover::examples::fibonacci::Fibonacci;
+    use stwo_prover::trace_generation::commit_and_prove;
 
     #[test]
     fn test_integration() {
@@ -454,7 +454,7 @@ mod test {
                 .air
                 .component
                 .claim])));
-        let proof = prove(&fib.air, channel, vec![trace]).unwrap();
+        let proof = commit_and_prove(&fib.air, channel, vec![trace]).unwrap();
 
         let channel =
             &mut BWSSha256Channel::new(BWSSha256Hasher::hash(BaseField::into_slice(&[fib
