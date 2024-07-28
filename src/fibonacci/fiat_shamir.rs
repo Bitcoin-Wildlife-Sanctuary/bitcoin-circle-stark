@@ -25,7 +25,7 @@ use stwo_prover::core::prover::{
 };
 use stwo_prover::core::queries::{Queries, SparseSubCircleDomain};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
-use stwo_prover::core::ColumnVec;
+use stwo_prover::core::{ColumnVec, InteractionElements, LookupValues};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 #[derive(Clone)]
@@ -168,13 +168,31 @@ pub fn compute_fiat_shamir_hints(
 ) -> Result<(FiatShamirOutput, FiatShamirHints), VerificationError> {
     // Read trace commitment.
     let mut commitment_scheme = CommitmentSchemeVerifier::new();
-    commitment_scheme.commit(proof.commitments[0], air.column_log_sizes(), channel);
+
+    // TODO(spapini): Retrieve column_log_sizes from AirTraceVerifier, and remove the dependency on
+    // Air.
+    let column_log_sizes = air.column_log_sizes();
+    commitment_scheme.commit(proof.commitments[0], &column_log_sizes[0], channel);
+
+    if air.column_log_sizes().len() == 2 {
+        commitment_scheme.commit(proof.commitments[1], &column_log_sizes[1], channel);
+    }
+
+    channel.mix_felts(
+        &proof
+            .lookup_values
+            .0
+            .values()
+            .map(|v| SecureField::from(*v))
+            .collect_vec(),
+    );
+
     let (random_coeff, random_coeff_hint) = channel.draw_felt_and_hints();
 
     // Read composition polynomial commitment.
     commitment_scheme.commit(
-        proof.commitments[1],
-        vec![air.composition_log_degree_bound(); 4],
+        *proof.commitments.last().unwrap(),
+        &[air.composition_log_degree_bound(); 4],
         channel,
     );
 
@@ -186,10 +204,7 @@ pub fn compute_fiat_shamir_hints(
     let masked_points = trace_sample_points.clone();
 
     // TODO(spapini): Change when we support multiple interactions.
-    // First tree - trace.
-    let mut sampled_points = TreeVec::new(vec![trace_sample_points.flatten()]);
-    // Second tree - composition polynomial.
-    sampled_points.push(vec![vec![oods_point]; 4]);
+    let sampled_points = air.mask_points(oods_point);
 
     // this step is just a reorganization of the data
     assert_eq!(sampled_points.0[0][0][0], masked_points[0][0][0]);
@@ -212,7 +227,13 @@ pub fn compute_fiat_shamir_hints(
             .unwrap();
 
     if composition_oods_value
-        != air.eval_composition_polynomial_at_point(oods_point, &trace_oods_values, random_coeff)
+        != air.eval_composition_polynomial_at_point(
+            oods_point,
+            &trace_oods_values,
+            random_coeff,
+            &InteractionElements::default(),
+            &LookupValues::default(),
+        )
     {
         return Err(VerificationError::OodsNotMatching);
     }
@@ -221,11 +242,11 @@ pub fn compute_fiat_shamir_hints(
         constraint_eval_quotients_by_mask: vec![
             air.component.boundary_constraint_eval_quotient_by_mask(
                 oods_point,
-                trace_oods_values[0][0][..1].try_into().unwrap(),
+                trace_oods_values[0][0][0][..1].try_into().unwrap(),
             ),
             air.component.step_constraint_eval_quotient_by_mask(
                 oods_point,
-                trace_oods_values[0][0][..].try_into().unwrap(),
+                trace_oods_values[0][0][0][..].try_into().unwrap(),
             ),
         ],
     };
