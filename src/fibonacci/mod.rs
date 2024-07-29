@@ -22,14 +22,12 @@ use crate::fibonacci::quotients::compute_quotients_hints;
 use crate::treepp::pushable::{Builder, Pushable};
 use quotients::PerQueryQuotientHint;
 use stwo_prover::core::air::Air;
-use stwo_prover::core::backend::CpuBackend;
 use stwo_prover::core::channel::BWSSha256Channel;
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::TreeVec;
-use stwo_prover::core::poly::circle::SecureCirclePoly;
 use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
-use stwo_prover::core::{ColumnVec, ComponentVec};
+use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
 /// All the hints for the verifier (note: proof is also provided as a hint).
@@ -94,36 +92,36 @@ pub fn verify_with_hints(
     })
 }
 
+#[allow(clippy::type_complexity)]
 fn sampled_values_to_mask(
     air: &impl Air,
-    mut sampled_values: TreeVec<ColumnVec<Vec<SecureField>>>,
-) -> Result<(ComponentVec<Vec<SecureField>>, SecureField), InvalidOodsSampleStructure> {
-    let composition_partial_sampled_values =
-        sampled_values.pop().ok_or(InvalidOodsSampleStructure)?;
-    let composition_oods_value = SecureCirclePoly::<CpuBackend>::eval_from_partial_evals(
-        composition_partial_sampled_values
+    sampled_values: TreeVec<ColumnVec<Vec<SecureField>>>,
+) -> Result<(Vec<TreeVec<Vec<Vec<SecureField>>>>, SecureField), InvalidOodsSampleStructure> {
+    let mut sampled_values = sampled_values.as_ref();
+    let composition_values = sampled_values.pop().ok_or(InvalidOodsSampleStructure)?;
+
+    let mut sample_iters = sampled_values.map(|tree_value| tree_value.iter());
+    let trace_oods_values = air
+        .components()
+        .iter()
+        .map(|component| {
+            component
+                .mask_points(CirclePoint::zero())
+                .zip(sample_iters.as_mut())
+                .map(|(mask_per_tree, tree_iter)| {
+                    tree_iter.take(mask_per_tree.len()).cloned().collect_vec()
+                })
+        })
+        .collect_vec();
+
+    let composition_oods_value = SecureField::from_partial_evals(
+        composition_values
             .iter()
             .flatten()
             .cloned()
             .collect_vec()
             .try_into()
             .map_err(|_| InvalidOodsSampleStructure)?,
-    );
-
-    // Retrieve sampled mask values for each component.
-    let flat_trace_values = &mut sampled_values
-        .pop()
-        .ok_or(InvalidOodsSampleStructure)?
-        .into_iter();
-    let trace_oods_values = ComponentVec(
-        air.components()
-            .iter()
-            .map(|c| {
-                flat_trace_values
-                    .take(c.mask_points(CirclePoint::zero()).len())
-                    .collect_vec()
-            })
-            .collect(),
     );
 
     Ok((trace_oods_values, composition_oods_value))
@@ -134,10 +132,10 @@ mod test {
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
-    use stwo_prover::core::prover::{prove, verify};
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hasher;
     use stwo_prover::core::vcs::hasher::Hasher;
     use stwo_prover::examples::fibonacci::Fibonacci;
+    use stwo_prover::trace_generation::{commit_and_prove, commit_and_verify};
 
     #[test]
     fn test_fib_prove() {
@@ -150,13 +148,13 @@ mod test {
                 .air
                 .component
                 .claim])));
-        let proof = prove(&fib.air, channel, vec![trace]).unwrap();
+        let proof = commit_and_prove(&fib.air, channel, vec![trace]).unwrap();
 
         let channel =
             &mut BWSSha256Channel::new(BWSSha256Hasher::hash(BaseField::into_slice(&[fib
                 .air
                 .component
                 .claim])));
-        verify(proof, &fib.air, channel).unwrap()
+        commit_and_verify(proof, &fib.air, channel).unwrap()
     }
 }
