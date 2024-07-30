@@ -127,50 +127,23 @@ pub fn m31_vec_from_bottom_gadget(len: usize) -> Script {
     }
 }
 
-/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
-/// due to inability to reconcile the dependency issues between BitVM and stwo.
-pub fn limb_to_be_bits_common(num_bits: u32) -> Script {
-    let min_i = min(22, num_bits - 1);
+/// Clean the stack.
+pub fn clean_stack(num: usize) -> Script {
     script! {
-        OP_TOALTSTACK
-
-        // Push the powers of 2 onto the stack
-        // First, all powers of 2 that we can push as 3-byte numbers
-        for i in 0..min_i  {
-            { 2 << i }
+        for _ in 0..(num / 2) {
+            OP_2DROP
         }
-        // Then, we double powers of 2 to generate the 4-byte numbers
-        for _ in min_i..num_bits - 1 {
-            OP_DUP
-            OP_DUP
-            OP_ADD
+        if num % 2 == 1 {
+            OP_DROP
         }
-
-        OP_FROMALTSTACK
-
-        for _ in 0..num_bits - 2 {
-            OP_2DUP OP_LESSTHANOREQUAL
-            OP_IF
-                OP_SWAP OP_SUB 1
-            OP_ELSE
-                OP_NIP 0
-            OP_ENDIF
-            OP_TOALTSTACK
-        }
-
-        OP_2DUP OP_LESSTHANOREQUAL
-        OP_IF
-            OP_SWAP OP_SUB 1
-        OP_ELSE
-            OP_NIP 0
-        OP_ENDIF
     }
 }
 
 /// Convert a limb to low-endian bits
 /// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
 /// due to inability to reconcile the dependency issues between BitVM and stwo.
-pub fn limb_to_le_bits_common(num_bits: u32) -> Script {
+pub fn limb_to_le_bits(num_bits: u32) -> Script {
+    assert!(num_bits >= 2);
     let min_i = min(22, num_bits - 1);
     script! {
         // Push the powers of 2 onto the stack
@@ -218,15 +191,65 @@ pub fn limb_to_le_bits_common(num_bits: u32) -> Script {
     }
 }
 
-/// Clean the stack.
-pub fn clean_stack(num: usize) -> Script {
+fn limb_to_be_bits_toaltstack_common(num_bits: u32) -> Script {
+    assert!(num_bits >= 2);
+    let min_i = min(22, num_bits - 1);
     script! {
-        for _ in 0..(num / 2) {
-            OP_2DROP
+        OP_TOALTSTACK
+
+        // Push the powers of 2 onto the stack
+        // First, all powers of 2 that we can push as 3-byte numbers
+        for i in 0..min_i  {
+            { 2 << i }
         }
-        if num % 2 == 1 {
-            OP_DROP
+        // Then, we double powers of 2 to generate the 4-byte numbers
+        for _ in min_i..num_bits - 1 {
+            OP_DUP
+            OP_DUP
+            OP_ADD
         }
+
+        OP_FROMALTSTACK
+
+        for _ in 0..num_bits - 2 {
+            OP_2DUP OP_LESSTHANOREQUAL
+            OP_IF
+                OP_SWAP OP_SUB 1
+            OP_ELSE
+                OP_NIP 0
+            OP_ENDIF
+            OP_TOALTSTACK
+        }
+
+        OP_2DUP OP_LESSTHANOREQUAL
+        OP_IF
+            OP_SWAP OP_SUB 1
+        OP_ELSE
+            OP_NIP 0
+        OP_ENDIF
+    }
+}
+
+/// Convert a limb to big-endian bits but store them in the altstack for now
+/// except the lowest 1 bit.
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_be_bits_toaltstack_except_lowest_1bit(num_bits: u32) -> Script {
+    script! {
+        { limb_to_be_bits_toaltstack_common(num_bits) }
+        OP_TOALTSTACK OP_DROP
+    }
+}
+
+/// Convert a limb to big-endian bits but store them in the altstack for now
+/// except the lowest 1 bit.
+/// Adapted from https://github.com/BitVM/BitVM/blob/main/src/bigint/bits.rs
+/// due to inability to reconcile the dependency issues between BitVM and stwo.
+pub fn limb_to_be_bits_toaltstack_except_lowest_2bits(num_bits: u32) -> Script {
+    script! {
+        { limb_to_be_bits_toaltstack_common(num_bits) }
+        OP_DROP
+        OP_DROP
     }
 }
 

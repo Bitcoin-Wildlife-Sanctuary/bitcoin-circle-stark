@@ -3,8 +3,8 @@ use crate::fri::FFTGadget;
 use crate::merkle_tree::MerkleTreePathGadget;
 use crate::treepp::*;
 use crate::utils::{
-    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits, m31_vec_from_bottom_gadget,
-    qm31_reverse,
+    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits_toaltstack_except_lowest_1bit,
+    limb_to_be_bits_toaltstack_except_lowest_2bits, m31_vec_from_bottom_gadget, qm31_reverse,
 };
 use bitcoin_scriptexec::{profiler_end, profiler_start};
 use rust_bitcoin_m31::{
@@ -38,8 +38,7 @@ impl FibonacciPerQueryFoldGadget {
 
             // pull the query
             { 4 + 4 + 15 + 24 + 4 + 12 + 16 + 12 + 8 + 24 + (2 + 8) * N_QUERIES + N_QUERIES - query_idx - 1 } OP_PICK
-            { limb_to_be_bits(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) }
-            OP_TOALTSTACK OP_DROP
+            { limb_to_be_bits_toaltstack_except_lowest_1bit(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) }
 
             // pull y inverse (last twiddle factor)
             8 OP_ROLL
@@ -95,9 +94,7 @@ impl FibonacciPerQueryFoldGadget {
 
                 // push the root hash to the altstack, first
                 OP_SWAP OP_TOALTSTACK
-                { limb_to_be_bits(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) }
-                OP_DROP
-                OP_DROP
+                { limb_to_be_bits_toaltstack_except_lowest_2bits(FIB_LOG_SIZE + LOG_BLOWUP_FACTOR + 1) }
                 for _ in 0..j {
                     OP_FROMALTSTACK OP_DROP
                 }

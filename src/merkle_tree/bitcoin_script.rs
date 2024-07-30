@@ -1,6 +1,7 @@
 use crate::treepp::*;
 use crate::utils::{
-    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits, m31_vec_from_bottom_gadget,
+    dup_m31_vec_gadget, hash, hash_m31_vec_gadget, limb_to_be_bits_toaltstack_except_lowest_1bit,
+    m31_vec_from_bottom_gadget,
 };
 use crate::OP_HINT;
 
@@ -55,8 +56,7 @@ impl MerkleTreeTwinGadget {
         script! {
             // push the root hash to the altstack, first
             OP_SWAP OP_TOALTSTACK
-            { limb_to_be_bits(logn as u32) }
-            OP_TOALTSTACK OP_DROP // drop the lowest bit
+            { limb_to_be_bits_toaltstack_except_lowest_1bit(logn as u32) }
             { Self::query_and_verify_internal(len, logn) }
         }
     }
