@@ -27,6 +27,7 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::prover::{InvalidOodsSampleStructure, StarkProof, VerificationError};
+use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
@@ -64,7 +65,7 @@ impl Pushable for VerifierHints {
 
 /// A verifier program that generates hints.
 pub fn verify_with_hints(
-    proof: StarkProof,
+    proof: StarkProof<BWSSha256MerkleHasher>,
     air: &FibonacciAir,
     channel: &mut BWSSha256Channel,
 ) -> Result<VerifierHints, VerificationError> {
@@ -132,8 +133,9 @@ mod test {
     use stwo_prover::core::channel::{BWSSha256Channel, Channel};
     use stwo_prover::core::fields::m31::{BaseField, M31};
     use stwo_prover::core::fields::IntoSlice;
+    use stwo_prover::core::prover::StarkProof;
     use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hasher;
-    use stwo_prover::core::vcs::hasher::Hasher;
+    use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
     use stwo_prover::examples::fibonacci::Fibonacci;
     use stwo_prover::trace_generation::{commit_and_prove, commit_and_verify};
 
@@ -148,7 +150,8 @@ mod test {
                 .air
                 .component
                 .claim])));
-        let proof = commit_and_prove(&fib.air, channel, vec![trace]).unwrap();
+        let proof: StarkProof<BWSSha256MerkleHasher> =
+            commit_and_prove(&fib.air, channel, vec![trace]).unwrap();
 
         let channel =
             &mut BWSSha256Channel::new(BWSSha256Hasher::hash(BaseField::into_slice(&[fib
