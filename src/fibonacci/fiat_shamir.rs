@@ -25,6 +25,7 @@ use stwo_prover::core::prover::{
 };
 use stwo_prover::core::queries::{Queries, SparseSubCircleDomain};
 use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 use stwo_prover::core::{ColumnVec, InteractionElements, LookupValues};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
 
@@ -162,12 +163,13 @@ pub struct FiatShamirOutput {
 
 /// Generate Fiat Shamir hints along with fri inputs
 pub fn compute_fiat_shamir_hints(
-    proof: StarkProof,
+    proof: StarkProof<BWSSha256MerkleHasher>,
     channel: &mut BWSSha256Channel,
     air: &FibonacciAir,
 ) -> Result<(FiatShamirOutput, FiatShamirHints), VerificationError> {
     // Read trace commitment.
-    let mut commitment_scheme = CommitmentSchemeVerifier::new();
+    let mut commitment_scheme: CommitmentSchemeVerifier<BWSSha256MerkleHasher> =
+        CommitmentSchemeVerifier::new();
 
     // TODO(spapini): Retrieve column_log_sizes from AirTraceVerifier, and remove the dependency on
     // Air.
