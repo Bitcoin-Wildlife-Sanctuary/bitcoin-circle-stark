@@ -175,16 +175,13 @@ mod test {
     use rust_bitcoin_m31::qm31_equalverify;
     use std::iter::zip;
     use stwo_prover::core::air::accumulation::PointEvaluationAccumulator;
-    use stwo_prover::core::air::Component;
+    use stwo_prover::core::air::{AirProver, Component, ComponentProvers};
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::pcs::TreeVec;
     use stwo_prover::core::{InteractionElements, LookupValues};
+    use stwo_prover::trace_generation::AirTraceGenerator;
     use stwo_prover::{
-        core::{
-            air::{AirExt, ComponentTrace},
-            circle::CirclePoint,
-            poly::circle::CanonicCoset,
-        },
+        core::{air::ComponentTrace, circle::CirclePoint, poly::circle::CanonicCoset},
         examples::fibonacci::Fibonacci,
     };
 
@@ -227,7 +224,10 @@ mod test {
                 y: get_rand_qm31(&mut prng),
             };
 
-            let points = fib.air.mask_points(z);
+            let air_prover = fib.air.to_air_prover();
+            let components = ComponentProvers(air_prover.component_provers());
+
+            let points = components.components().mask_points(z);
             let mask_values = zip(&component_traces[0].polys[0], &points[0])
                 .map(|(poly, points)| {
                     points
