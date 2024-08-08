@@ -7,7 +7,9 @@ use crate::oods::{OODSHint, OODS};
 use crate::pow::PoWHint;
 use crate::treepp::pushable::{Builder, Pushable};
 use itertools::Itertools;
-use stwo_prover::core::air::AirExt;
+use stwo_prover::core::air::accumulation::PointEvaluationAccumulator;
+use stwo_prover::core::air::ComponentProvers;
+use stwo_prover::core::air::{AirProver, Component};
 use stwo_prover::core::channel::{BWSSha256Channel, Channel};
 use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::fields::m31::M31;
@@ -28,6 +30,7 @@ use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
 use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 use stwo_prover::core::{ColumnVec, InteractionElements, LookupValues};
 use stwo_prover::examples::fibonacci::air::FibonacciAir;
+use stwo_prover::trace_generation::AirTraceGenerator;
 
 #[derive(Clone)]
 /// Hints for performing the Fiat-Shamir transform until finalizing the queries.
@@ -171,12 +174,15 @@ pub fn compute_fiat_shamir_hints(
     let mut commitment_scheme: CommitmentSchemeVerifier<BWSSha256MerkleHasher> =
         CommitmentSchemeVerifier::new();
 
+    let air_prover = air.to_air_prover();
+    let components = ComponentProvers(air_prover.component_provers());
+
     // TODO(spapini): Retrieve column_log_sizes from AirTraceVerifier, and remove the dependency on
     // Air.
-    let column_log_sizes = air.column_log_sizes();
+    let column_log_sizes = components.components().column_log_sizes();
     commitment_scheme.commit(proof.commitments[0], &column_log_sizes[0], channel);
 
-    if air.column_log_sizes().len() == 2 {
+    if column_log_sizes.len() == 2 {
         commitment_scheme.commit(proof.commitments[1], &column_log_sizes[1], channel);
     }
 
@@ -202,11 +208,11 @@ pub fn compute_fiat_shamir_hints(
     let (oods_point, oods_hint) = CirclePoint::<SecureField>::get_random_point_with_hint(channel);
 
     // Get mask sample points relative to oods point.
-    let trace_sample_points = air.mask_points(oods_point);
+    let trace_sample_points = components.components().mask_points(oods_point);
     let masked_points = trace_sample_points.clone();
 
     // TODO(spapini): Change when we support multiple interactions.
-    let sampled_points = air.mask_points(oods_point);
+    let sampled_points = components.components().mask_points(oods_point);
 
     // this step is just a reorganization of the data
     assert_eq!(sampled_points.0[0][0][0], masked_points[0][0][0]);
@@ -228,15 +234,17 @@ pub fn compute_fiat_shamir_hints(
             })
             .unwrap();
 
-    if composition_oods_value
-        != air.eval_composition_polynomial_at_point(
-            oods_point,
-            &trace_oods_values,
-            random_coeff,
-            &InteractionElements::default(),
-            &LookupValues::default(),
-        )
-    {
+    let mut evaluation_accumulator = PointEvaluationAccumulator::new(random_coeff);
+    air.component.evaluate_constraint_quotients_at_point(
+        oods_point,
+        &trace_oods_values[0],
+        &mut evaluation_accumulator,
+        &InteractionElements::default(),
+        &LookupValues::default(),
+    );
+    let oods_value = evaluation_accumulator.finalize();
+
+    if composition_oods_value != oods_value {
         return Err(VerificationError::OodsNotMatching);
     }
 
