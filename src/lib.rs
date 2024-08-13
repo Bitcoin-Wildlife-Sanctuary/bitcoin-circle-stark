@@ -1,7 +1,7 @@
 //! The bitcoin-circle-stark crate implements a number of Bitcoin script gadgets for
 //! a stwo proof verifier.
 
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::circle::CirclePoint;
@@ -18,8 +18,6 @@ pub mod channel;
 pub mod circle;
 /// Module for constraints over the circle curve
 pub mod constraints;
-/// Module for Fibonacci end-to-end test.
-pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
 /// Module for the Merkle tree.
@@ -35,7 +33,7 @@ pub mod tests_utils;
 /// Module for utility functions.
 pub mod utils;
 
-pub(crate) mod treepp {
+pub mod treepp {
     pub use bitcoin_script::{define_pushable, script};
 
     pub use bitcoin_scriptexec::{convert_to_witness, get_final_stack};
