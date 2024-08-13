@@ -83,7 +83,7 @@ impl Pushable for CirclePoint<QM31> {
 }
 
 #[allow(non_snake_case)]
-pub(crate) fn OP_HINT() -> treepp::Script {
+pub fn OP_HINT() -> treepp::Script {
     use treepp::*;
     script! {
         OP_DEPTH OP_1SUB OP_ROLL
