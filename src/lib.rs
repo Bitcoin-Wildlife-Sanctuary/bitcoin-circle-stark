@@ -18,8 +18,6 @@ pub mod channel;
 pub mod circle;
 /// Module for constraints over the circle curve
 pub mod constraints;
-/// Module for Fibonacci end-to-end test.
-pub mod fibonacci;
 /// Module for FRI.
 pub mod fri;
 /// Module for the Merkle tree.
@@ -35,7 +33,8 @@ pub mod tests_utils;
 /// Module for utility functions.
 pub mod utils;
 
-pub(crate) mod treepp {
+#[allow(missing_docs)]
+pub mod treepp {
     pub use bitcoin_script::{define_pushable, script};
 
     pub use bitcoin_scriptexec::{convert_to_witness, get_final_stack};
@@ -85,7 +84,8 @@ impl Pushable for CirclePoint<QM31> {
 }
 
 #[allow(non_snake_case)]
-pub(crate) fn OP_HINT() -> treepp::Script {
+/// Pseudo opcode for retrieving a hint element from the bottom of the stack.
+pub fn OP_HINT() -> treepp::Script {
     use treepp::*;
     script! {
         OP_DEPTH OP_1SUB OP_ROLL
