@@ -1,6 +1,5 @@
 use crate::channel::Sha256ChannelGadget;
 use crate::treepp::*;
-use crate::utils::hash;
 use crate::OP_HINT;
 
 /// Gadget for verifying PoW.
@@ -20,8 +19,6 @@ impl PowGadget {
     /// Output:
     ///  new channel digest = channel.mix_nonce(nonce)
     ///
-    /// It is important to know that channel.mix_nonce(nonce)
-    ///
     /// require:
     ///  prefix || msb || {0x00}^(n_bits // 8)  != sha256(channel||nonce)
     ///     where msb is required if n_bits % 8 != 0 and should not be present if it is not
@@ -37,11 +34,9 @@ impl PowGadget {
             // check the length of the nonce
             OP_SIZE 8 OP_EQUALVERIFY
 
-            // compute sha256(channel||nonce)
-            OP_2DUP
-            OP_CAT hash
-
-            // stack: channel, nonce, sha256(channel||nonce)
+            OP_SWAP
+            { Sha256ChannelGadget::mix_nonce() }
+            // stack: new_channel
 
             // pull the prefix
             OP_HINT
@@ -71,10 +66,8 @@ impl PowGadget {
                 OP_CAT
             }
 
+            OP_OVER
             OP_EQUALVERIFY
-
-            OP_SWAP
-            { Sha256ChannelGadget::mix_nonce() }
         }
     }
 }
@@ -86,32 +79,21 @@ mod test {
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use stwo_prover::core::channel::Channel;
-    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+    use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
-    use crate::pow::{bitcoin_script::PowGadget, hash_with_nonce, PoWHint};
-
-    // Check that the prefix leading zeros is greater than `bound_bits`.
-    fn check_leading_zeros(bytes: &[u8], bound_bits: u32) -> bool {
-        let mut n_bits = 0;
-        // bytes are in little endian order.
-        for byte in bytes.iter().rev() {
-            if *byte == 0 {
-                n_bits += 8;
-            } else {
-                n_bits += byte.leading_zeros();
-                break;
-            }
-        }
-        n_bits >= bound_bits
-    }
+    use crate::pow::{bitcoin_script::PowGadget, PoWHint};
 
     // A handy function for grinding, which finds a nonce that makes the resulting hash with enough zeroes.
     fn grind_find_nonce(channel_digest: Vec<u8>, n_bits: u32) -> u64 {
         let mut nonce = 0u64;
 
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(channel_digest.into());
+
         loop {
-            let hash = hash_with_nonce(&channel_digest, nonce);
-            if check_leading_zeros(hash.as_ref(), n_bits) {
+            let mut channel = channel.clone();
+            channel.mix_nonce(nonce);
+            if channel.trailing_zeros() >= n_bits {
                 return nonce;
             }
             nonce += 1;
@@ -126,9 +108,15 @@ mod test {
         prng.fill_bytes(&mut channel_digest);
 
         let nonce = grind_find_nonce(channel_digest.clone(), 1);
-        let new_channel = hash_with_nonce(&channel_digest, nonce);
 
-        let pow_hint = PoWHint::new(BWSSha256Hash::from(channel_digest), nonce, 1);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(channel_digest.clone().into());
+        channel.mix_nonce(nonce);
+
+        let new_channel_digest = channel.digest();
+        let new_channel = new_channel_digest.as_ref();
+
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest), nonce, 1);
 
         let script = script! {
             { pow_hint }
@@ -155,11 +143,7 @@ mod test {
 
         let nonce = 1337;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -181,11 +165,7 @@ mod test {
 
         let nonce = 1337 + 4;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -207,11 +187,7 @@ mod test {
 
         let nonce = 1337;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -246,10 +222,10 @@ mod test {
                 }
 
                 let pow_hint =
-                    PoWHint::new(BWSSha256Hash::from(channel_digest.clone()), nonce, n_bits);
+                    PoWHint::new(Sha256Hash::from(channel_digest.clone()), nonce, n_bits);
 
-                let mut channel =
-                    Sha256Channel::new(BWSSha256Hash::from(channel_digest.as_slice()));
+                let mut channel = Sha256Channel::default();
+                channel.update_digest(channel_digest.clone().into());
                 channel.mix_nonce(nonce);
 
                 let script = script! {

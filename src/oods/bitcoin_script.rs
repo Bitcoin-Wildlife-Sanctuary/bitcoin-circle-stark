@@ -75,9 +75,8 @@ mod test {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
-    use stwo_prover::core::channel::Channel;
     use stwo_prover::core::circle::CirclePoint;
-    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+    use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
     #[test]
     fn test_get_random_point() {
@@ -90,9 +89,10 @@ mod test {
         let mut a = [0u8; 32];
         a.iter_mut().for_each(|v| *v = prng.gen());
 
-        let a = BWSSha256Hash::from(a.to_vec());
+        let a = Sha256Hash::from(a.to_vec());
 
-        let mut channel = Sha256Channel::new(a);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(a);
 
         let (oods_res, hint) = CirclePoint::get_random_point_with_hint(&mut channel);
 

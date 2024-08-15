@@ -8,7 +8,7 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
 /// Module for AIR-related features.
 pub mod air;
@@ -69,7 +69,7 @@ impl Pushable for QM31 {
     }
 }
 
-impl Pushable for BWSSha256Hash {
+impl Pushable for Sha256Hash {
     fn bitcoin_script_push(&self, builder: Builder) -> Builder {
         self.as_ref().to_vec().bitcoin_script_push(builder)
     }

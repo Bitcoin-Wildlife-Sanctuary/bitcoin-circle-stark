@@ -2,19 +2,8 @@ mod bitcoin_script;
 pub use bitcoin_script::*;
 
 use crate::treepp::pushable::{Builder, Pushable};
-use sha2::{Digest, Sha256};
-use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
-
-/// Compute the hash from a seed and a nonce.
-pub fn hash_with_nonce(seed: &[u8], nonce: u64) -> Vec<u8> {
-    let mut concat = seed.to_owned();
-    concat.extend(nonce.to_le_bytes().to_vec());
-
-    let mut hasher = Sha256::new();
-    Digest::update(&mut hasher, concat);
-
-    hasher.finalize().as_slice().to_vec()
-}
+use stwo_prover::core::channel::{Channel, Sha256Channel};
+use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
 #[derive(Clone)]
 /// A hint for PoW.
@@ -31,10 +20,15 @@ pub struct PoWHint {
 impl PoWHint {
     /// Create the hint for verifying the PoW.
     /// It contains the nonce, the suffix, and the msb (if n_bits % 8 != 0).
-    pub fn new(channel_digest: BWSSha256Hash, nonce: u64, n_bits: u32) -> Self {
+    pub fn new(channel_digest: Sha256Hash, nonce: u64, n_bits: u32) -> Self {
         assert!(n_bits > 0);
 
-        let digest = hash_with_nonce(channel_digest.as_ref(), nonce);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(channel_digest);
+        channel.mix_nonce(nonce);
+
+        let channel_digest = channel.digest();
+        let digest = channel_digest.as_ref();
         let n_bits = n_bits as usize;
 
         if n_bits % 8 == 0 {

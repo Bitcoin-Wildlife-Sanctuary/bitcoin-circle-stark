@@ -1,10 +1,10 @@
 use crate::treepp::pushable::{Builder, Pushable};
 use std::collections::{BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::{BaseField, M31};
-use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
-use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
 use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
+use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
+use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleHasher;
 
 mod bitcoin_script;
 pub use bitcoin_script::*;
@@ -14,9 +14,9 @@ pub struct MerkleTree {
     /// Leaf layers, consisting of m31 elements.
     pub leaf_layer: Vec<Vec<M31>>,
     /// Intermediate layers.
-    pub intermediate_layers: Vec<Vec<BWSSha256Hash>>,
+    pub intermediate_layers: Vec<Vec<Sha256Hash>>,
     /// Root hash.
-    pub root_hash: BWSSha256Hash,
+    pub root_hash: Sha256Hash,
 }
 
 impl MerkleTree {
@@ -28,19 +28,19 @@ impl MerkleTree {
         let mut cur = leaf_layer
             .chunks_exact(2)
             .map(|v| {
-                let commit_1 = BWSSha256MerkleHasher::hash_node(None, &v[0]);
-                let commit_2 = BWSSha256MerkleHasher::hash_node(None, &v[1]);
+                let commit_1 = Sha256MerkleHasher::hash_node(None, &v[0]);
+                let commit_2 = Sha256MerkleHasher::hash_node(None, &v[1]);
 
-                BWSSha256MerkleHasher::hash_node(Some((commit_1, commit_2)), &[])
+                Sha256MerkleHasher::hash_node(Some((commit_1, commit_2)), &[])
             })
-            .collect::<Vec<BWSSha256Hash>>();
+            .collect::<Vec<Sha256Hash>>();
         intermediate_layers.push(cur.clone());
 
         while cur.len() > 1 {
             cur = cur
                 .chunks_exact(2)
-                .map(|v| BWSSha256MerkleHasher::hash_node(Some((v[0], v[1])), &[]))
-                .collect::<Vec<BWSSha256Hash>>();
+                .map(|v| Sha256MerkleHasher::hash_node(Some((v[0], v[1])), &[]))
+                .collect::<Vec<Sha256Hash>>();
             intermediate_layers.push(cur.clone());
         }
 
@@ -56,7 +56,7 @@ impl MerkleTree {
 /// An internal proof type that excludes the leaf (or leaves).
 pub struct MerkleTreePath {
     /// All the intermediate sibling nodes.
-    pub siblings: Vec<BWSSha256Hash>,
+    pub siblings: Vec<Sha256Hash>,
 }
 
 impl Pushable for MerkleTreePath {
@@ -85,9 +85,9 @@ impl MerkleTreePath {
     /// Verify the Merkle tree path given the root hash, the considered depth, the leaf hash, and the query.
     pub fn verify(
         &self,
-        root_hash: &BWSSha256Hash,
+        root_hash: &Sha256Hash,
         depth: usize,
-        mut leaf_hash: BWSSha256Hash,
+        mut leaf_hash: Sha256Hash,
         mut query: usize,
     ) -> bool {
         assert_eq!(self.siblings.len(), depth);
@@ -99,7 +99,7 @@ impl MerkleTreePath {
                 (self.siblings[i], leaf_hash)
             };
 
-            leaf_hash = BWSSha256MerkleHasher::hash_node(Some((f0, f1)), &[]);
+            leaf_hash = Sha256MerkleHasher::hash_node(Some((f0, f1)), &[]);
             query >>= 1;
         }
 
@@ -143,13 +143,13 @@ impl MerkleTreeTwinProof {
     }
 
     /// Verify a Merkle tree proof.
-    pub fn verify(&self, root_hash: &BWSSha256Hash, logn: usize, mut query: usize) -> bool {
+    pub fn verify(&self, root_hash: &Sha256Hash, logn: usize, mut query: usize) -> bool {
         assert_eq!(query & 1, 0);
 
-        let left_hash = BWSSha256MerkleHasher::hash_node(None, &self.left);
-        let right_hash = BWSSha256MerkleHasher::hash_node(None, &self.right);
+        let left_hash = Sha256MerkleHasher::hash_node(None, &self.left);
+        let right_hash = Sha256MerkleHasher::hash_node(None, &self.right);
 
-        let leaf_hash = BWSSha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
+        let leaf_hash = Sha256MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
         query >>= 1;
 
         self.path.verify(root_hash, logn - 1, leaf_hash, query)
@@ -160,7 +160,7 @@ impl MerkleTreeTwinProof {
         logn: usize,
         queries_parents: &[usize],
         values: &[Vec<BaseField>],
-        merkle_decommitment: &MerkleDecommitment<BWSSha256MerkleHasher>,
+        merkle_decommitment: &MerkleDecommitment<Sha256MerkleHasher>,
     ) -> Vec<Self> {
         // find out all the queried positions and sort them
         let mut queries = vec![];
@@ -191,12 +191,12 @@ impl MerkleTreeTwinProof {
         let mut hash_iterator = merkle_decommitment.hash_witness.iter();
 
         // create the merkle partial tree
-        let mut layers: Vec<HashMap<usize, BWSSha256Hash>> = vec![];
+        let mut layers: Vec<HashMap<usize, Sha256Hash>> = vec![];
 
         // create the leaf layer
         let mut layer = HashMap::new();
         for (&query, value) in queries_values_map.iter() {
-            layer.insert(query, BWSSha256MerkleHasher::hash_node(None, value));
+            layer.insert(query, Sha256MerkleHasher::hash_node(None, value));
         }
         layers.push(layer);
 
@@ -211,7 +211,7 @@ impl MerkleTreeTwinProof {
             for &position in positions.iter() {
                 layer.insert(
                     position,
-                    BWSSha256MerkleHasher::hash_node(
+                    Sha256MerkleHasher::hash_node(
                         Some((
                             *layers[i].get(&(position << 1)).unwrap(),
                             *layers[i].get(&((position << 1) + 1)).unwrap(),
@@ -269,8 +269,8 @@ mod test {
     use std::collections::BTreeMap;
     use stwo_prover::core::backend::CpuBackend;
     use stwo_prover::core::fields::m31::BaseField;
-    use stwo_prover::core::vcs::bws_sha256_merkle::BWSSha256MerkleHasher;
     use stwo_prover::core::vcs::prover::MerkleProver;
+    use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleHasher;
 
     #[test]
     fn test_merkle_tree() {
@@ -313,7 +313,7 @@ mod test {
             let polynomials_ref = polynomials.iter().collect::<Vec<&Vec<BaseField>>>();
 
             let prover =
-                MerkleProver::<CpuBackend, BWSSha256MerkleHasher>::commit(polynomials_ref.clone());
+                MerkleProver::<CpuBackend, Sha256MerkleHasher>::commit(polynomials_ref.clone());
 
             let queries = (0..20)
                 .map(|_| prng.gen::<usize>() % (1 << LOG_SIZE))
