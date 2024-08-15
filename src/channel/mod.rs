@@ -10,8 +10,8 @@ mod bitcoin_script;
 use crate::treepp::pushable::{Builder, Pushable};
 pub use bitcoin_script::*;
 
-pub use stwo_prover::core::channel::BWSSha256Channel as Sha256Channel;
-use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+pub use stwo_prover::core::channel::Sha256Channel;
+use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
 /// A wrapper trait to implement hint-related method for channels.
 pub trait ChannelWithHint: Channel {
@@ -53,7 +53,7 @@ impl ChannelWithHint for Sha256Channel {
 
             let mut hasher = Sha256::new();
             Digest::update(&mut hasher, self.digest);
-            self.digest = BWSSha256Hash::from(hasher.finalize().to_vec());
+            self.digest = Sha256Hash::from(hasher.finalize().to_vec());
 
             count += 8;
         }

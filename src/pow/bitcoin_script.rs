@@ -86,7 +86,7 @@ mod test {
     use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use stwo_prover::core::channel::Channel;
-    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+    use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
     use crate::pow::{bitcoin_script::PowGadget, hash_with_nonce, PoWHint};
 
@@ -128,7 +128,7 @@ mod test {
         let nonce = grind_find_nonce(channel_digest.clone(), 1);
         let new_channel = hash_with_nonce(&channel_digest, nonce);
 
-        let pow_hint = PoWHint::new(BWSSha256Hash::from(channel_digest), nonce, 1);
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest), nonce, 1);
 
         let script = script! {
             { pow_hint }
@@ -155,11 +155,7 @@ mod test {
 
         let nonce = 1337;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -181,11 +177,7 @@ mod test {
 
         let nonce = 1337 + 4;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -207,11 +199,7 @@ mod test {
 
         let nonce = 1337;
 
-        let pow_hint = PoWHint::new(
-            BWSSha256Hash::from(channel_digest.as_slice()),
-            nonce,
-            n_bits,
-        );
+        let pow_hint = PoWHint::new(Sha256Hash::from(channel_digest.as_slice()), nonce, n_bits);
 
         let script = script! {
             { pow_hint }
@@ -246,10 +234,10 @@ mod test {
                 }
 
                 let pow_hint =
-                    PoWHint::new(BWSSha256Hash::from(channel_digest.clone()), nonce, n_bits);
+                    PoWHint::new(Sha256Hash::from(channel_digest.clone()), nonce, n_bits);
 
-                let mut channel =
-                    Sha256Channel::new(BWSSha256Hash::from(channel_digest.as_slice()));
+                let mut channel = Sha256Channel::default();
+                channel.update_digest(Sha256Hash::from(channel_digest.as_slice()));
                 channel.mix_nonce(nonce);
 
                 let script = script! {

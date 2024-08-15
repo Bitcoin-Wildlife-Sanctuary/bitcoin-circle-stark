@@ -175,7 +175,7 @@ mod test {
     use rand_chacha::ChaCha20Rng;
     use rust_bitcoin_m31::qm31_equalverify;
     use stwo_prover::core::channel::Channel;
-    use stwo_prover::core::vcs::bws_sha256_hash::BWSSha256Hash;
+    use stwo_prover::core::vcs::sha256_hash::{Sha256Hash, Sha256Hasher};
 
     #[test]
     fn test_mix_digest() {
@@ -186,14 +186,15 @@ mod test {
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
-        let init_state = BWSSha256Hash::from(init_state.to_vec());
+        let init_state = Sha256Hash::from(init_state.to_vec());
 
         let mut elem = [0u8; 32];
         elem.iter_mut().for_each(|v| *v = prng.gen());
-        let elem = BWSSha256Hash::from(elem.to_vec());
+        let elem = Sha256Hash::from(elem.to_vec());
 
-        let mut channel = Sha256Channel::new(init_state);
-        channel.mix_digest(elem);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(init_state);
+        channel.update_digest(Sha256Hasher::concat_and_hash(&elem, &channel.digest()));
 
         let final_state = channel.digest;
 
@@ -217,11 +218,12 @@ mod test {
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
-        let init_state = BWSSha256Hash::from(init_state.to_vec());
+        let init_state = Sha256Hash::from(init_state.to_vec());
 
         let elem = get_rand_qm31(&mut prng);
 
-        let mut channel = Sha256Channel::new(init_state);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(init_state);
         channel.mix_felts(&[elem]);
 
         let final_state = channel.digest;
@@ -246,11 +248,12 @@ mod test {
 
         let mut init_state = [0u8; 32];
         init_state.iter_mut().for_each(|v| *v = prng.gen());
-        let init_state = BWSSha256Hash::from(init_state.to_vec());
+        let init_state = Sha256Hash::from(init_state.to_vec());
 
         let nonce = prng.gen::<u64>();
 
-        let mut channel = Sha256Channel::new(init_state);
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(init_state);
         channel.mix_nonce(nonce);
 
         let final_state = channel.digest;
@@ -273,9 +276,10 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
-            let a = BWSSha256Hash::from(a.to_vec());
+            let a = Sha256Hash::from(a.to_vec());
 
-            let mut channel = Sha256Channel::new(a);
+            let mut channel = Sha256Channel::default();
+            channel.update_digest(a);
             let (b, hint) = channel.draw_m31_and_hints(8);
 
             let c = channel.digest;
@@ -308,9 +312,10 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
-            let a = BWSSha256Hash::from(a.to_vec());
+            let a = Sha256Hash::from(a.to_vec());
 
-            let mut channel = Sha256Channel::new(a);
+            let mut channel = Sha256Channel::default();
+            channel.update_digest(a);
             let (b, hint) = channel.draw_felt_and_hints();
 
             let c = channel.digest;
@@ -340,9 +345,10 @@ mod test {
         for _ in 0..100 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
-            let a = BWSSha256Hash::from(a.to_vec());
+            let a = Sha256Hash::from(a.to_vec());
 
-            let mut channel = Sha256Channel::new(a);
+            let mut channel = Sha256Channel::default();
+            channel.update_digest(a);
             let (b, hint) = channel.draw_queries_and_hints(5, 15);
 
             let c = channel.digest;
