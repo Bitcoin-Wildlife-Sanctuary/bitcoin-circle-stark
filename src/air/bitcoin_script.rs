@@ -39,6 +39,39 @@ impl AirGadget {
         }
     }
 
+    /// Mask a point by shifting it with signed mask
+    ///
+    /// Input:
+    /// -  point (in qm31)
+    ///
+    /// Output:
+    /// -  shifted point (in qm31)
+    pub fn shifted_signed_mask_points(
+        mask: &ColumnVec<Vec<isize>>,
+        domains: &[CanonicCoset],
+    ) -> Script {
+        let mut shifted = vec![];
+        for (mask_entry, domain) in mask.iter().zip(domains.iter()) {
+            let step_point = domain.step();
+            for mask_item in mask_entry.iter() {
+                shifted.push(step_point.mul_signed(*mask_item));
+            }
+        }
+
+        script! {
+            if !shifted.is_empty() {
+                for elem in shifted.iter().take(shifted.len() - 1) {
+                    { CirclePointGadget::dup() }
+                    { CirclePointGadget::add_constant_m31_point(elem) }
+                    { CirclePointGadget::swap() }
+                }
+                { CirclePointGadget::add_constant_m31_point(shifted.last().unwrap()) }
+            } else {
+                { CirclePointGadget::drop() }
+            }
+        }
+    }
+
     /// Combine the evaluation on four points into one.
     ///
     /// Input:
