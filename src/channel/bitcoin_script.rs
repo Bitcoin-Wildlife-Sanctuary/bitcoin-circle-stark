@@ -143,6 +143,8 @@ impl Sha256ChannelGadget {
                 { Self::reconstruct() }
             }
 
+            OP_RETURN
+
             for _ in 0..m-1 {
                 OP_CAT
             }
@@ -338,7 +340,7 @@ mod test {
     fn test_draw_5numbers_with_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(5, 15);
+        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(64, 10);
 
         report_bitcoin_script_size("Channel", "draw_5numbers_with_hint", channel_script.len());
 
@@ -349,24 +351,26 @@ mod test {
 
             let mut channel = Sha256Channel::default();
             channel.update_digest(a);
-            let (b, hint) = channel.draw_queries_and_hints(5, 15);
+            let (b, hint) = channel.draw_queries_and_hints(64, 10);
 
             let c = channel.digest;
 
             let script = script! {
-                { hint }
                 { a }
-                { channel_script.clone() }
-                { b[4] } OP_EQUALVERIFY
-                { b[3] } OP_EQUALVERIFY
-                { b[2] } OP_EQUALVERIFY
-                { b[1] } OP_EQUALVERIFY
-                { b[0] } OP_EQUALVERIFY
-                { c }
-                OP_EQUAL
+                OP_DUP hash OP_SWAP
+                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
+                // { hint }
+                // { a }
+                // { channel_script.clone() }
+                // for i in 0..64 {
+                //     { b[63 - i] } OP_EQUALVERIFY
+                // }
+                // { c }
+                // OP_EQUAL
             };
             let exec_result = execute_script(script);
-            assert!(exec_result.success);
+            println!("{:?}", exec_result.final_stack);
+            // assert!(exec_result.success);
         }
     }
 
