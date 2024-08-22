@@ -78,8 +78,8 @@ impl Sha256ChannelGadget {
     /// Draw queries from the channel, each of logn bits, using hints.
     ///
     /// Output:
-    ///    channel digest
     ///    all the numbers (m)
+    ///    channel digest
     pub fn draw_numbers_with_hint(m: usize, logn: usize) -> Script {
         assert_eq!(m % 8, 0);
         script! {
