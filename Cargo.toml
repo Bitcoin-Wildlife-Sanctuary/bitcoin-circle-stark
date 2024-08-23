@@ -17,10 +17,6 @@ lazy_static = "1.4.0"
 ctor = "0.2.8"
 itertools = "0.13.0"
 hex = "0.4.3"
-anyhow = "1.0.86"
-covenants-gadgets = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets" }
-clap = { version = "4.5.0", features = ["derive"] }
-colored = "2.1.0"
 
 # Add cargo-husky to run pre-commit hooks
 [dev-dependencies.cargo-husky]
