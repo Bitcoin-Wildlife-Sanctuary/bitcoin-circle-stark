@@ -81,7 +81,6 @@ impl Sha256ChannelGadget {
     ///    all the numbers (m)
     ///    channel digest
     pub fn draw_numbers_with_hint(m: usize, logn: usize) -> Script {
-        assert_eq!(m % 8, 0);
         script! {
             for _ in 0..(m / 8) {
                 OP_DUP hash OP_SWAP
@@ -91,6 +90,15 @@ impl Sha256ChannelGadget {
                     { i } OP_ROLL { trim_m31_gadget(logn) }
                 }
                 8 OP_ROLL
+            }
+            if m % 8 != 0 {
+                OP_DUP hash OP_SWAP
+                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
+                { Self::unpack_multi_m31(m % 8) }
+                for i in 0..m % 8 {
+                    { i } OP_ROLL { trim_m31_gadget(logn) }
+                }
+                { m % 8 } OP_ROLL
             }
         }
     }
@@ -274,7 +282,7 @@ mod test {
     }
 
     #[test]
-    fn test_draw_64_elements() {
+    fn test_draw_8_elements() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for _ in 0..100 {
@@ -284,21 +292,19 @@ mod test {
 
             let mut channel = Sha256Channel::default();
             channel.update_digest(a);
-            let (b, hint) = channel.draw_m31_and_hints(64);
+            let (b, hint) = channel.draw_m31_and_hints(8);
 
             let c = channel.digest;
 
             let script = script! {
                 { hint }
                 { a }
-                for i in 0..(64 / 8) {
-                    OP_DUP hash OP_SWAP
-                    OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
-                    { Sha256ChannelGadget::unpack_multi_m31(8) }
-                    for j in 0..8 {
-                        { b[i * 8 + j] }
-                        OP_EQUALVERIFY
-                    }
+                OP_DUP hash OP_SWAP
+                OP_PUSHBYTES_1 OP_PUSHBYTES_0 OP_CAT hash
+                { Sha256ChannelGadget::unpack_multi_m31(8) }
+                for i in 0..8 {
+                    { b[i] }
+                    OP_EQUALVERIFY
                 }
                 { c }
                 OP_EQUAL
@@ -341,21 +347,20 @@ mod test {
     }
 
     #[test]
-    fn test_draw_64numbers_with_hint() {
+    fn test_draw_many_numbers_with_hint() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(64, 10);
+        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(8, 10);
+        report_bitcoin_script_size("Channel", "draw_8numbers_with_hint", channel_script.len());
 
-        report_bitcoin_script_size("Channel", "draw_5numbers_with_hint", channel_script.len());
-
-        for _ in 0..1 {
+        for _ in 0..10 {
             let mut a = [0u8; 32];
             a.iter_mut().for_each(|v| *v = prng.gen());
             let a = Sha256Hash::from(a.to_vec());
 
             let mut channel = Sha256Channel::default();
             channel.update_digest(a);
-            let (b, hint) = channel.draw_queries_and_hints(64, 10);
+            let (b, hint) = channel.draw_queries_and_hints(8, 10);
 
             let c = channel.digest;
 
@@ -364,8 +369,39 @@ mod test {
                 { a }
                 { channel_script.clone() }
                 OP_TOALTSTACK
-                for i in 0..64 {
-                    { b[63 - i] }
+                for i in 0..8 {
+                    { b[7 - i] }
+                    OP_EQUALVERIFY
+                }
+                OP_FROMALTSTACK
+                { c }
+                OP_EQUAL
+            };
+            let exec_result = execute_script(script);
+            assert!(exec_result.success);
+        }
+
+        let channel_script = Sha256ChannelGadget::draw_numbers_with_hint(12, 10);
+        report_bitcoin_script_size("Channel", "draw_12numbers_with_hint", channel_script.len());
+
+        for _ in 0..10 {
+            let mut a = [0u8; 32];
+            a.iter_mut().for_each(|v| *v = prng.gen());
+            let a = Sha256Hash::from(a.to_vec());
+
+            let mut channel = Sha256Channel::default();
+            channel.update_digest(a);
+            let (b, hint) = channel.draw_queries_and_hints(12, 10);
+
+            let c = channel.digest;
+
+            let script = script! {
+                { hint }
+                { a }
+                { channel_script.clone() }
+                OP_TOALTSTACK
+                for i in 0..12 {
+                    { b[11 - i] }
                     OP_EQUALVERIFY
                 }
                 OP_FROMALTSTACK
