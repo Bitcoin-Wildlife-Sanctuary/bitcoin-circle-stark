@@ -24,18 +24,15 @@ impl AirGadget {
                 shifted.push(domain.at(*mask_item));
             }
         }
+        assert!(!shifted.is_empty());
 
         script! {
-            if !shifted.is_empty() {
-                for elem in shifted.iter().take(shifted.len() - 1) {
-                    { CirclePointGadget::dup() }
-                    { CirclePointGadget::add_constant_m31_point(elem) }
-                    { CirclePointGadget::swap() }
-                }
-                { CirclePointGadget::add_constant_m31_point(shifted.last().unwrap()) }
-            } else {
-                { CirclePointGadget::drop() }
+            for elem in shifted.iter().take(shifted.len() - 1) {
+                { CirclePointGadget::dup() }
+                { CirclePointGadget::add_constant_m31_point(elem) }
+                { CirclePointGadget::swap() }
             }
+            { CirclePointGadget::add_constant_m31_point(shifted.last().unwrap()) }
         }
     }
 
@@ -57,18 +54,15 @@ impl AirGadget {
                 shifted.push(step_point.mul_signed(*mask_item));
             }
         }
+        assert!(!shifted.is_empty());
 
         script! {
-            if !shifted.is_empty() {
-                for elem in shifted.iter().take(shifted.len() - 1) {
-                    { CirclePointGadget::dup() }
-                    { CirclePointGadget::add_constant_m31_point(elem) }
-                    { CirclePointGadget::swap() }
-                }
-                { CirclePointGadget::add_constant_m31_point(shifted.last().unwrap()) }
-            } else {
-                { CirclePointGadget::drop() }
+            for elem in shifted.iter().take(shifted.len() - 1) {
+                { CirclePointGadget::dup() }
+                { CirclePointGadget::add_constant_m31_point(elem) }
+                { CirclePointGadget::swap() }
             }
+            { CirclePointGadget::add_constant_m31_point(shifted.last().unwrap()) }
         }
     }
 
