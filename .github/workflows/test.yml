@@ -60,6 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: crate-ci/typos@cbb98c663b362e22c2b411e82b11beeeeb530349 # v1.23.7
+      - uses: crate-ci/typos@853bbe8898c2e3ce040ba6fb0b2cbb3d0ababec5 # v1.24.4
         with:
           files: .
