@@ -1,6 +1,3 @@
-mod bitcoin_script;
-pub use bitcoin_script::*;
-
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::channel::{Channel, Sha256Channel};
 use stwo_prover::core::vcs::sha256_hash::Sha256Hash;

@@ -7,9 +7,6 @@ use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::poly::circle::CanonicCoset;
 
-mod bitcoin_script;
-pub use bitcoin_script::*;
-
 mod constants;
 pub use constants::*;
 
