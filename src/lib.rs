@@ -1,8 +1,6 @@
 //! The bitcoin-circle-stark crate implements a number of Bitcoin script gadgets for
 //! a stwo proof verifier.
 
-#![deny(missing_docs)]
-
 use crate::treepp::pushable::{Builder, Pushable};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::cm31::CM31;
@@ -10,20 +8,17 @@ use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::sha256_hash::Sha256Hash;
 
-/// Module for AIR-related features.
-pub mod air;
+pub mod algorithms;
+pub mod dsl;
+
 /// Module for absorbing and squeezing of the channel.
 pub mod channel;
-/// Module for the circle curve over the qm31 field.
-pub mod circle;
 /// Module for constraints over the circle curve
 pub mod constraints;
 /// Module for FRI.
 pub mod fri;
 /// Module for the Merkle tree.
 pub mod merkle_tree;
-/// Module for out-of-domain sampling.
-pub mod oods;
 /// Module for PoW.
 pub mod pow;
 /// Module for the precomputed data Merkle tree.
