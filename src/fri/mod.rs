@@ -1,9 +1,6 @@
 use crate::channel::{ChannelWithHint, DrawHints};
 use stwo_prover::core::queries::Queries;
 
-mod bitcoin_script;
-pub use bitcoin_script::*;
-
 /// A trait for generating the queries with hints.
 pub trait QueriesWithHint: Sized {
     /// Generate the queries and the corresponding hints.
