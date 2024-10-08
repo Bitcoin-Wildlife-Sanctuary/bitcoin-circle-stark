@@ -271,7 +271,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-script-dsl"
 version = "0.1.0"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/dsl#c69fadc92ee5e95bf529d6544bb49cdb7ed28f1f"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/dsl#36f3bc7fdae77a53c63fa66c6ddc8ed3ceebc434"
 dependencies = [
  "anyhow",
  "bincode",
@@ -880,9 +880,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.86"
+version = "1.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
+checksum = "b3e4daa0dcf6feba26f985457cdf104d4b4256fc5a09547140f3631bb076b19a"
 dependencies = [
  "unicode-ident",
 ]
