@@ -6,7 +6,7 @@ use bitcoin::script::write_scriptint;
 use bitcoin_script_dsl::builtins::table::utils::OP_HINT;
 use bitcoin_script_dsl::compiler::Compiler;
 use bitcoin_script_dsl::constraint_system::Element;
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 use bitcoin_scriptexec::utils::scriptint_vec;
 use covenants_gadgets::utils::stack_hash::StackHash;
 use covenants_gadgets::CovenantProgram;
@@ -84,7 +84,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
     let mut witnesses = vec![];
 
     let hints = Hints::instance();
-    let mut worm = WORMMemory::new();
+    let mut ldm = LDM::new();
 
     let num_to_str = |v: i32| {
         let mut out = [0u8; 8];
@@ -103,7 +103,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
         super::part6_column_line_coeffs2::generate_cs,
         super::part7_column_line_coeffs3::generate_cs,
     ] {
-        let cs = f(&hints, &mut worm).unwrap();
+        let cs = f(&hints, &mut ldm).unwrap();
         let program = Compiler::compile(cs).unwrap();
 
         scripts.push(program.script);
@@ -123,8 +123,8 @@ pub fn compute_all_information() -> PlonkAllInformation {
         witnesses.push(witness);
         outputs.push(
             convert_to_witness(script! {
-                { worm.write_hash_var.as_ref().unwrap().value.clone() }
-                { worm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
             })
             .unwrap(),
         );
@@ -141,7 +141,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
             super::per_query_part7_num_interaction2::generate_cs,
             super::per_query_part8_last_step::generate_cs,
         ] {
-            let dsl = f(&hints, &mut worm, query_idx).unwrap();
+            let dsl = f(&hints, &mut ldm, query_idx).unwrap();
             let program = Compiler::compile(dsl).unwrap();
 
             scripts.push(program.script);
@@ -162,8 +162,8 @@ pub fn compute_all_information() -> PlonkAllInformation {
 
             outputs.push(
                 convert_to_witness(script! {
-                    { worm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { worm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
                 })
                 .unwrap(),
             );
@@ -171,7 +171,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
     }
 
     for f in [super::part8_cleanup::generate_cs] {
-        let cs = f(&hints, &mut worm).unwrap();
+        let cs = f(&hints, &mut ldm).unwrap();
         let program = Compiler::compile(cs).unwrap();
 
         scripts.push(program.script);
@@ -192,8 +192,8 @@ pub fn compute_all_information() -> PlonkAllInformation {
 
         outputs.push(
             convert_to_witness(script! {
-                { worm.write_hash_var.as_ref().unwrap().value.clone() }
-                { worm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
             })
             .unwrap(),
         );
@@ -336,10 +336,10 @@ mod test {
         // The integration assumes a fee rate of 7 sat/vByte.
         // Note that in many situations, the fee rate is only 2 sat/vByte.
 
-        let mut fees = vec![114555, 210434, 103439, 101696, 93044, 81704, 92834];
+        let mut fees = vec![114555, 210434, 103439, 101759, 93233, 81704, 92834];
 
         for _ in 0..8 {
-            fees.extend_from_slice(&[100926, 97293, 97167, 86863, 77679, 86863, 88802, 40467]);
+            fees.extend_from_slice(&[100926, 97300, 97167, 86891, 77679, 86863, 88865, 40467]);
         }
 
         fees.push(49777);

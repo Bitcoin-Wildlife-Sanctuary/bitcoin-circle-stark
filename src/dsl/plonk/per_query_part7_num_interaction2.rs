@@ -6,29 +6,29 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 
 pub fn generate_cs(
     _: &Hints,
-    worm: &mut WORMMemory,
+    ldm: &mut LDM,
     query_idx: usize,
 ) -> anyhow::Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
-    let y: M31Var = worm.read(format!("circle_point_y_{}", query_idx))?;
+    let y: M31Var = ldm.read(format!("circle_point_y_{}", query_idx))?;
     let table = TableVar::new_constant(&cs, ())?;
 
     let interaction_l: QM31Var =
-        worm.read(format!("interaction_cum_queried_results_{}_l", query_idx))?;
+        ldm.read(format!("interaction_cum_queried_results_{}_l", query_idx))?;
     let interaction_r: QM31Var =
-        worm.read(format!("interaction_cum_queried_results_{}_r", query_idx))?;
+        ldm.read(format!("interaction_cum_queried_results_{}_r", query_idx))?;
 
     let mut column_line_interaction_vars = Vec::<(CM31Var, CM31Var)>::new();
     for i in 0..4 {
         column_line_interaction_vars.push((
-            worm.read(format!("column_line_coeffs_interaction_{}_a", 4 + i))?,
-            worm.read(format!("column_line_coeffs_interaction_{}_b", 4 + i))?,
+            ldm.read(format!("column_line_coeffs_interaction_{}_a", 4 + i))?,
+            ldm.read(format!("column_line_coeffs_interaction_{}_b", 4 + i))?,
         ))
     }
 
@@ -68,9 +68,9 @@ pub fn generate_cs(
         &column_line_interaction_vars[3].1,
     );
 
-    let alpha3: QM31Var = worm.read("line_batch_random_coeff_3")?;
-    let alpha2: QM31Var = worm.read("line_batch_random_coeff_2")?;
-    let alpha: QM31Var = worm.read("line_batch_random_coeff")?;
+    let alpha3: QM31Var = ldm.read("line_batch_random_coeff_3")?;
+    let alpha2: QM31Var = ldm.read("line_batch_random_coeff_2")?;
+    let alpha: QM31Var = ldm.read("line_batch_random_coeff")?;
 
     let mut sum_num_interaction_l = &alpha3 * (&table, &numerator_interaction_0.0);
     sum_num_interaction_l =
@@ -87,45 +87,45 @@ pub fn generate_cs(
     sum_num_interaction_r = &sum_num_interaction_r + &numerator_interaction_3.1;
 
     let alpha4interaction_ab_l: QM31Var =
-        worm.read(format!("alpha4interaction_ab_{}_l", query_idx))?;
+        ldm.read(format!("alpha4interaction_ab_{}_l", query_idx))?;
     let alpha4interaction_ab_r: QM31Var =
-        worm.read(format!("alpha4interaction_ab_{}_r", query_idx))?;
+        ldm.read(format!("alpha4interaction_ab_{}_r", query_idx))?;
 
     let interaction_sum_l = &alpha4interaction_ab_l + &sum_num_interaction_l;
     let interaction_sum_r = &alpha4interaction_ab_r + &sum_num_interaction_r;
 
-    let alpha12: QM31Var = worm.read("line_batch_random_coeff_12")?;
+    let alpha12: QM31Var = ldm.read("line_batch_random_coeff_12")?;
 
     let alpha12interaction_sum_l = &alpha12 * (&table, &interaction_sum_l);
     let alpha12interaction_sum_r = &alpha12 * (&table, &interaction_sum_r);
 
-    let alpha20trace_l: QM31Var = worm.read(format!("alpha20trace_{}_l", query_idx))?;
-    let alpha20trace_r: QM31Var = worm.read(format!("alpha20trace_{}_r", query_idx))?;
+    let alpha20trace_l: QM31Var = ldm.read(format!("alpha20trace_{}_l", query_idx))?;
+    let alpha20trace_r: QM31Var = ldm.read(format!("alpha20trace_{}_r", query_idx))?;
 
     let mut quotient_term1_num_l = &alpha20trace_l + &alpha12interaction_sum_l;
     let mut quotient_term1_num_r = &alpha20trace_r + &alpha12interaction_sum_r;
 
-    let alpha8constant_l: QM31Var = worm.read(format!("alpha8constant_{}_l", query_idx))?;
-    let alpha8constant_r: QM31Var = worm.read(format!("alpha8constant_{}_r", query_idx))?;
+    let alpha8constant_l: QM31Var = ldm.read(format!("alpha8constant_{}_l", query_idx))?;
+    let alpha8constant_r: QM31Var = ldm.read(format!("alpha8constant_{}_r", query_idx))?;
 
     quotient_term1_num_l = &quotient_term1_num_l + &alpha8constant_l;
     quotient_term1_num_r = &quotient_term1_num_r + &alpha8constant_r;
 
-    let alpha4composition_l: QM31Var = worm.read(format!("alpha4composition_{}_l", query_idx))?;
-    let alpha4composition_r: QM31Var = worm.read(format!("alpha4composition_{}_r", query_idx))?;
+    let alpha4composition_l: QM31Var = ldm.read(format!("alpha4composition_{}_l", query_idx))?;
+    let alpha4composition_r: QM31Var = ldm.read(format!("alpha4composition_{}_r", query_idx))?;
 
     quotient_term1_num_l = &quotient_term1_num_l + &alpha4composition_l;
     quotient_term1_num_r = &quotient_term1_num_r + &alpha4composition_r;
 
-    worm.write(
+    ldm.write(
         format!("quotient_term1_num_{}_l", query_idx),
         &quotient_term1_num_l,
     )?;
-    worm.write(
+    ldm.write(
         format!("quotient_term1_num_{}_r", query_idx),
         &quotient_term1_num_r,
     )?;
 
-    worm.save()?;
+    ldm.save()?;
     Ok(cs)
 }

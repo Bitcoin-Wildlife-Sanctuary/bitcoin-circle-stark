@@ -9,13 +9,13 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 use stwo_prover::core::channel::Sha256Channel;
 use stwo_prover::core::prover::{LOG_BLOWUP_FACTOR, PROOF_OF_WORK_BITS};
 
-pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSystemRef> {
+pub fn generate_cs(hints: &Hints, ldm: &mut LDM) -> Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
     let channel = &mut Sha256Channel::default();
 
@@ -30,10 +30,10 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
 
     // Step 2: derive the z and alpha
     let z_var = channel_var.draw_felt();
-    worm.write("z", &z_var)?;
+    ldm.write("z", &z_var)?;
 
     let alpha_var = channel_var.draw_felt();
-    worm.write("alpha", &alpha_var)?;
+    ldm.write("alpha", &alpha_var)?;
 
     // Step 3: mix the channel with the interaction commitment and constant commitment
     let interaction_commitment_var = HashVar::new_hint(
@@ -49,7 +49,7 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
     channel_var = &channel_var + &constant_commitment_var;
 
     let composition_fold_random_coeff_var = channel_var.draw_felt();
-    worm.write(
+    ldm.write(
         "composition_fold_random_coeff",
         &composition_fold_random_coeff_var,
     )?;
@@ -59,7 +59,7 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
         &cs,
         hints.fiat_shamir_hints.commitments[3].as_ref().to_vec(),
     )?;
-    worm.write("composition_commitment", &composition_commitment_var)?;
+    ldm.write("composition_commitment", &composition_commitment_var)?;
     channel_var = &channel_var + &composition_commitment_var;
 
     // Step 5: save a copy of the channel before drawing the OODS point draw (for deferred computation)
@@ -93,25 +93,25 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
 
     for (i, trace_oods_value_var) in trace_oods_values_vars.iter().enumerate() {
         channel_var = &channel_var + trace_oods_value_var;
-        worm.write(format!("trace_oods_value_{}", i), trace_oods_value_var)?;
+        ldm.write(format!("trace_oods_value_{}", i), trace_oods_value_var)?;
     }
     for (i, interaction_oods_value_var) in interaction_oods_values_vars.iter().enumerate() {
         channel_var = &channel_var + interaction_oods_value_var;
-        worm.write(
+        ldm.write(
             format!("interaction_oods_value_{}", i),
             interaction_oods_value_var,
         )?;
     }
     for (i, constant_oods_value_var) in constant_oods_values_vars.iter().enumerate() {
         channel_var = &channel_var + constant_oods_value_var;
-        worm.write(
+        ldm.write(
             format!("constant_oods_value_{}", i),
             constant_oods_value_var,
         )?;
     }
     for (i, composition_oods_raw_value_var) in composition_oods_raw_values_vars.iter().enumerate() {
         channel_var = &channel_var + composition_oods_raw_value_var;
-        worm.write(
+        ldm.write(
             format!("composition_oods_value_{}", i),
             composition_oods_raw_value_var,
         )?;
@@ -119,9 +119,9 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
 
     // Step 7: derive line_batch_random_coeff and fri_fold_random_coeff
     let line_batch_random_coeff_var = channel_var.draw_felt();
-    worm.write("line_batch_random_coeff", &line_batch_random_coeff_var)?;
+    ldm.write("line_batch_random_coeff", &line_batch_random_coeff_var)?;
     let fri_fold_random_coeff_var = channel_var.draw_felt();
-    worm.write("fri_fold_random_coeff", &fri_fold_random_coeff_var)?;
+    ldm.write("fri_fold_random_coeff", &fri_fold_random_coeff_var)?;
 
     // Step 8: get the FRI trees' commitments, mix them with the channel one by one, and obtain the folding alphas
     let mut fri_tree_commitments_vars = vec![];
@@ -134,7 +134,7 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
     {
         let fri_tree_commitment_var =
             HashVar::new_hint(&cs, fri_tree_commitment.as_ref().to_vec())?;
-        worm.write(
+        ldm.write(
             format!("fri_tree_commitments_{}", i),
             &fri_tree_commitment_var,
         )?;
@@ -143,13 +143,13 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
         fri_tree_commitments_vars.push(fri_tree_commitment_var);
 
         let folding_alpha_var = channel_var.draw_felt();
-        worm.write(format!("folding_alpha_{}", i), &folding_alpha_var)?;
+        ldm.write(format!("folding_alpha_{}", i), &folding_alpha_var)?;
         folding_alphas_vars.push(folding_alpha_var);
     }
 
     // Step 9: get the last layer and mix it with the channel
     let last_layer_var = QM31Var::new_hint(&cs, hints.fiat_shamir_hints.last_layer)?;
-    worm.write("last_layer", &last_layer_var)?;
+    ldm.write("last_layer", &last_layer_var)?;
     channel_var = &channel_var + &last_layer_var;
 
     // Step 10: check proof of work
@@ -162,7 +162,7 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
     // Step 11: draw all the queries
     let queries = channel_var.draw_numbers(8, (LOG_N_ROWS + LOG_BLOWUP_FACTOR + 1) as usize);
     for (i, query) in queries.iter().enumerate() {
-        worm.write(format!("query_{}", i), query)?;
+        ldm.write(format!("query_{}", i), query)?;
     }
     // at this moment, the channel is no longer needed.
 
@@ -173,14 +173,14 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
         .enumerate()
     {
         let res = query_and_verify_merkle_twin_tree(&trace_commitment_var, query, proof)?;
-        worm.write(format!("trace_mult_queried_results_{}_l", i), &res.0[0])?;
-        worm.write(format!("trace_mult_queried_results_{}_r", i), &res.1[0])?;
-        worm.write(format!("trace_a_val_queried_results_{}_l", i), &res.0[1])?;
-        worm.write(format!("trace_a_val_queried_results_{}_r", i), &res.1[1])?;
-        worm.write(format!("trace_b_val_queried_results_{}_l", i), &res.0[2])?;
-        worm.write(format!("trace_b_val_queried_results_{}_r", i), &res.1[2])?;
-        worm.write(format!("trace_c_val_queried_results_{}_l", i), &res.0[3])?;
-        worm.write(format!("trace_c_val_queried_results_{}_r", i), &res.1[3])?;
+        ldm.write(format!("trace_mult_queried_results_{}_l", i), &res.0[0])?;
+        ldm.write(format!("trace_mult_queried_results_{}_r", i), &res.1[0])?;
+        ldm.write(format!("trace_a_val_queried_results_{}_l", i), &res.0[1])?;
+        ldm.write(format!("trace_a_val_queried_results_{}_r", i), &res.1[1])?;
+        ldm.write(format!("trace_b_val_queried_results_{}_l", i), &res.0[2])?;
+        ldm.write(format!("trace_b_val_queried_results_{}_r", i), &res.1[2])?;
+        ldm.write(format!("trace_c_val_queried_results_{}_l", i), &res.0[3])?;
+        ldm.write(format!("trace_c_val_queried_results_{}_r", i), &res.1[3])?;
     }
 
     // Step 13: query the interaction commitment on the queries
@@ -211,8 +211,8 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
                 imag: res.1[3].clone(),
             },
         };
-        worm.write(format!("interaction_ab_queried_results_{}_l", i), &left)?;
-        worm.write(format!("interaction_ab_queried_results_{}_r", i), &right)?;
+        ldm.write(format!("interaction_ab_queried_results_{}_l", i), &left)?;
+        ldm.write(format!("interaction_ab_queried_results_{}_r", i), &right)?;
 
         let left = QM31Var {
             first: CM31Var {
@@ -234,8 +234,8 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
                 imag: res.1[7].clone(),
             },
         };
-        worm.write(format!("interaction_cum_queried_results_{}_l", i), &left)?;
-        worm.write(format!("interaction_cum_queried_results_{}_r", i), &right)?;
+        ldm.write(format!("interaction_cum_queried_results_{}_l", i), &left)?;
+        ldm.write(format!("interaction_cum_queried_results_{}_r", i), &right)?;
     }
 
     // Step 14: query the constant commitment on the queries
@@ -245,41 +245,41 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
         .enumerate()
     {
         let res = query_and_verify_merkle_twin_tree(&constant_commitment_var, query, proof)?;
-        worm.write(
+        ldm.write(
             format!("constant_a_wire_queried_results_{}_l", i),
             &res.0[0],
         )?;
-        worm.write(
+        ldm.write(
             format!("constant_a_wire_queried_results_{}_r", i),
             &res.1[0],
         )?;
-        worm.write(
+        ldm.write(
             format!("constant_b_wire_queried_results_{}_l", i),
             &res.0[1],
         )?;
-        worm.write(
+        ldm.write(
             format!("constant_b_wire_queried_results_{}_r", i),
             &res.1[1],
         )?;
-        worm.write(
+        ldm.write(
             format!("constant_c_wire_queried_results_{}_l", i),
             &res.0[2],
         )?;
-        worm.write(
+        ldm.write(
             format!("constant_c_wire_queried_results_{}_r", i),
             &res.1[2],
         )?;
-        worm.write(format!("constant_op_queried_results_{}_l", i), &res.0[3])?;
-        worm.write(format!("constant_op_queried_results_{}_r", i), &res.1[3])?;
+        ldm.write(format!("constant_op_queried_results_{}_l", i), &res.0[3])?;
+        ldm.write(format!("constant_op_queried_results_{}_r", i), &res.1[3])?;
     }
 
     // compute the OODS point
     let table = TableVar::new_constant(&cs, ())?;
     let point = get_oods_point(&mut channel_var_before_oods, &table);
-    worm.write("oods_x", &point.x)?;
-    worm.write("oods_y", &point.y)?;
+    ldm.write("oods_x", &point.x)?;
+    ldm.write("oods_y", &point.y)?;
 
-    worm.save()?;
+    ldm.save()?;
 
     Ok(cs)
 }
