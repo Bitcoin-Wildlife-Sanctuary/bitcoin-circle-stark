@@ -7,29 +7,25 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 
-pub fn generate_cs(
-    _: &Hints,
-    worm: &mut WORMMemory,
-    query_idx: usize,
-) -> Result<ConstraintSystemRef> {
+pub fn generate_cs(_: &Hints, ldm: &mut LDM, query_idx: usize) -> Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
-    let y: M31Var = worm.read(format!("circle_point_y_{}", query_idx))?;
+    let y: M31Var = ldm.read(format!("circle_point_y_{}", query_idx))?;
     let table = TableVar::new_constant(&cs, ())?;
 
     let composition_l: QM31Var =
-        worm.read(format!("composition_queried_results_{}_l", query_idx))?;
+        ldm.read(format!("composition_queried_results_{}_l", query_idx))?;
     let composition_r: QM31Var =
-        worm.read(format!("composition_queried_results_{}_r", query_idx))?;
+        ldm.read(format!("composition_queried_results_{}_r", query_idx))?;
 
     let mut column_line_composition_vars = Vec::<(CM31Var, CM31Var)>::new();
     for i in 0..4 {
         column_line_composition_vars.push((
-            worm.read(format!("column_line_coeffs_composition_{}_a", i))?,
-            worm.read(format!("column_line_coeffs_composition_{}_b", i))?,
+            ldm.read(format!("column_line_coeffs_composition_{}_a", i))?,
+            ldm.read(format!("column_line_coeffs_composition_{}_b", i))?,
         ))
     }
 
@@ -69,9 +65,9 @@ pub fn generate_cs(
         &column_line_composition_vars[3].1,
     );
 
-    let alpha3: QM31Var = worm.read("line_batch_random_coeff_3")?;
-    let alpha2: QM31Var = worm.read("line_batch_random_coeff_2")?;
-    let alpha: QM31Var = worm.read("line_batch_random_coeff")?;
+    let alpha3: QM31Var = ldm.read("line_batch_random_coeff_3")?;
+    let alpha2: QM31Var = ldm.read("line_batch_random_coeff_2")?;
+    let alpha: QM31Var = ldm.read("line_batch_random_coeff")?;
 
     let mut sum_num_composition_l = &alpha3 * (&table, &numerator_composition_0.0);
     sum_num_composition_l =
@@ -87,20 +83,20 @@ pub fn generate_cs(
         &sum_num_composition_r + &(&alpha * (&table, &numerator_composition_2.1));
     sum_num_composition_r = &sum_num_composition_r + &numerator_composition_3.1;
 
-    let alpha4: QM31Var = worm.read("line_batch_random_coeff_4")?;
+    let alpha4: QM31Var = ldm.read("line_batch_random_coeff_4")?;
 
     let alpha4composition_l = &alpha4 * (&table, &sum_num_composition_l);
     let alpha4composition_r = &alpha4 * (&table, &sum_num_composition_r);
 
-    worm.write(
+    ldm.write(
         format!("alpha4composition_{}_l", query_idx),
         &alpha4composition_l,
     )?;
-    worm.write(
+    ldm.write(
         format!("alpha4composition_{}_r", query_idx),
         &alpha4composition_r,
     )?;
 
-    worm.save()?;
+    ldm.save()?;
     Ok(cs)
 }

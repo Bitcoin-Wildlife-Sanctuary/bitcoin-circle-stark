@@ -9,22 +9,18 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 
-pub fn generate_cs(
-    hints: &Hints,
-    worm: &mut WORMMemory,
-    query_idx: usize,
-) -> Result<ConstraintSystemRef> {
+pub fn generate_cs(hints: &Hints, ldm: &mut LDM, query_idx: usize) -> Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
-    let query: M31Var = worm.read(format!("query_{}", query_idx))?;
+    let query: M31Var = ldm.read(format!("query_{}", query_idx))?;
     let queries = decompose_positions(&query, 5);
 
     let mut fri_tree_commitments_vars = Vec::<HashVar>::new();
     for i in 0..LOG_N_ROWS {
-        fri_tree_commitments_vars.push(worm.read(format!("fri_tree_commitments_{}", i))?);
+        fri_tree_commitments_vars.push(ldm.read(format!("fri_tree_commitments_{}", i))?);
     }
 
     let mut folding_intermediate_vars = vec![];
@@ -62,15 +58,15 @@ pub fn generate_cs(
     let swap_bits_vars = skip_one_and_extract_bits(&query, 5);
 
     let mut twiddles_vars = Vec::<M31Var>::new();
-    twiddles_vars.push(worm.read(format!("twiddle_factor_1_{}", query_idx))?);
-    twiddles_vars.push(worm.read(format!("twiddle_factor_2_{}", query_idx))?);
-    twiddles_vars.push(worm.read(format!("twiddle_factor_3_{}", query_idx))?);
-    twiddles_vars.push(worm.read(format!("twiddle_factor_4_{}", query_idx))?);
-    twiddles_vars.push(worm.read(format!("twiddle_factor_5_{}", query_idx))?);
+    twiddles_vars.push(ldm.read(format!("twiddle_factor_1_{}", query_idx))?);
+    twiddles_vars.push(ldm.read(format!("twiddle_factor_2_{}", query_idx))?);
+    twiddles_vars.push(ldm.read(format!("twiddle_factor_3_{}", query_idx))?);
+    twiddles_vars.push(ldm.read(format!("twiddle_factor_4_{}", query_idx))?);
+    twiddles_vars.push(ldm.read(format!("twiddle_factor_5_{}", query_idx))?);
 
     let mut folding_alphas_vars = Vec::<QM31Var>::new();
     for i in 0..LOG_N_ROWS {
-        folding_alphas_vars.push(worm.read(format!("folding_alpha_{}", i))?);
+        folding_alphas_vars.push(ldm.read(format!("folding_alpha_{}", i))?);
     }
 
     let table = TableVar::new_constant(&cs, ())?;
@@ -104,14 +100,14 @@ pub fn generate_cs(
         .0
         .conditional_swap(&folding_intermediate_vars[0].1, &swap_bits_vars[0])
         .0;
-    worm.write(
+    ldm.write(
         format!("expected_entry_quotient_{}", query_idx),
         &expected_entry_quotient,
     )?;
 
-    let last_layer_var: QM31Var = worm.read("last_layer")?;
+    let last_layer_var: QM31Var = ldm.read("last_layer")?;
     folded_results_vars[4].equalverify(&last_layer_var)?;
 
-    worm.save()?;
+    ldm.save()?;
     Ok(cs)
 }
