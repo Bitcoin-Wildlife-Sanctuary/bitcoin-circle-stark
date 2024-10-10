@@ -336,10 +336,10 @@ mod test {
         // The integration assumes a fee rate of 7 sat/vByte.
         // Note that in many situations, the fee rate is only 2 sat/vByte.
 
-        let mut fees = vec![114555, 210434, 103439, 101696, 93044, 81704, 92834];
+        let mut fees = vec![114555, 210434, 103439, 101759, 93233, 81704, 92834];
 
         for _ in 0..8 {
-            fees.extend_from_slice(&[100926, 97293, 97167, 86863, 77679, 86863, 88802, 40467]);
+            fees.extend_from_slice(&[100926, 97300, 97167, 86891, 77679, 86863, 88865, 40467]);
         }
 
         fees.push(49777);

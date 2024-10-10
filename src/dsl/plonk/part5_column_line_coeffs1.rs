@@ -11,13 +11,12 @@ pub fn generate_cs(_: &Hints, ldm: &mut LDM) -> anyhow::Result<ConstraintSystemR
     ldm.init(&cs)?;
 
     let oods_y: QM31Var = ldm.read("oods_y")?;
+    let table = TableVar::new_constant(&cs, ())?;
 
     let mult_var: QM31Var = ldm.read("trace_oods_value_0")?;
     let a_val_var: QM31Var = ldm.read("trace_oods_value_1")?;
     let b_val_var: QM31Var = ldm.read("trace_oods_value_2")?;
     let c_val_var: QM31Var = ldm.read("trace_oods_value_3")?;
-
-    let table = TableVar::new_constant(&cs, ())?;
 
     let res = column_line_coeffs(
         &table,
