@@ -7,15 +7,15 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 use stwo_prover::core::poly::circle::CanonicCoset;
 
-pub fn generate_cs(_: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSystemRef> {
+pub fn generate_cs(_: &Hints, ldm: &mut LDM) -> Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
-    let oods_x: QM31Var = worm.read("oods_x")?;
-    let oods_y: QM31Var = worm.read("oods_y")?;
+    let oods_x: QM31Var = ldm.read("oods_x")?;
+    let oods_y: QM31Var = ldm.read("oods_y")?;
 
     let oods_point = SecureCirclePointVar {
         x: oods_x,
@@ -35,13 +35,13 @@ pub fn generate_cs(_: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSystemR
 
     let constraint_denom = cur_x.inverse(&table);
 
-    let constraint_num: QM31Var = worm.read("constraint_num")?;
+    let constraint_num: QM31Var = ldm.read("constraint_num")?;
     let computed_composition = &constraint_denom * (&table, &constraint_num);
 
-    let composition_0_var: QM31Var = worm.read("composition_oods_value_0")?;
-    let composition_1_var: QM31Var = worm.read("composition_oods_value_1")?;
-    let composition_2_var: QM31Var = worm.read("composition_oods_value_2")?;
-    let composition_3_var: QM31Var = worm.read("composition_oods_value_3")?;
+    let composition_0_var: QM31Var = ldm.read("composition_oods_value_0")?;
+    let composition_1_var: QM31Var = ldm.read("composition_oods_value_1")?;
+    let composition_2_var: QM31Var = ldm.read("composition_oods_value_2")?;
+    let composition_3_var: QM31Var = ldm.read("composition_oods_value_3")?;
 
     let mut composition_var = &composition_0_var + &composition_1_var.shift_by_i();
     composition_var = &composition_var + &composition_2_var.shift_by_j();
@@ -55,9 +55,9 @@ pub fn generate_cs(_: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSystemR
 
     let oods_shifted_by_1 = add_constant_m31_point(&oods_point, &table, shift_minus_1);
 
-    worm.write("oods_shifted_by_1_x", &oods_shifted_by_1.x)?;
-    worm.write("oods_shifted_by_1_y", &oods_shifted_by_1.y)?;
+    ldm.write("oods_shifted_by_1_x", &oods_shifted_by_1.x)?;
+    ldm.write("oods_shifted_by_1_y", &oods_shifted_by_1.y)?;
 
-    worm.save()?;
+    ldm.save()?;
     Ok(cs)
 }

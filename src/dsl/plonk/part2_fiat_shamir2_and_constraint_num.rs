@@ -12,18 +12,18 @@ use bitcoin_script_dsl::builtins::qm31::QM31Var;
 use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
-use bitcoin_script_dsl::worm::WORMMemory;
+use bitcoin_script_dsl::ldm::LDM;
 use stwo_prover::core::prover::N_QUERIES;
 
-pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSystemRef> {
+pub fn generate_cs(hints: &Hints, ldm: &mut LDM) -> Result<ConstraintSystemRef> {
     let cs = ConstraintSystem::new_ref();
-    worm.init(&cs)?;
+    ldm.init(&cs)?;
 
-    let composition_commitment_var: HashVar = worm.read("composition_commitment")?;
+    let composition_commitment_var: HashVar = ldm.read("composition_commitment")?;
 
     let mut queries = Vec::<M31Var>::new();
     for i in 0..N_QUERIES {
-        queries.push(worm.read(format!("query_{}", i))?)
+        queries.push(ldm.read(format!("query_{}", i))?)
     }
 
     // Step 1: query the composition commitment on the queries
@@ -54,8 +54,8 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
                 imag: res.1[3].clone(),
             },
         };
-        worm.write(format!("composition_queried_results_{}_l", i), &left)?;
-        worm.write(format!("composition_queried_results_{}_r", i), &right)?;
+        ldm.write(format!("composition_queried_results_{}_l", i), &left)?;
+        ldm.write(format!("composition_queried_results_{}_r", i), &right)?;
     }
 
     let precomputed_merkle_tree_roots =
@@ -72,21 +72,21 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
             query,
             proof,
         )?;
-        worm.write(format!("circle_point_x_{}", i), &res.circle_point_x_var)?;
-        worm.write(format!("circle_point_y_{}", i), &res.circle_point_y_var)?;
-        worm.write(format!("twiddle_factor_1_{}", i), &res.twiddles_var[13])?;
-        worm.write(format!("twiddle_factor_2_{}", i), &res.twiddles_var[12])?;
-        worm.write(format!("twiddle_factor_3_{}", i), &res.twiddles_var[11])?;
-        worm.write(format!("twiddle_factor_4_{}", i), &res.twiddles_var[10])?;
-        worm.write(format!("twiddle_factor_5_{}", i), &res.twiddles_var[9])?;
+        ldm.write(format!("circle_point_x_{}", i), &res.circle_point_x_var)?;
+        ldm.write(format!("circle_point_y_{}", i), &res.circle_point_y_var)?;
+        ldm.write(format!("twiddle_factor_1_{}", i), &res.twiddles_var[13])?;
+        ldm.write(format!("twiddle_factor_2_{}", i), &res.twiddles_var[12])?;
+        ldm.write(format!("twiddle_factor_3_{}", i), &res.twiddles_var[11])?;
+        ldm.write(format!("twiddle_factor_4_{}", i), &res.twiddles_var[10])?;
+        ldm.write(format!("twiddle_factor_5_{}", i), &res.twiddles_var[9])?;
     }
 
     let table = TableVar::new_constant(&cs, ())?;
 
-    let a_val_var: QM31Var = worm.read("trace_oods_value_1")?;
-    let b_val_var: QM31Var = worm.read("trace_oods_value_2")?;
-    let c_val_var: QM31Var = worm.read("trace_oods_value_3")?;
-    let op_var: QM31Var = worm.read("constant_oods_value_3")?;
+    let a_val_var: QM31Var = ldm.read("trace_oods_value_1")?;
+    let b_val_var: QM31Var = ldm.read("trace_oods_value_2")?;
+    let c_val_var: QM31Var = ldm.read("trace_oods_value_3")?;
+    let op_var: QM31Var = ldm.read("constant_oods_value_3")?;
 
     let a_val_times_b_val = &a_val_var * (&table, &b_val_var);
 
@@ -94,17 +94,17 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
         + &a_val_times_b_val)
         - &c_val_var;
 
-    let composition_fold_random_coeff_var: QM31Var = worm.read("composition_fold_random_coeff")?;
+    let composition_fold_random_coeff_var: QM31Var = ldm.read("composition_fold_random_coeff")?;
     let composition_fold_random_coeff_squared_var =
         &composition_fold_random_coeff_var * &composition_fold_random_coeff_var;
 
     res1 = &res1 * &composition_fold_random_coeff_squared_var;
 
-    let a_wire_var: QM31Var = worm.read("constant_oods_value_0")?;
-    let b_wire_var: QM31Var = worm.read("constant_oods_value_1")?;
-    let c_wire_var: QM31Var = worm.read("constant_oods_value_2")?;
-    let alpha_var: QM31Var = worm.read("alpha")?;
-    let z_var: QM31Var = worm.read("z")?;
+    let a_wire_var: QM31Var = ldm.read("constant_oods_value_0")?;
+    let b_wire_var: QM31Var = ldm.read("constant_oods_value_1")?;
+    let c_wire_var: QM31Var = ldm.read("constant_oods_value_2")?;
+    let alpha_var: QM31Var = ldm.read("alpha")?;
+    let z_var: QM31Var = ldm.read("z")?;
 
     let denominator_1_var = &(&a_wire_var + &(&alpha_var * (&table, &a_val_var))) - &z_var;
     let denominator_2_var = &(&b_wire_var + &(&alpha_var * (&table, &b_val_var))) - &z_var;
@@ -112,10 +112,10 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
     let num_aggregated_var = &denominator_1_var + &denominator_2_var;
     let denom_aggregated_var = &denominator_1_var * (&table, &denominator_2_var);
 
-    let a_b_logup_0_var: QM31Var = worm.read("interaction_oods_value_0")?;
-    let a_b_logup_1_var: QM31Var = worm.read("interaction_oods_value_1")?;
-    let a_b_logup_2_var: QM31Var = worm.read("interaction_oods_value_2")?;
-    let a_b_logup_3_var: QM31Var = worm.read("interaction_oods_value_3")?;
+    let a_b_logup_0_var: QM31Var = ldm.read("interaction_oods_value_0")?;
+    let a_b_logup_1_var: QM31Var = ldm.read("interaction_oods_value_1")?;
+    let a_b_logup_2_var: QM31Var = ldm.read("interaction_oods_value_2")?;
+    let a_b_logup_3_var: QM31Var = ldm.read("interaction_oods_value_3")?;
 
     let mut a_b_logup_var = &a_b_logup_0_var + &a_b_logup_1_var.shift_by_i();
     a_b_logup_var = &a_b_logup_var + &a_b_logup_2_var.shift_by_j();
@@ -128,19 +128,19 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
 
     let denominator_3_var = &(&c_wire_var + &(&alpha_var * (&table, &c_val_var))) - &z_var;
 
-    let c_logup_0_var: QM31Var = worm.read("interaction_oods_value_4")?;
-    let c_logup_1_var: QM31Var = worm.read("interaction_oods_value_6")?;
-    let c_logup_2_var: QM31Var = worm.read("interaction_oods_value_8")?;
-    let c_logup_3_var: QM31Var = worm.read("interaction_oods_value_10")?;
+    let c_logup_0_var: QM31Var = ldm.read("interaction_oods_value_4")?;
+    let c_logup_1_var: QM31Var = ldm.read("interaction_oods_value_6")?;
+    let c_logup_2_var: QM31Var = ldm.read("interaction_oods_value_8")?;
+    let c_logup_3_var: QM31Var = ldm.read("interaction_oods_value_10")?;
 
     let mut c_logup_var = &c_logup_0_var + &c_logup_1_var.shift_by_i();
     c_logup_var = &c_logup_var + &c_logup_2_var.shift_by_j();
     c_logup_var = &c_logup_var + &c_logup_3_var.shift_by_ij();
 
-    let c_logup_next_0_var: QM31Var = worm.read("interaction_oods_value_5")?;
-    let c_logup_next_1_var: QM31Var = worm.read("interaction_oods_value_7")?;
-    let c_logup_next_2_var: QM31Var = worm.read("interaction_oods_value_9")?;
-    let c_logup_next_3_var: QM31Var = worm.read("interaction_oods_value_11")?;
+    let c_logup_next_0_var: QM31Var = ldm.read("interaction_oods_value_5")?;
+    let c_logup_next_1_var: QM31Var = ldm.read("interaction_oods_value_7")?;
+    let c_logup_next_2_var: QM31Var = ldm.read("interaction_oods_value_9")?;
+    let c_logup_next_3_var: QM31Var = ldm.read("interaction_oods_value_11")?;
 
     let mut c_logup_next_var = &c_logup_next_0_var + &c_logup_next_1_var.shift_by_i();
     c_logup_next_var = &c_logup_next_var + &c_logup_next_2_var.shift_by_j();
@@ -152,13 +152,13 @@ pub fn generate_cs(hints: &Hints, worm: &mut WORMMemory) -> Result<ConstraintSys
     let mut res3 = &(&(&c_logup_var - &c_logup_next_var) - &a_b_logup_var) + &claimed_sum_divided;
     res3 = &res3 * (&table, &denominator_3_var);
 
-    let mult_var: QM31Var = worm.read("trace_oods_value_0")?;
+    let mult_var: QM31Var = ldm.read("trace_oods_value_0")?;
     res3 = &res3 + &mult_var;
 
     let constraint_num = &res12 + &res3;
-    worm.write("constraint_num", &constraint_num)?;
+    ldm.write("constraint_num", &constraint_num)?;
 
-    worm.save()?;
+    ldm.save()?;
 
     Ok(cs)
 }
