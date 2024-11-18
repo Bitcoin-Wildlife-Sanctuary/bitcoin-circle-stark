@@ -271,7 +271,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-script-dsl"
 version = "0.1.0"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/dsl#36f3bc7fdae77a53c63fa66c6ddc8ed3ceebc434"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/dsl#2d4c8090f4cff1241edde9755350c1609593f29f"
 dependencies = [
  "anyhow",
  "bincode",
