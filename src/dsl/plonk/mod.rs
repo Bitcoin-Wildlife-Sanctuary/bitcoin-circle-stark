@@ -38,8 +38,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -49,8 +48,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -59,8 +57,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -69,8 +66,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -79,8 +75,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -89,8 +84,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -99,8 +93,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -110,8 +103,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -120,8 +112,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -130,8 +121,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -141,8 +131,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -153,8 +142,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -164,8 +152,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -175,8 +162,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -185,8 +171,7 @@ mod test {
             test_program(
                 cs,
                 script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 },
             )
             .unwrap();
@@ -196,8 +181,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
