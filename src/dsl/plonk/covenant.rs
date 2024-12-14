@@ -123,8 +123,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
         witnesses.push(witness);
         outputs.push(
             convert_to_witness(script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             })
             .unwrap(),
         );
@@ -162,8 +161,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
 
             outputs.push(
                 convert_to_witness(script! {
-                    { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                    { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                    { ldm.hash_var.as_ref().unwrap().value.clone() }
                 })
                 .unwrap(),
             );
@@ -192,8 +190,7 @@ pub fn compute_all_information() -> PlonkAllInformation {
 
         outputs.push(
             convert_to_witness(script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             })
             .unwrap(),
         );
@@ -260,17 +257,17 @@ impl CovenantProgram for PlonkVerifierProgram {
                         // - new stack hash
                         OP_TOALTSTACK OP_TOALTSTACK
 
-                        { StackHash::hash_from_hint(2) }
+                        { StackHash::hash_from_hint(1) }
                         OP_FROMALTSTACK OP_EQUALVERIFY
                     }
 
                     { all_information.scripts[script_idx].clone() }
 
                     OP_DEPTH
-                    { 2 }
+                    { 1 }
                     OP_EQUALVERIFY
 
-                    { StackHash::hash_drop(2) }
+                    { StackHash::hash_drop(1) }
                     OP_FROMALTSTACK OP_EQUALVERIFY
                     OP_TRUE
                 },
