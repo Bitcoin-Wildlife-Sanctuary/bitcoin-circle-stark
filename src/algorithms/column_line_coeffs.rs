@@ -1,7 +1,7 @@
+use crate::dsl::primitives::cm31::CM31Var;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use anyhow::Result;
-use bitcoin_script_dsl::builtins::cm31::CM31Var;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 
 /// Compute the parameters of `column_line_coeffs` without applying alpha.
 ///
@@ -11,7 +11,7 @@ use bitcoin_script_dsl::builtins::table::TableVar;
 ///
 /// Output:
 /// - `(a1, b1), (a2, b2), (a3, b3), ..., (an, bn)`
-/// where all of them are cm31.
+///   where all of them are cm31.
 /// - `ai = Im(f(P)) / Im(p.y)`
 /// - `bi = Im(f(P)) / Im(p.y) Re(p.y) - Re(f(P))`
 ///

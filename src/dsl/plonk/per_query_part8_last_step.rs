@@ -1,8 +1,8 @@
 use crate::dsl::plonk::hints::Hints;
-use bitcoin_script_dsl::builtins::cm31::CM31Var;
-use bitcoin_script_dsl::builtins::m31::M31Var;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
+use crate::dsl::primitives::cm31::CM31Var;
+use crate::dsl::primitives::m31::M31Var;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
 use bitcoin_script_dsl::ldm::LDM;

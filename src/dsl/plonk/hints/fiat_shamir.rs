@@ -41,9 +41,6 @@ pub struct FiatShamirOutput {
     /// trace sample points and odds points
     pub sampled_points: TreeVec<Vec<Vec<CirclePoint<QM31>>>>,
 
-    /// sample values
-    pub sample_values: Vec<Vec<Vec<QM31>>>,
-
     /// query subcircle domain.
     pub query_subcircle_domain: SparseSubCircleDomain,
 
@@ -149,10 +146,7 @@ pub fn compute_fiat_shamir_hints(
     );
     let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
 
-    // step 4: pull trace oods values and composition oods values from proof
-    let sample_values = &proof.commitment_scheme_proof.sampled_values.0;
-
-    // step 5: draw fri folding coefficient with all oods values
+    // step 4: draw fri folding coefficient with all oods values
     channel.mix_felts(
         &proof
             .commitment_scheme_proof
@@ -164,7 +158,7 @@ pub fn compute_fiat_shamir_hints(
     let line_batch_random_coeff = channel.draw_felt();
     let fri_fold_random_coeff = channel.draw_felt();
 
-    // step 6: fri layer operator coefficients (intermediate)
+    // step 5: fri layer operator coefficients (intermediate)
     // Get mask sample points relative to oods point.
     let mut sampled_points = components.mask_points(oods_point);
     // Add the composition polynomial mask points.
@@ -225,7 +219,7 @@ pub fn compute_fiat_shamir_hints(
         layer_domain = layer_domain.double();
     }
 
-    // step 8: fri layer operator coefficient (last layer)
+    // step 6: fri layer operator coefficient (last layer)
     if layer_bound.log_degree_bound != config.fri_config.log_last_layer_degree_bound {
         return Err(VerificationError::Fri(
             FriVerificationError::InvalidNumFriLayers,
@@ -241,7 +235,7 @@ pub fn compute_fiat_shamir_hints(
     }
     channel.mix_felts(&last_layer_poly);
 
-    // step 9: Verify proof of work.
+    // step 7: Verify proof of work.
     let pow_hint = PoWHint::new(
         channel.digest,
         proof.commitment_scheme_proof.proof_of_work,
@@ -253,7 +247,7 @@ pub fn compute_fiat_shamir_hints(
         return Err(VerificationError::ProofOfWork);
     }
 
-    // step 10. FRI query domains
+    // step 8. FRI query domains
     let column_log_sizes = bounds
         .iter()
         .dedup()
@@ -384,7 +378,6 @@ pub fn compute_fiat_shamir_hints(
         queries_parents,
         commitment_scheme_column_log_sizes: commitment_scheme.column_log_sizes(),
         sampled_points,
-        sample_values: sample_values.to_vec(),
         query_subcircle_domain: query_domain.1.clone(),
         queried_values_left,
         queried_values_right,

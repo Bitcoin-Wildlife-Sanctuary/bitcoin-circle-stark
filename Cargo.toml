@@ -4,22 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31", tag = "1.0.0" }
-bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script", tag = "1.0.0" }
+rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31" }
+bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script" }
 bitcoin = "0.32.0"
-bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", tag = "1.0.0", features = ["debug"] }
+bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", features = ["debug"] }
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo", tag = "for-fibonacci" }
+stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo" }
 num-traits = "0.2.0"
 lazy_static = "1.4.0"
 ctor = "0.2.9"
 itertools = "0.13.0"
 hex = "0.4.3"
 anyhow = "1.0.86"
-bitcoin-script-dsl = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/dsl" }
-covenants-gadgets = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets", tag = "1.0.0" }
+bitcoin-script-dsl = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/dsl", tag = "0.2.0" }
+covenants-gadgets = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets" }
 clap = { version = "4.5.23", features = ["derive"] }
 colored = "2.1.0"
 
@@ -29,6 +29,9 @@ version = "1"
 default-features = false
 features = ["user-hooks"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
 [profile.dev]
 opt-level = 3
 
@@ -37,3 +40,4 @@ lto = true
 
 [features]
 profiler = ["bitcoin-scriptexec/profiler"]
+assume-op-cat = []

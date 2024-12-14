@@ -37,8 +37,8 @@ impl PoWHint {
         } else {
             Self {
                 nonce,
-                prefix: digest[..32 - (n_bits + 8 - 1) / 8].to_vec(),
-                msb: Some(digest[32 - (n_bits + 8 - 1) / 8]),
+                prefix: digest[..32 - n_bits.div_ceil(8)].to_vec(),
+                msb: Some(digest[32 - n_bits.div_ceil(8)]),
             }
         }
     }

@@ -1,6 +1,6 @@
 use crate::algorithms::point::SecureCirclePointVar;
-use bitcoin_script_dsl::builtins::cm31::CM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
+use crate::dsl::primitives::cm31::CM31Var;
+use crate::dsl::primitives::table::TableVar;
 
 pub fn prepare_pair_vanishing(
     point: &SecureCirclePointVar,

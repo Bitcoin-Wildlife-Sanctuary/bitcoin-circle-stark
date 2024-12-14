@@ -2,9 +2,9 @@ use crate::algorithms::point::{
     add_constant_m31_point, add_constant_m31_point_x_only, SecureCirclePointVar,
 };
 use crate::dsl::plonk::hints::{Hints, LOG_N_ROWS};
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use anyhow::Result;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
 use bitcoin_script_dsl::ldm::LDM;

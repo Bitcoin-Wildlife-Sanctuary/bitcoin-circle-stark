@@ -1,6 +1,6 @@
-use bitcoin_script_dsl::builtins::cm31::CM31Var;
-use bitcoin_script_dsl::builtins::m31::M31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
+use crate::dsl::primitives::cm31::CM31Var;
+use crate::dsl::primitives::m31::M31Var;
+use crate::dsl::primitives::table::TableVar;
 
 pub fn apply_twin(
     table: &TableVar,

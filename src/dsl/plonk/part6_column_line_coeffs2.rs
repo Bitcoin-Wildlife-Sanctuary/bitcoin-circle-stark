@@ -1,8 +1,8 @@
 use crate::algorithms::column_line_coeffs::column_line_coeffs;
 use crate::dsl::plonk::hints::Hints;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use anyhow::Result;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
 use bitcoin_script_dsl::ldm::LDM;

@@ -70,9 +70,9 @@ pub fn compute_fold_hints(
 
         for &queries_parent in queries_parent_sorted.iter() {
             let sibling = queries_parent ^ 1;
-            if queries_and_results.get(&sibling).is_none() {
-                queries_and_results.insert(sibling, *iter.next().unwrap());
-            }
+            queries_and_results
+                .entry(sibling)
+                .or_insert_with(|| *iter.next().unwrap());
         }
         assert_eq!(iter.next(), None);
 

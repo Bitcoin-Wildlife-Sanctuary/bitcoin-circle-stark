@@ -1,8 +1,8 @@
 use crate::algorithms::pair_vanishing::prepare_pair_vanishing;
 use crate::algorithms::point::SecureCirclePointVar;
 use crate::dsl::plonk::hints::Hints;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
 use bitcoin_script_dsl::ldm::LDM;
