@@ -34,7 +34,7 @@ jobs:
       - name: Generate coverage report
         run: cargo install cargo-tarpaulin --version 0.31.2 && cargo tarpaulin --engine llvm --out Xml
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e # v5.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
