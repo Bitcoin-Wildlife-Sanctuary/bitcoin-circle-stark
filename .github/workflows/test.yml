@@ -32,7 +32,7 @@ jobs:
           name: bitcoin-scripts-performance-report
           path: target/bitcoin_scripts_performance_report.csv
       - name: Generate coverage report
-        run: cargo install cargo-tarpaulin && cargo tarpaulin --engine llvm --out Xml
+        run: cargo install cargo-tarpaulin --version 0.31.2 && cargo tarpaulin --engine llvm --out Xml
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
         with:
