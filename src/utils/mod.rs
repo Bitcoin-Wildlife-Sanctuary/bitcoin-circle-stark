@@ -41,12 +41,12 @@ pub fn hash_m31_vec(v: &[M31]) -> [u8; 32] {
         res.copy_from_slice(hasher.finalize().as_slice());
     } else {
         let mut hasher = Sha256::new();
-        Digest::update(&mut hasher, &num_to_bytes(v[v.len() - 1]));
+        Digest::update(&mut hasher, num_to_bytes(v[v.len() - 1]));
         res.copy_from_slice(hasher.finalize().as_slice());
 
         for elem in v.iter().rev().skip(1) {
             let mut hasher = Sha256::new();
-            Digest::update(&mut hasher, &num_to_bytes(*elem));
+            Digest::update(&mut hasher, num_to_bytes(*elem));
             Digest::update(&mut hasher, res);
             res.copy_from_slice(hasher.finalize().as_slice());
         }

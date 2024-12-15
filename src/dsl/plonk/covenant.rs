@@ -1,9 +1,9 @@
 use crate::dsl::plonk::hints::Hints;
 use crate::treepp::*;
 use crate::utils::hash;
+use crate::OP_HINT;
 use anyhow::Result;
 use bitcoin::script::write_scriptint;
-use bitcoin_script_dsl::builtins::table::utils::OP_HINT;
 use bitcoin_script_dsl::compiler::Compiler;
 use bitcoin_script_dsl::constraint_system::Element;
 use bitcoin_script_dsl::ldm::LDM;
