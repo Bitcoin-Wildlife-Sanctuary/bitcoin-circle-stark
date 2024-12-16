@@ -1113,7 +1113,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "stwo-prover"
 version = "0.1.1"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/stwo#99175fdf1158f054b87ff8353f1f815f90cf191e"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/stwo#f4804bb6a99ec73f92caabbcf7e4740e72b87cf3"
 dependencies = [
  "bytemuck",
  "cfg-if",
