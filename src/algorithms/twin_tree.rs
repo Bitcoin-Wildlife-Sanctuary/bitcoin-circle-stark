@@ -1,10 +1,10 @@
+use crate::dsl::primitives::m31::M31Var;
 use crate::merkle_tree::MerkleTreeTwinProof;
 use crate::treepp::*;
 use crate::utils::{hash, limb_to_be_bits_toaltstack_except_lowest_1bit};
 use anyhow::Error;
 use anyhow::Result;
 use bitcoin_script_dsl::builtins::hash::HashVar;
-use bitcoin_script_dsl::builtins::m31::M31Var;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::options::Options;
 use bitcoin_script_dsl::stack::Stack;

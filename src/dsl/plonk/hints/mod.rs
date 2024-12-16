@@ -3,6 +3,7 @@ use crate::dsl::plonk::hints::fold::PerQueryFoldHints;
 use crate::dsl::plonk::hints::quotients::PerQueryQuotientHint;
 use stwo_prover::core::channel::Sha256Channel;
 use stwo_prover::core::pcs::PcsConfig;
+use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleChannel;
 use stwo_prover::examples::plonk::prove_fibonacci_plonk;
 
 pub const LOG_N_ROWS: u32 = 5;
@@ -22,7 +23,8 @@ impl Hints {
     pub fn instance() -> Self {
         let config = PcsConfig::default();
 
-        let (plonk_component, proof) = prove_fibonacci_plonk(LOG_N_ROWS, config);
+        let (plonk_component, proof) =
+            prove_fibonacci_plonk::<Sha256MerkleChannel>(LOG_N_ROWS, config);
 
         let mut channel = Sha256Channel::default();
 

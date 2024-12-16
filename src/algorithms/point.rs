@@ -1,7 +1,8 @@
+use crate::dsl::primitives::channel::HashVarWithChannel;
+use crate::dsl::primitives::m31::M31Var;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use bitcoin_script_dsl::builtins::hash::HashVar;
-use bitcoin_script_dsl::builtins::m31::M31Var;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;

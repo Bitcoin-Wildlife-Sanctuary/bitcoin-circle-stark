@@ -1,8 +1,8 @@
+use crate::dsl::primitives::m31::M31Var;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use crate::treepp::*;
 use anyhow::Result;
-use bitcoin_script_dsl::builtins::m31::M31Var;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::{AllocVar, BVar};
 use bitcoin_script_dsl::options::Options;
 use bitcoin_script_dsl::stack::Stack;
@@ -150,8 +150,8 @@ fn check_0_or_1() -> Script {
 #[cfg(test)]
 mod test {
     use crate::algorithms::folding::{decompose_positions, skip_one_and_extract_bits};
+    use crate::dsl::primitives::m31::M31Var;
     use crate::treepp::*;
-    use bitcoin_script_dsl::builtins::m31::M31Var;
     use bitcoin_script_dsl::bvar::AllocVar;
     use bitcoin_script_dsl::constraint_system::ConstraintSystem;
     use bitcoin_script_dsl::test_program;

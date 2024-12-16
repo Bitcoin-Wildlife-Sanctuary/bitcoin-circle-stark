@@ -1,15 +1,15 @@
 use crate::algorithms::precomputed_tree::query_and_verify_precomputed_merkle_tree;
 use crate::algorithms::twin_tree::query_and_verify_merkle_twin_tree;
 use crate::dsl::plonk::hints::Hints;
+use crate::dsl::primitives::cm31::CM31Var;
+use crate::dsl::primitives::m31::M31Var;
+use crate::dsl::primitives::qm31::QM31Var;
+use crate::dsl::primitives::table::TableVar;
 use crate::precomputed_merkle_tree::{
     get_precomputed_merkle_tree_roots, PRECOMPUTED_MERKLE_TREE_ROOTS,
 };
 use anyhow::Result;
-use bitcoin_script_dsl::builtins::cm31::CM31Var;
 use bitcoin_script_dsl::builtins::hash::HashVar;
-use bitcoin_script_dsl::builtins::m31::M31Var;
-use bitcoin_script_dsl::builtins::qm31::QM31Var;
-use bitcoin_script_dsl::builtins::table::TableVar;
 use bitcoin_script_dsl::bvar::AllocVar;
 use bitcoin_script_dsl::constraint_system::{ConstraintSystem, ConstraintSystemRef};
 use bitcoin_script_dsl::ldm::LDM;
