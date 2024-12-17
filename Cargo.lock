@@ -864,6 +864,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
+name = "poseidon2-m31"
+version = "0.1.0"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/poseidon2-m31#cfad2244aed76ea07fcd78982de5998cafc7e851"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,7 +1146,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "stwo-prover"
 version = "0.1.1"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/stwo#69d72e192d22ff55e7aa67882527c453b7b8a1f8"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/stwo#d4c18cb8c5ea823312b097bc620e99e4da8f864b"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -1148,6 +1156,7 @@ dependencies = [
  "indexmap",
  "itertools 0.12.1",
  "num-traits",
+ "poseidon2-m31",
  "rand",
  "rayon",
  "serde",
