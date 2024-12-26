@@ -90,9 +90,9 @@ pub fn generate_cs(hints: &Hints, ldm: &mut LDM) -> Result<ConstraintSystemRef> 
 
     let a_val_times_b_val = &a_val_var * (&table, &b_val_var);
 
-    let mut res1 = &(&(&op_var * (&table, &(&(&a_val_var + &b_val_var) - &a_val_times_b_val)))
-        + &a_val_times_b_val)
-        - &c_val_var;
+    let mut res1 = &c_val_var
+        - (&(&(&op_var * (&table, &(&(&a_val_var + &b_val_var) - &a_val_times_b_val)))
+            + &a_val_times_b_val));
 
     let composition_fold_random_coeff_var: QM31Var = ldm.read("composition_fold_random_coeff")?;
     let composition_fold_random_coeff_squared_var =
