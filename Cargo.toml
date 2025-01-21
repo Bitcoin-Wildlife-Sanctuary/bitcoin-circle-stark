@@ -20,7 +20,7 @@ hex = "0.4.3"
 anyhow = "1.0.95"
 bitcoin-script-dsl = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/dsl", tag = "0.2.0" }
 covenants-gadgets = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets" }
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 colored = "2.1.0"
 
 # Add cargo-husky to run pre-commit hooks
