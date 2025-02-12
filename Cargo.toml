@@ -14,7 +14,7 @@ rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo" }
 num-traits = "0.2.0"
 lazy_static = "1.4.0"
-ctor = "0.2.9"
+ctor = "0.3.0"
 itertools = "0.14.0"
 hex = "0.4.3"
 anyhow = "1.0.95"
