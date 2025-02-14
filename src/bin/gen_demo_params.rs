@@ -4,11 +4,19 @@ use bitcoin::{Address, Network, ScriptBuf, WScriptHash};
 use bitcoin_circle_stark::dsl::plonk::covenant::PlonkVerifierProgram;
 use clap::Parser;
 use covenants_gadgets::{get_script_pub_key, CovenantProgram};
+use serde::Serialize;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long, default_value = "42")]
+    randomizer: u32,
+}
+
+#[derive(Serialize)]
+struct Output {
+    program_address: String,
+    caboose_address: String,
     randomizer: u32,
 }
 
@@ -41,6 +49,11 @@ fn main() {
     let program_address = get_program_address(network);
     let caboose_address = get_caboose_address(network, args.randomizer);
 
-    println!("Program Address: {}", program_address);
-    println!("Caboose Address: {}", caboose_address);
+    let output = Output {
+        program_address: program_address.to_string(),
+        caboose_address: caboose_address.to_string(),
+        randomizer: args.randomizer,
+    };
+
+    println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }

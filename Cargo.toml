@@ -7,7 +7,9 @@ edition = "2021"
 rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31" }
 bitcoin-script = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-script" }
 bitcoin = "0.32.0"
-bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", features = ["debug"] }
+bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", features = [
+    "debug",
+] }
 sha2 = "0.10.8"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
@@ -22,6 +24,8 @@ bitcoin-script-dsl = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/dsl"
 covenants-gadgets = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets" }
 clap = { version = "4.5.28", features = ["derive"] }
 colored = "2.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Add cargo-husky to run pre-commit hooks
 [dev-dependencies.cargo-husky]
