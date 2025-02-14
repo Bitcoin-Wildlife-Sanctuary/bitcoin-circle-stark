@@ -23,6 +23,47 @@ struct Args {
     initial_program_txid: Option<String>,
 }
 
+const OUTPUT_DIR: &str = "./demo";
+
+fn print_state_info(state: &PlonkVerifierState, step: usize) {
+    println!("\n{}", "=".repeat(50));
+    println!("Step {}: Current State", step);
+    println!("{}", "-".repeat(30));
+    println!("Program Counter (pc): {}", state.pc);
+    // display stack hash as hex
+    println!("Stack Hash: {}", hex::encode(&state.stack_hash));
+    println!("Stack Length: {}", state.stack.len());
+}
+
+fn print_covenant_input(input: &CovenantInput, _step: usize) {
+    println!("\n{}", "Step: Covenant Input".blue());
+    println!("{}", "-".repeat(30));
+    println!("Old Randomizer: {}", input.old_randomizer);
+    println!("Old Balance: {} sats", input.old_balance);
+    println!("Old TxId: {}", input.old_txid);
+    println!(
+        "Input Outpoint1: {}:{}",
+        input.input_outpoint1.txid, input.input_outpoint1.vout
+    );
+    println!("New Balance: {} sats", input.new_balance);
+    println!(
+        "Balance Change: -{} sats",
+        input.old_balance - input.new_balance
+    );
+}
+
+fn print_transaction_info(tx: &bitcoin::Transaction, _step: usize) {
+    println!("\n{}", "Step: Generated Transaction".green());
+    println!("{}", "-".repeat(30));
+    println!("TxId: {}", tx.compute_txid());
+    println!("Input Count: {}", tx.input.len());
+    println!("Output Count: {}", tx.output.len());
+    println!("Outputs:");
+    for (i, output) in tx.output.iter().enumerate() {
+        println!("  Output {}: {} sats", i, output.value);
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -138,11 +179,20 @@ fn main() {
             }
         };
 
-        for _ in 0..72 {
+        for step in 0..72 {
             let next = get_instruction(&old_state).unwrap();
 
+            println!("\n{}", "=".repeat(80));
+            println!(
+                "{}",
+                format!("Processing Transaction {} of 72", step + 1).yellow()
+            );
+            println!("{}", "=".repeat(80));
+
+            print_state_info(&old_state, step + 1);
+
             let mut new_balance = old_balance;
-            new_balance -= next.fee as u64; // as for transaction fee
+            new_balance -= next.fee as u64;
             new_balance -= DUST_AMOUNT;
 
             let info = CovenantInput {
@@ -155,9 +205,19 @@ fn main() {
                 new_balance,
             };
 
+            print_covenant_input(&info, step + 1);
+
             let new_state =
                 PlonkVerifierProgram::run(next.program_index, &old_state, &next.program_input)
                     .unwrap();
+
+            println!("\nState Transition:");
+            println!("Old PC: {} -> New PC: {}", old_state.pc, new_state.pc);
+            println!(
+                "Old Stack Size: {} -> New Stack Size: {}",
+                old_state.stack.len(),
+                new_state.stack.len()
+            );
 
             let (tx_template, randomizer) = get_tx::<PlonkVerifierProgram>(
                 &info,
@@ -166,6 +226,8 @@ fn main() {
                 &new_state,
                 &next.program_input,
             );
+
+            print_transaction_info(&tx_template.tx, step + 1);
 
             txs.push(tx_template.tx.clone());
 
@@ -177,12 +239,15 @@ fn main() {
             old_tx_outpoint1 = tx_template.tx.input[0].previous_output;
         }
 
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all(OUTPUT_DIR).unwrap();
+
         for (i, tx) in txs.iter().enumerate() {
             let mut bytes = vec![];
             tx.consensus_encode(&mut bytes).unwrap();
 
-            // this directory is to Fractal mainnet
-            let mut fs = std::fs::File::create(format!("./demo-fractal/tx-{}.txt", i + 1)).unwrap();
+            // Write the transaction to a file
+            let mut fs = std::fs::File::create(format!("{}/tx-{}.txt", OUTPUT_DIR, i + 1)).unwrap();
             fs.write_all(hex::encode(bytes).as_bytes()).unwrap();
         }
 
