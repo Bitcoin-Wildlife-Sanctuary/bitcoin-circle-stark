@@ -21,6 +21,9 @@ struct Args {
     /// Txid
     #[arg(short, long)]
     initial_program_txid: Option<String>,
+
+    #[arg(short, long, default_value = "42")]
+    randomizer: u32,
 }
 
 const OUTPUT_DIR: &str = "./demo";
@@ -94,7 +97,7 @@ fn main() {
 
         let mut bytes = vec![OP_RETURN.to_u8(), OP_PUSHBYTES_36.to_u8()];
         bytes.extend_from_slice(&hash);
-        bytes.extend_from_slice(&12u32.to_le_bytes());
+        bytes.extend_from_slice(&args.randomizer.to_le_bytes());
 
         let caboose_address = Address::from_script(
             ScriptBuf::new_p2wsh(&WScriptHash::hash(&bytes)).as_script(),
@@ -153,7 +156,7 @@ fn main() {
         funding_txid.reverse();
 
         let mut old_state = PlonkVerifierProgram::new();
-        let mut old_randomizer = 12u32;
+        let mut old_randomizer = args.randomizer;
         let mut old_balance = rest;
         let mut old_txid =
             Txid::from_raw_hash(*sha256d::Hash::from_bytes_ref(&initial_program_txid));

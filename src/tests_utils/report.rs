@@ -8,12 +8,14 @@ use std::{
     io::BufReader,
 };
 
+const OUTPUT_DIR: &str = "target/";
+
 lazy_static::lazy_static! {
     static ref REPORT_FILE: Mutex<File> = Mutex::new(
         OpenOptions::new()
             .create(true)
             .append(true)
-            .open("target/bitcoin_scripts_performance_report.csv")
+            .open(format!("{}/bitcoin_scripts_performance_report.csv", OUTPUT_DIR))
             .unwrap()
     );
 }
@@ -21,11 +23,17 @@ lazy_static::lazy_static! {
 // This function will run before any tests
 #[ctor::ctor]
 fn setup() {
+    // Create the output directory if it doesn't exist
+    std::fs::create_dir_all(OUTPUT_DIR).unwrap();
+
     let mut file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open("target/bitcoin_scripts_performance_report.csv")
+        .open(format!(
+            "{}/bitcoin_scripts_performance_report.csv",
+            OUTPUT_DIR
+        ))
         .unwrap();
     writeln!(file, "category,name,script_size_bytes").unwrap();
 }
@@ -33,7 +41,7 @@ fn setup() {
 // Ensure this runs after all tests have completed
 #[ctor::dtor]
 fn finalize() {
-    sort_csv_file("target/bitcoin_scripts_performance_report.csv");
+    sort_csv_file(format!("{}/bitcoin_scripts_performance_report.csv", OUTPUT_DIR).as_str());
 }
 
 /// Report the size of a bitcoin script to a CSV file.
