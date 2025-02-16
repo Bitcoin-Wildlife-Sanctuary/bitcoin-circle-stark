@@ -21,6 +21,54 @@ struct Args {
     /// Txid
     #[arg(short, long)]
     initial_program_txid: Option<String>,
+
+    #[arg(short, long, default_value = "42")]
+    randomizer: u32,
+    #[arg(long, default_value = "0")]
+    funding_tx_vout: u32,
+}
+
+const OUTPUT_DIR: &str = "./demo";
+const FEE_RATE: u64 = 1500; // 1 for signet, ~1500 for fractal
+const NETWORK: Network = Network::Bitcoin;
+
+fn print_state_info(state: &PlonkVerifierState, step: usize) {
+    println!("\n{}", "=".repeat(50));
+    println!("Step {}: Current State", step);
+    println!("{}", "-".repeat(30));
+    println!("Program Counter (pc): {}", state.pc);
+    // display stack hash as hex
+    println!("Stack Hash: {}", hex::encode(&state.stack_hash));
+    println!("Stack Length: {}", state.stack.len());
+}
+
+fn print_covenant_input(input: &CovenantInput, _step: usize) {
+    println!("\n{}", "Step: Covenant Input".blue());
+    println!("{}", "-".repeat(30));
+    println!("Old Randomizer: {}", input.old_randomizer);
+    println!("Old Balance: {} sats", input.old_balance);
+    println!("Old TxId: {}", input.old_txid);
+    println!(
+        "Input Outpoint1: {}:{}",
+        input.input_outpoint1.txid, input.input_outpoint1.vout
+    );
+    println!("New Balance: {} sats", input.new_balance);
+    println!(
+        "Balance Change: -{} sats",
+        input.old_balance - input.new_balance
+    );
+}
+
+fn print_transaction_info(tx: &bitcoin::Transaction, _step: usize) {
+    println!("\n{}", "Step: Generated Transaction".green());
+    println!("{}", "-".repeat(30));
+    println!("TxId: {}", tx.compute_txid());
+    println!("Input Count: {}", tx.input.len());
+    println!("Output Count: {}", tx.output.len());
+    println!("Outputs:");
+    for (i, output) in tx.output.iter().enumerate() {
+        println!("  Output {}: {} sats", i, output.value);
+    }
 }
 
 fn main() {
@@ -34,30 +82,27 @@ fn main() {
 
     fees.push(49777);
 
-    let fee_rate = 1500; // 1 for signet, ~1500 for fractal
-    let network = Network::Bitcoin;
-
     let amount =
-        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * fee_rate + 330 * 74 + 400 * fee_rate;
+        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * FEE_RATE + 330 * 74 + 400 * FEE_RATE;
     let amount_display = (((amount as f64) / 1000.0 / 1000.0 / 100.0) * 10000.0).ceil() / 10000.0;
     let actual_amount = (amount_display * 100.0 * 1000.0 * 1000.0) as u64;
-    let rest = actual_amount - 330 - 400 * fee_rate;
+    let rest = actual_amount - 330 - 400 * FEE_RATE;
 
     if args.funding_txid.is_none() || args.initial_program_txid.is_none() {
         let script_pub_key = get_script_pub_key::<PlonkVerifierProgram>();
 
-        let program_address = Address::from_script(script_pub_key.as_script(), network).unwrap();
+        let program_address = Address::from_script(script_pub_key.as_script(), NETWORK).unwrap();
 
         let init_state = PlonkVerifierProgram::new();
         let hash = PlonkVerifierProgram::get_hash(&init_state);
 
         let mut bytes = vec![OP_RETURN.to_u8(), OP_PUSHBYTES_36.to_u8()];
         bytes.extend_from_slice(&hash);
-        bytes.extend_from_slice(&12u32.to_le_bytes());
+        bytes.extend_from_slice(&args.randomizer.to_le_bytes());
 
         let caboose_address = Address::from_script(
             ScriptBuf::new_p2wsh(&WScriptHash::hash(&bytes)).as_script(),
-            network,
+            NETWORK,
         )
         .unwrap();
 
@@ -112,14 +157,14 @@ fn main() {
         funding_txid.reverse();
 
         let mut old_state = PlonkVerifierProgram::new();
-        let mut old_randomizer = 12u32;
+        let mut old_randomizer = args.randomizer;
         let mut old_balance = rest;
         let mut old_txid =
             Txid::from_raw_hash(*sha256d::Hash::from_bytes_ref(&initial_program_txid));
 
         let mut old_tx_outpoint1 = OutPoint {
             txid: Txid::from_raw_hash(*sha256d::Hash::from_bytes_ref(&funding_txid)),
-            vout: 0, // change this number if the funding tx is not the first output
+            vout: args.funding_tx_vout,
         };
 
         let mut txs = Vec::new();
@@ -130,7 +175,7 @@ fn main() {
             if old_state.pc < fees.len() {
                 Some(SimulationInstruction::<PlonkVerifierProgram> {
                     program_index: old_state.pc,
-                    fee: (fees[old_state.pc] as f64 / 7.0 * (fee_rate as f64)).ceil() as usize,
+                    fee: (fees[old_state.pc] as f64 / 7.0 * (FEE_RATE as f64)).ceil() as usize,
                     program_input: all_information.get_input(old_state.pc),
                 })
             } else {
@@ -138,11 +183,20 @@ fn main() {
             }
         };
 
-        for _ in 0..72 {
+        for step in 0..72 {
             let next = get_instruction(&old_state).unwrap();
 
+            println!("\n{}", "=".repeat(80));
+            println!(
+                "{}",
+                format!("Processing Transaction {} of 72", step + 1).yellow()
+            );
+            println!("{}", "=".repeat(80));
+
+            print_state_info(&old_state, step + 1);
+
             let mut new_balance = old_balance;
-            new_balance -= next.fee as u64; // as for transaction fee
+            new_balance -= next.fee as u64;
             new_balance -= DUST_AMOUNT;
 
             let info = CovenantInput {
@@ -155,9 +209,19 @@ fn main() {
                 new_balance,
             };
 
+            print_covenant_input(&info, step + 1);
+
             let new_state =
                 PlonkVerifierProgram::run(next.program_index, &old_state, &next.program_input)
                     .unwrap();
+
+            println!("\nState Transition:");
+            println!("Old PC: {} -> New PC: {}", old_state.pc, new_state.pc);
+            println!(
+                "Old Stack Size: {} -> New Stack Size: {}",
+                old_state.stack.len(),
+                new_state.stack.len()
+            );
 
             let (tx_template, randomizer) = get_tx::<PlonkVerifierProgram>(
                 &info,
@@ -166,6 +230,8 @@ fn main() {
                 &new_state,
                 &next.program_input,
             );
+
+            print_transaction_info(&tx_template.tx, step + 1);
 
             txs.push(tx_template.tx.clone());
 
@@ -177,12 +243,15 @@ fn main() {
             old_tx_outpoint1 = tx_template.tx.input[0].previous_output;
         }
 
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all(OUTPUT_DIR).unwrap();
+
         for (i, tx) in txs.iter().enumerate() {
             let mut bytes = vec![];
             tx.consensus_encode(&mut bytes).unwrap();
 
-            // this directory is to Fractal mainnet
-            let mut fs = std::fs::File::create(format!("./demo-fractal/tx-{}.txt", i + 1)).unwrap();
+            // Write the transaction to a file
+            let mut fs = std::fs::File::create(format!("{}/tx-{}.txt", OUTPUT_DIR, i + 1)).unwrap();
             fs.write_all(hex::encode(bytes).as_bytes()).unwrap();
         }
 

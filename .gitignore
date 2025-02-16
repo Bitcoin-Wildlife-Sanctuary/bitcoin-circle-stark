@@ -10,3 +10,5 @@ target/
 *.pdb
 
 .idea
+
+demo/
