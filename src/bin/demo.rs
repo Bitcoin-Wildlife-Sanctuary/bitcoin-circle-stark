@@ -27,6 +27,8 @@ struct Args {
 }
 
 const OUTPUT_DIR: &str = "./demo";
+const FEE_RATE: u64 = 1500; // 1 for signet, ~1500 for fractal
+const NETWORK: Network = Network::Bitcoin;
 
 fn print_state_info(state: &PlonkVerifierState, step: usize) {
     println!("\n{}", "=".repeat(50));
@@ -78,19 +80,16 @@ fn main() {
 
     fees.push(49777);
 
-    let fee_rate = 1500; // 1 for signet, ~1500 for fractal
-    let network = Network::Bitcoin;
-
     let amount =
-        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * fee_rate + 330 * 74 + 400 * fee_rate;
+        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * FEE_RATE + 330 * 74 + 400 * FEE_RATE;
     let amount_display = (((amount as f64) / 1000.0 / 1000.0 / 100.0) * 10000.0).ceil() / 10000.0;
     let actual_amount = (amount_display * 100.0 * 1000.0 * 1000.0) as u64;
-    let rest = actual_amount - 330 - 400 * fee_rate;
+    let rest = actual_amount - 330 - 400 * FEE_RATE;
 
     if args.funding_txid.is_none() || args.initial_program_txid.is_none() {
         let script_pub_key = get_script_pub_key::<PlonkVerifierProgram>();
 
-        let program_address = Address::from_script(script_pub_key.as_script(), network).unwrap();
+        let program_address = Address::from_script(script_pub_key.as_script(), NETWORK).unwrap();
 
         let init_state = PlonkVerifierProgram::new();
         let hash = PlonkVerifierProgram::get_hash(&init_state);
@@ -101,7 +100,7 @@ fn main() {
 
         let caboose_address = Address::from_script(
             ScriptBuf::new_p2wsh(&WScriptHash::hash(&bytes)).as_script(),
-            network,
+            NETWORK,
         )
         .unwrap();
 
@@ -174,7 +173,7 @@ fn main() {
             if old_state.pc < fees.len() {
                 Some(SimulationInstruction::<PlonkVerifierProgram> {
                     program_index: old_state.pc,
-                    fee: (fees[old_state.pc] as f64 / 7.0 * (fee_rate as f64)).ceil() as usize,
+                    fee: (fees[old_state.pc] as f64 / 7.0 * (FEE_RATE as f64)).ceil() as usize,
                     program_input: all_information.get_input(old_state.pc),
                 })
             } else {
