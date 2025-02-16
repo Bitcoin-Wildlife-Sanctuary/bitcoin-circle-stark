@@ -24,6 +24,8 @@ struct Args {
 
     #[arg(short, long, default_value = "42")]
     randomizer: u32,
+    #[arg(long, default_value = "0")]
+    funding_tx_vout: u32,
 }
 
 const OUTPUT_DIR: &str = "./demo";
@@ -162,7 +164,7 @@ fn main() {
 
         let mut old_tx_outpoint1 = OutPoint {
             txid: Txid::from_raw_hash(*sha256d::Hash::from_bytes_ref(&funding_txid)),
-            vout: 0, // change this number if the funding tx is not the first output
+            vout: args.funding_tx_vout,
         };
 
         let mut txs = Vec::new();
