@@ -10,7 +10,7 @@ bitcoin = "0.32.0"
 bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec", features = [
     "debug",
 ] }
-sha2 = "0.10.8"
+sha2 = "0.10.9"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo" }
