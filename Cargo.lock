@@ -311,7 +311,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-simulator"
 version = "0.1.0"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-simulator?tag=1.0.0#bbfaa2ee55932421ed5ff88c3d5b882690262197"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/bitcoin-simulator?tag=1.1.0#16b73cfa3fb21b55b37dee93ebd7fc34ba33cbe7"
 dependencies = [
  "anyhow",
  "bitcoin",
@@ -485,7 +485,7 @@ checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 [[package]]
 name = "covenants-gadgets"
 version = "0.1.0"
-source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets#294d09bbd6e789aa5b362197c3099cb7e6e7c76c"
+source = "git+https://github.com/Bitcoin-Wildlife-Sanctuary/covenants-gadgets#93e057f2abdac14760b6a8ff82ee4a613a263153"
 dependencies = [
  "anyhow",
  "bitcoin",
