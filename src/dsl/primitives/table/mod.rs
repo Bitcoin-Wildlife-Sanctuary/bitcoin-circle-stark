@@ -87,17 +87,30 @@ impl AllocVar for TableVar {
     }
 
     fn new_constant(cs: &ConstraintSystemRef, _: <Self as BVar>::Value) -> Result<Self> {
-        let table = get_table();
-
-        let mut variables = vec![];
-        for &elem in table.data.iter().rev() {
-            variables.push(cs.alloc(Element::Num(elem as i32), AllocationMode::Constant)?);
+        #[cfg(feature = "free-mul")]
+        {
+            // under `free-mul` the mul gadgets are empty and never actually read
+            // from the lookup table, so we skip the 513-element push entirely.
+            let placeholder = cs.alloc(Element::Num(0), AllocationMode::Constant)?;
+            Ok(Self {
+                variables: vec![placeholder; 513],
+                cs: cs.clone(),
+            })
         }
+        #[cfg(not(feature = "free-mul"))]
+        {
+            let table = get_table();
 
-        Ok(Self {
-            variables,
-            cs: cs.clone(),
-        })
+            let mut variables = vec![];
+            for &elem in table.data.iter().rev() {
+                variables.push(cs.alloc(Element::Num(elem as i32), AllocationMode::Constant)?);
+            }
+
+            Ok(Self {
+                variables,
+                cs: cs.clone(),
+            })
+        }
     }
 
     fn new_program_input(_: &ConstraintSystemRef, _: <Self as BVar>::Value) -> Result<Self> {

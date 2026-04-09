@@ -1,8 +1,10 @@
 use super::m31::M31Var;
-use super::table::m31::{M31Limbs, M31LimbsGadget, M31Mult, M31MultGadget};
-use super::table::utils::{
-    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, OP_256MUL,
-};
+#[cfg(not(feature = "free-mul"))]
+use super::table::m31::M31MultGadget;
+use super::table::m31::{M31Limbs, M31LimbsGadget, M31Mult};
+#[cfg(not(feature = "free-mul"))]
+use super::table::utils::{check_limb_format, OP_256MUL};
+use super::table::utils::{convert_m31_from_limbs, convert_m31_to_limbs};
 use super::table::TableVar;
 use crate::treepp::*;
 use anyhow::Result;
@@ -151,32 +153,47 @@ impl Add<&M31LimbsVar> for &M31LimbsVar {
 }
 
 pub fn m31_to_limbs_gadget() -> Script {
-    // input: m31_var, limb1..4
-    script! {
-        check_limb_format
-        OP_256MUL OP_SWAP
-        check_limb_format OP_ADD
+    #[cfg(feature = "free-mul")]
+    {
+        script! {}
+    }
+    #[cfg(not(feature = "free-mul"))]
+    {
+        // input: m31_var, limb1..4
+        script! {
+            check_limb_format
+            OP_256MUL OP_SWAP
+            check_limb_format OP_ADD
 
-        OP_256MUL OP_SWAP
-        check_limb_format OP_ADD
+            OP_256MUL OP_SWAP
+            check_limb_format OP_ADD
 
-        OP_256MUL OP_SWAP
-        check_limb_format OP_ADD
+            OP_256MUL OP_SWAP
+            check_limb_format OP_ADD
 
-        OP_EQUALVERIFY
+            OP_EQUALVERIFY
+        }
     }
 }
 
 fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> {
-    let last_table_elem = options.get_u32("table_ref")?;
-    let k = stack.get_relative_position(last_table_elem as usize)? - 512;
+    #[cfg(feature = "free-mul")]
+    {
+        let _ = (stack, options);
+        Ok(script! {})
+    }
+    #[cfg(not(feature = "free-mul"))]
+    {
+        let last_table_elem = options.get_u32("table_ref")?;
+        let k = stack.get_relative_position(last_table_elem as usize)? - 512;
 
-    Ok(script! {
-        OP_TOALTSTACK
-        { M31MultGadget::compute_c_limbs(k) }
-        OP_FROMALTSTACK
-        { M31MultGadget::reduce() }
-    })
+        Ok(script! {
+            OP_TOALTSTACK
+            { M31MultGadget::compute_c_limbs(k) }
+            OP_FROMALTSTACK
+            { M31MultGadget::reduce() }
+        })
+    }
 }
 
 #[cfg(test)]

@@ -45,3 +45,4 @@ lto = true
 [features]
 profiler = ["bitcoin-scriptexec/profiler"]
 assume-op-cat = []
+free-mul = []
