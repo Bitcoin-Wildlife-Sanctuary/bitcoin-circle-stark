@@ -61,6 +61,28 @@ impl AllocVar for M31LimbsVar {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl From<&M31Var> for M31LimbsVar {
+    fn from(v: &M31Var) -> Self {
+        // Simulate "native 64-bit mul" by reusing the single M31 stack slot
+        // rather than allocating four fresh limb hints. This gives a tighter
+        // upper bound on the script size achievable with real bigint opcodes.
+        let num = v.value().unwrap().0;
+        let limbs = [
+            num & 0xff,
+            (num >> 8) & 0xff,
+            (num >> 16) & 0xff,
+            (num >> 24) & 0xff,
+        ];
+        Self {
+            variables: [v.variable; 4],
+            value: limbs,
+            cs: v.cs(),
+        }
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl From<&M31Var> for M31LimbsVar {
     fn from(v: &M31Var) -> Self {
         let cs = v.cs();

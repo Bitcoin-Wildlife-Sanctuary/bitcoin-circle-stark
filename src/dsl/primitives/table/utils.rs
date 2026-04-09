@@ -80,3 +80,9 @@ pub fn OP_HINT() -> Script {
         OP_DEPTH OP_1SUB OP_ROLL
     }
 }
+
+/// Empty script, used by the `free-mul` feature to emit "native multiplication"
+/// gadgets that consume operand stack slots without any actual opcodes.
+pub fn empty_gadget() -> Script {
+    script! {}
+}

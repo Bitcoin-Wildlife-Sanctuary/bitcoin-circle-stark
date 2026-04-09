@@ -1,5 +1,7 @@
+#[cfg(not(feature = "free-mul"))]
 use super::cm31_limbs::CM31LimbsVar;
 use super::m31::M31Var;
+#[cfg(not(feature = "free-mul"))]
 use super::m31_limbs::M31LimbsVar;
 use super::table::TableVar;
 use anyhow::Result;
@@ -112,6 +114,32 @@ impl Mul for &CM31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
+    type Output = CM31Var;
+
+    fn mul(self, rhs: (&TableVar, &CM31Var)) -> Self::Output {
+        // Simulate a native CM31 mul opcode: 4 operand slots in, 2 result
+        // slots out, no actual script bytes.
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs().and(&rhs.cs());
+        let res = self.value().unwrap() * rhs.value().unwrap();
+        cs.insert_script(
+            crate::dsl::primitives::table::utils::empty_gadget,
+            [
+                self.imag.variable,
+                self.real.variable,
+                rhs.imag.variable,
+                rhs.real.variable,
+            ],
+        )
+        .unwrap();
+        CM31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
     type Output = CM31Var;
 
@@ -125,6 +153,25 @@ impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &M31Var)> for &CM31Var {
+    type Output = CM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs().and(&rhs.cs());
+        let res = self.value().unwrap() * CM31::from(rhs.value);
+        cs.insert_script(
+            crate::dsl::primitives::table::utils::empty_gadget,
+            [self.imag.variable, self.real.variable, rhs.variable],
+        )
+        .unwrap();
+        CM31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &M31Var)> for &CM31Var {
     type Output = CM31Var;
 

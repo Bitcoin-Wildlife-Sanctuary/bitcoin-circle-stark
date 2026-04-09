@@ -96,6 +96,27 @@ impl Mul for &M31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &M31Var)> for &M31Var {
+    type Output = M31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        // Simulate a native M31 mul opcode: consume the 2 operand slots
+        // and produce 1 result slot with no actual script bytes.
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs.and(&rhs.cs);
+        let res = self.value * rhs.value;
+        cs.insert_script(
+            crate::dsl::primitives::table::utils::empty_gadget,
+            [self.variable, rhs.variable],
+        )
+        .unwrap();
+        M31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &M31Var)> for &M31Var {
     type Output = M31Var;
 

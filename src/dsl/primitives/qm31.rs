@@ -1,7 +1,10 @@
 use crate::dsl::primitives::cm31::CM31Var;
+#[cfg(not(feature = "free-mul"))]
 use crate::dsl::primitives::cm31_limbs::CM31LimbsVar;
 use crate::dsl::primitives::m31::M31Var;
+#[cfg(not(feature = "free-mul"))]
 use crate::dsl::primitives::m31_limbs::M31LimbsVar;
+#[cfg(not(feature = "free-mul"))]
 use crate::dsl::primitives::qm31_limbs::QM31LimbsVar;
 use crate::dsl::primitives::table::TableVar;
 use crate::treepp::*;
@@ -135,6 +138,26 @@ impl Sub<&M31Var> for QM31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &QM31Var)) -> Self::Output {
+        // Simulate a native QM31 mul opcode: 8 operand slots in, 4 result
+        // slots out, no actual script bytes.
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs().and(&rhs.cs());
+        let res = self.value().unwrap() * rhs.value().unwrap();
+        let mut inputs = self.variables();
+        inputs.extend(rhs.variables());
+        cs.insert_script(crate::dsl::primitives::table::utils::empty_gadget, inputs)
+            .unwrap();
+        QM31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
     type Output = QM31Var;
 
@@ -148,6 +171,24 @@ impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &M31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs().and(&rhs.cs());
+        let res = self.value().unwrap() * QM31::from(rhs.value);
+        let mut inputs = self.variables();
+        inputs.push(rhs.variable);
+        cs.insert_script(crate::dsl::primitives::table::utils::empty_gadget, inputs)
+            .unwrap();
+        QM31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &M31Var)> for &QM31Var {
     type Output = QM31Var;
 
@@ -176,6 +217,24 @@ impl Mul<(&TableVar, &M31Var)> for &QM31Var {
     }
 }
 
+#[cfg(feature = "free-mul")]
+impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &CM31Var)) -> Self::Output {
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs().and(&rhs.cs());
+        let res = self.value().unwrap() * QM31::from(rhs.value().unwrap());
+        let mut inputs = self.variables();
+        inputs.extend(rhs.variables());
+        cs.insert_script(crate::dsl::primitives::table::utils::empty_gadget, inputs)
+            .unwrap();
+        QM31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(not(feature = "free-mul"))]
 impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
     type Output = QM31Var;
 
