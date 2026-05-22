@@ -87,17 +87,18 @@ impl AllocVar for TableVar {
     }
 
     fn new_constant(cs: &ConstraintSystemRef, _: <Self as BVar>::Value) -> Result<Self> {
-        #[cfg(feature = "free-mul")]
+        #[cfg(any(feature = "free-mul", feature = "op-mulmod"))]
         {
-            // under `free-mul` the mul gadgets are empty and never actually read
-            // from the lookup table, so we skip the 513-element push entirely.
+            // under `free-mul` / `op-mulmod` no gadget reads the 8-bit lookup
+            // table (muls are either empty or use OP_MUL/OP_MOD), so we skip the
+            // 513-element push entirely.
             let placeholder = cs.alloc(Element::Num(0), AllocationMode::Constant)?;
             Ok(Self {
                 variables: vec![placeholder; 513],
                 cs: cs.clone(),
             })
         }
-        #[cfg(not(feature = "free-mul"))]
+        #[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
         {
             let table = get_table();
 

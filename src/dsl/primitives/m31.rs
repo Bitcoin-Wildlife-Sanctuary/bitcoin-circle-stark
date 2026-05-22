@@ -1,3 +1,4 @@
+#[cfg(any(feature = "free-mul", not(feature = "op-mulmod")))]
 use super::m31_limbs::{m31_to_limbs_gadget, M31LimbsVar};
 use super::table::TableVar;
 use crate::treepp::*;
@@ -116,7 +117,35 @@ impl Mul<(&TableVar, &M31Var)> for &M31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &M31Var)> for &M31Var {
+    type Output = M31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        // Native 64-bit mul: `a b OP_MUL <p> OP_MOD`. Both operands are in
+        // [0, p), so the product is in [0, (p-1)^2] ⊂ [0, 2^62) (fits signed
+        // 64-bit) and is non-negative, so `% p` lands in [0, p) regardless of
+        // the OP_MOD sign convention.
+        let _ = rhs.0;
+        let rhs = rhs.1;
+        let cs = self.cs.and(&rhs.cs);
+        let res = self.value * rhs.value;
+        cs.insert_script(m31_mulmod_gadget, [self.variable, rhs.variable])
+            .unwrap();
+        M31Var::new_function_output(&cs, res).unwrap()
+    }
+}
+
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+fn m31_mulmod_gadget() -> Script {
+    script! {
+        OP_MUL
+        { (1i64 << 31) - 1 }
+        OP_MOD
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &M31Var)> for &M31Var {
     type Output = M31Var;
 
@@ -160,6 +189,17 @@ impl M31Var {
             .unwrap();
     }
 
+    #[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+    pub fn inverse(&self, table: &TableVar) -> Self {
+        // With OP_MUL/OP_MOD a hinted inverse is verified by a single mul:
+        // inv * self == 1. No limb decomposition / lookup table needed.
+        let inv = M31Var::new_hint(&self.cs, self.value.inverse()).unwrap();
+        let check = self * (table, &inv);
+        check.is_one();
+        inv
+    }
+
+    #[cfg(any(feature = "free-mul", not(feature = "op-mulmod")))]
     pub fn inverse(&self, table: &TableVar) -> Self {
         let self_limbs = M31LimbsVar::from(self);
         let inv_limbs = self_limbs.inverse(table);

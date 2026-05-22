@@ -1,7 +1,7 @@
-#[cfg(not(feature = "free-mul"))]
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 use super::cm31_limbs::CM31LimbsVar;
 use super::m31::M31Var;
-#[cfg(not(feature = "free-mul"))]
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 use super::m31_limbs::M31LimbsVar;
 use super::table::TableVar;
 use anyhow::Result;
@@ -139,7 +139,33 @@ impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
+    type Output = CM31Var;
+
+    fn mul(self, rhs: (&TableVar, &CM31Var)) -> Self::Output {
+        // Karatsuba over M31: 3 OP_MUL/OP_MOD muls + add/sub combination.
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_sum = &self.real + &self.imag;
+        let rhs_sum = &rhs.real + &rhs.imag;
+
+        let sum_product = &self_sum * (table, &rhs_sum);
+        let real_product = &self.real * (table, &rhs.real);
+        let imag_product = &self.imag * (table, &rhs.imag);
+
+        let new_real = &real_product - &imag_product;
+        let new_imag = &(&sum_product - &real_product) - &imag_product;
+
+        CM31Var {
+            real: new_real,
+            imag: new_imag,
+        }
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
     type Output = CM31Var;
 
@@ -171,7 +197,22 @@ impl Mul<(&TableVar, &M31Var)> for &CM31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &M31Var)> for &CM31Var {
+    type Output = CM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let real = &self.real * (table, rhs);
+        let imag = &self.imag * (table, rhs);
+
+        CM31Var { real, imag }
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &M31Var)> for &CM31Var {
     type Output = CM31Var;
 

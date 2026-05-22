@@ -1,10 +1,10 @@
 use crate::dsl::primitives::cm31::CM31Var;
-#[cfg(not(feature = "free-mul"))]
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 use crate::dsl::primitives::cm31_limbs::CM31LimbsVar;
 use crate::dsl::primitives::m31::M31Var;
-#[cfg(not(feature = "free-mul"))]
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 use crate::dsl::primitives::m31_limbs::M31LimbsVar;
-#[cfg(not(feature = "free-mul"))]
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 use crate::dsl::primitives::qm31_limbs::QM31LimbsVar;
 use crate::dsl::primitives::table::TableVar;
 use crate::treepp::*;
@@ -157,7 +157,36 @@ impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &QM31Var)) -> Self::Output {
+        // Karatsuba over CM31: 3 CM31 muls (= 9 M31 OP_MUL/OP_MOD muls) plus
+        // the degree-2 extension combination (mul-by-(2+i) done as adds).
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_sum = &self.first + &self.second;
+        let rhs_sum = &rhs.first + &rhs.second;
+
+        let sum_product = &self_sum * (table, &rhs_sum);
+        let first_product = &self.first * (table, &rhs.first);
+        let second_product = &self.second * (table, &rhs.second);
+
+        let mut first = &first_product + &second_product;
+        first = &first + &second_product;
+        let second_product_shifted_by_i = second_product.shift_by_i();
+        first = &first + &second_product_shifted_by_i;
+
+        let mut second = &sum_product - &first_product;
+        second = &second - &second_product;
+
+        QM31Var { first, second }
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
     type Output = QM31Var;
 
@@ -188,7 +217,33 @@ impl Mul<(&TableVar, &M31Var)> for &QM31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &M31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let res_first_real = &self.first.real * (table, rhs);
+        let res_first_imag = &self.first.imag * (table, rhs);
+        let res_second_real = &self.second.real * (table, rhs);
+        let res_second_imag = &self.second.imag * (table, rhs);
+
+        QM31Var {
+            first: CM31Var {
+                imag: res_first_imag,
+                real: res_first_real,
+            },
+            second: CM31Var {
+                imag: res_second_imag,
+                real: res_second_real,
+            },
+        }
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &M31Var)> for &QM31Var {
     type Output = QM31Var;
 
@@ -234,7 +289,25 @@ impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
     }
 }
 
-#[cfg(not(feature = "free-mul"))]
+#[cfg(all(feature = "op-mulmod", not(feature = "free-mul")))]
+impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &CM31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let res_first = &self.first * (table, rhs);
+        let res_second = &self.second * (table, rhs);
+
+        QM31Var {
+            first: res_first,
+            second: res_second,
+        }
+    }
+}
+
+#[cfg(not(any(feature = "free-mul", feature = "op-mulmod")))]
 impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
     type Output = QM31Var;
 

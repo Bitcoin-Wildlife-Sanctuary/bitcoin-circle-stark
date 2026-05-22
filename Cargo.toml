@@ -46,3 +46,7 @@ lto = true
 profiler = ["bitcoin-scriptexec/profiler"]
 assume-op-cat = []
 free-mul = []
+# Models two hypothetical 64-bit Bitcoin opcodes: `A B OP_MUL` (A*B) and
+# `A B OP_MOD` (A%B). M31 mul becomes `OP_MUL <p> OP_MOD`; CM31/QM31 muls are
+# emulated as Karatsuba over M31. Mutually exclusive with `free-mul`.
+op-mulmod = []

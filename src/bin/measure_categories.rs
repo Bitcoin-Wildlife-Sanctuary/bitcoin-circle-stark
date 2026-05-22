@@ -54,6 +54,8 @@ struct Buckets {
     op_fromaltstack: usize,
     op_add: usize,
     op_sub: usize,
+    op_mul: usize,
+    op_mod: usize,
 }
 
 impl Buckets {
@@ -75,6 +77,8 @@ impl Buckets {
         self.op_fromaltstack += o.op_fromaltstack;
         self.op_add += o.op_add;
         self.op_sub += o.op_sub;
+        self.op_mul += o.op_mul;
+        self.op_mod += o.op_mod;
     }
 }
 
@@ -143,11 +147,14 @@ fn classify(script: &[u8]) -> Buckets {
             | 0x8f /* OP_NEGATE */ | 0x90 /* OP_ABS */
             | 0x91 /* OP_NOT */ | 0x92 /* OP_0NOTEQUAL */
             | 0x93 /* OP_ADD */ | 0x94 /* OP_SUB */ | 0x95 /* OP_MUL */
+            | 0x96 /* OP_DIV */ | 0x97 /* OP_MOD */
             | 0xa1 /* OP_BOOLAND */ | 0xa2 /* OP_BOOLOR */ => {
                 b.arith += 1;
                 match op {
                     0x93 => b.op_add += 1,
                     0x94 => b.op_sub += 1,
+                    0x95 => b.op_mul += 1,
+                    0x97 => b.op_mod += 1,
                     _ => {}
                 }
             }
@@ -341,4 +348,12 @@ fn main() {
     println!("  OP_EQUALVERIFY   : {:>8}", total.op_equalverify);
     println!("  OP_ADD           : {:>8}", total.op_add);
     println!("  OP_SUB           : {:>8}", total.op_sub);
+    println!(
+        "  OP_MUL           : {:>8}    (op-mulmod only)",
+        total.op_mul
+    );
+    println!(
+        "  OP_MOD           : {:>8}    (op-mulmod only)",
+        total.op_mod
+    );
 }
