@@ -24,6 +24,24 @@ components.
 - **FRI**: implementation of the FRI quotient polynomial and the protocol for FRI low-degree testing.
 - **Merkle Tree**: implementation of Merkle path verification using hints and `OP_CAT + OP_SHA256`.
 
+### Research: cost under native 64-bit `OP_MUL` / `OP_MOD`
+
+This branch (`research/op-mulmod`) models two hypothetical 64-bit Bitcoin opcodes
+— `A B OP_MUL` and `A B OP_MOD` — to estimate how much the verifier script would
+shrink with native big-integer arithmetic. Measured across all 72 Plonk verifier
+parts:
+
+| Model | Bytes | % of baseline |
+|---|---|---|
+| Baseline (8-bit table mul) | 3,310,793 | 100.0% |
+| `op-mulmod` (native 64-bit `OP_MUL` / `OP_MOD`) | 413,766 | 12.5% |
+| `free-mul` v2 (idealized floor, entire field-mul free) | 229,316 | 6.9% |
+
+Native mulmod cuts the verifier to ~12.5% of baseline (an ~8× shrink), reaching
+~80% of the way to the "free multiplication" floor. See
+[docs/op-mulmod-cost.md](docs/op-mulmod-cost.md) for the model, gap analysis, and
+how to reproduce.
+
 ---
 
 ### License and contributors
