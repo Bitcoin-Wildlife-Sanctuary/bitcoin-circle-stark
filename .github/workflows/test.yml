@@ -34,7 +34,10 @@ jobs:
           name: bitcoin-scripts-performance-report
           path: target/bitcoin_scripts_performance_report.csv
       - name: Generate coverage report
-        run: cargo install cargo-tarpaulin --version 0.31.2 && cargo tarpaulin --engine llvm --out Xml
+        # --locked keeps transitive deps (e.g. hashbrown) on the versions
+        # published with 0.31.2; unlocked installs now pull crates that
+        # require edition2024 / newer cargo than nightly-2024-11-06.
+        run: cargo install cargo-tarpaulin --version 0.31.2 --locked && cargo tarpaulin --engine llvm --out Xml
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e # v5.1.1
         with:
