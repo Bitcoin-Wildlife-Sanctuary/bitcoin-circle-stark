@@ -5,11 +5,43 @@ use bitcoin::{Address, Network, OutPoint, ScriptBuf, Txid, WScriptHash};
 use bitcoin_circle_stark::dsl::plonk::covenant::{
     compute_all_information, PlonkVerifierProgram, PlonkVerifierState, PLONK_ALL_INFORMATION,
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use colored::Colorize;
 use covenants_gadgets::test::SimulationInstruction;
 use covenants_gadgets::{get_script_pub_key, get_tx, CovenantInput, CovenantProgram, DUST_AMOUNT};
 use std::io::Write;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum NetworkArg {
+    Regtest,
+    Signet,
+    Bitcoin,
+}
+
+impl NetworkArg {
+    fn to_bitcoin_network(self) -> Network {
+        match self {
+            NetworkArg::Regtest => Network::Regtest,
+            NetworkArg::Signet => Network::Signet,
+            NetworkArg::Bitcoin => Network::Bitcoin,
+        }
+    }
+
+    fn fee_rate(self) -> u64 {
+        match self {
+            NetworkArg::Regtest | NetworkArg::Signet => 1,
+            NetworkArg::Bitcoin => 1500, // ~1500 for mainnet/fractal
+        }
+    }
+
+    fn cli_flag(self) -> &'static str {
+        match self {
+            NetworkArg::Regtest => "-regtest",
+            NetworkArg::Signet => "-signet",
+            NetworkArg::Bitcoin => "",
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -26,11 +58,12 @@ struct Args {
     randomizer: u32,
     #[arg(long, default_value = "0")]
     funding_tx_vout: u32,
+
+    #[arg(short, long, value_enum, default_value = "signet")]
+    network: NetworkArg,
 }
 
 const OUTPUT_DIR: &str = "./demo";
-const FEE_RATE: u64 = 1500; // 1 for signet, ~1500 for fractal
-const NETWORK: Network = Network::Bitcoin;
 
 fn print_state_info(state: &PlonkVerifierState, step: usize) {
     println!("\n{}", "=".repeat(50));
@@ -74,6 +107,10 @@ fn print_transaction_info(tx: &bitcoin::Transaction, _step: usize) {
 fn main() {
     let args = Args::parse();
 
+    let network = args.network.to_bitcoin_network();
+    let fee_rate = args.network.fee_rate();
+    let cli_flag = args.network.cli_flag();
+
     let mut fees = vec![114555, 210434, 103439, 101759, 93233, 81704, 92834];
 
     for _ in 0..8 {
@@ -83,15 +120,15 @@ fn main() {
     fees.push(49777);
 
     let amount =
-        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * FEE_RATE + 330 * 74 + 400 * FEE_RATE;
+        (fees.iter().sum::<usize>() as u64 + 10000) / 7 * fee_rate + 330 * 74 + 400 * fee_rate;
     let amount_display = (((amount as f64) / 1000.0 / 1000.0 / 100.0) * 10000.0).ceil() / 10000.0;
     let actual_amount = (amount_display * 100.0 * 1000.0 * 1000.0) as u64;
-    let rest = actual_amount - 330 - 400 * FEE_RATE;
+    let rest = actual_amount - 330 - 400 * fee_rate;
 
     if args.funding_txid.is_none() || args.initial_program_txid.is_none() {
         let script_pub_key = get_script_pub_key::<PlonkVerifierProgram>();
 
-        let program_address = Address::from_script(script_pub_key.as_script(), NETWORK).unwrap();
+        let program_address = Address::from_script(script_pub_key.as_script(), network).unwrap();
 
         let init_state = PlonkVerifierProgram::new();
         let hash = PlonkVerifierProgram::get_hash(&init_state);
@@ -102,7 +139,7 @@ fn main() {
 
         let caboose_address = Address::from_script(
             ScriptBuf::new_p2wsh(&WScriptHash::hash(&bytes)).as_script(),
-            NETWORK,
+            network,
         )
         .unwrap();
 
@@ -113,7 +150,8 @@ fn main() {
                  amount_display
         );
         println!(
-            "> ./bitcoin-cli --datadir=signet sendtoaddress {} {}",
+            "> bitcoin-cli {} sendtoaddress {} {}",
+            cli_flag,
             "\"[an address in the local wallet]\""
                 .on_bright_green()
                 .black(),
@@ -121,7 +159,8 @@ fn main() {
         );
         println!();
         println!("According to that transaction, send BTC from that UTXO to the program and the state caboose with the initial state");
-        println!("> ./bitcoin-cli --datadir=signet createrawtransaction \"[{{\\\"txid\\\":\\\"{}\\\", \\\"vout\\\": {}}}]\" \"[{{\\\"{}\\\":{:.8}}}, {{\\\"{}\\\":0.0000033}}]\"",
+        println!("> bitcoin-cli {} createrawtransaction \"[{{\\\"txid\\\":\\\"{}\\\", \\\"vout\\\": {}}}]\" \"[{{\\\"{}\\\":{:.8}}}, {{\\\"{}\\\":0.0000033}}]\"",
+                 cli_flag,
                  "[txid]".on_bright_green().black(),
                  "[vout]".on_bright_green().black(), program_address, rest_display,
                  caboose_address
@@ -129,19 +168,22 @@ fn main() {
         println!();
         println!("Then, sign the transaction");
         println!(
-            "> ./bitcoin-cli --datadir=signet signrawtransactionwithwallet {}",
+            "> bitcoin-cli {} signrawtransactionwithwallet {}",
+            cli_flag,
             "[tx hex]".on_bright_green().black()
         );
         println!();
         println!("Send the signed transaction");
         println!(
-            "> ./bitcoin-cli --datadir=signet sendrawtransaction {}",
+            "> bitcoin-cli {} sendrawtransaction {}",
+            cli_flag,
             "[signed tx hex]".on_bright_green().black()
         );
         println!();
         println!("Call this tool again with the funding txid and initial program id");
         println!(
-            "> cargo run -- -f {} -i {}",
+            "> cargo run -- -n {} -f {} -i {}",
+            args.network.to_possible_value().unwrap().get_name(),
             "[funding txid]".on_bright_green().black(),
             "[initial program txid]".on_bright_green().black()
         );
@@ -175,7 +217,7 @@ fn main() {
             if old_state.pc < fees.len() {
                 Some(SimulationInstruction::<PlonkVerifierProgram> {
                     program_index: old_state.pc,
-                    fee: (fees[old_state.pc] as f64 / 7.0 * (FEE_RATE as f64)).ceil() as usize,
+                    fee: (fees[old_state.pc] as f64 / 7.0 * (fee_rate as f64)).ceil() as usize,
                     program_input: all_information.get_input(old_state.pc),
                 })
             } else {
